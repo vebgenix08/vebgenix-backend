@@ -1,0 +1,46 @@
+{
+  "name": "vagentix-backend",
+  "version": "1.0.0",
+  "description": "Backend for Educational Management System",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "node dist/main.js",
+    "dev": "nodemon src/main.ts",
+    "build": "tsc",
+    "clean-slate": "ts-node src/infrastructure/scripts/clean-slate.ts",
+    "seed": "ts-node src/infrastructure/scripts/seed.ts",
+    "reset-and-seed": "npm run clean-slate && npm run seed",
+    "seed:permissions": "ts-node --project tsconfig.json scripts/seed-permissions.ts",
+    "backfill:persona": "ts-node --project tsconfig.json scripts/backfill-personaRole.ts",
+    "grant:admin-dashboard-perms": "ts-node --project tsconfig.json scripts/grant-admin-dashboard-perms.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.93.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.3",
+    "serverless-http": "^4.0.0",
+    "uuidv7": "^1.1.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@prisma/client": "^5.22.0",
+    "@types/bcryptjs": "^2.4.5",
+    "@types/cors": "^2.8.15",
+    "@types/express": "^4.17.20",
+    "@types/jsonwebtoken": "^9.0.4",
+    "@types/morgan": "^1.9.10",
+    "@types/multer": "^1.4.9",
+    "@types/node": "^20.8.7",
+    "@types/nodemailer": "^6.4.14",
+    "nodemon": "^3.0.1",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}

@@ -1,0 +1,195 @@
+"""
+GraphQL Schema for Vebgenix ERP — Primary Types
+Phases: Users, Tenants, Admissions, Storage, Admin
+"""
+
+# ─── Common scalars ───────────────────────────────────────────────────────────
+scalar AWSDateTime
+scalar AWSJSON
+scalar AWSEmail
+
+# ─── Enums ────────────────────────────────────────────────────────────────────
+enum UserRole {
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+  TEACHER
+  STAFF
+}
+
+enum AdmissionStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum DocumentModule {
+  ADMISSIONS
+  USERS
+  FEES
+}
+
+# ─── Tenants ──────────────────────────────────────────────────────────────────
+type Tenant {
+  id: ID!
+  name: String!
+  slug: String!
+  plan: String!
+  active: Boolean!
+  createdAt: AWSDateTime!
+}
+
+input CreateTenantInput {
+  name: String!
+  slug: String!
+  plan: String!
+}
+
+# ─── Users ────────────────────────────────────────────────────────────────────
+type User {
+  id: ID!
+  email: AWSEmail!
+  fullName: String!
+  role: UserRole!
+  tenantId: ID!
+  active: Boolean!
+  createdAt: AWSDateTime!
+}
+
+type UserConnection {
+  items: [User!]!
+  nextToken: String
+}
+
+input CreateUserInput {
+  email: AWSEmail!
+  fullName: String!
+  role: UserRole!
+  temporaryPassword: String!
+}
+
+input UpdateUserInput {
+  fullName: String
+  role: UserRole
+  active: Boolean
+}
+
+# ─── Admissions ───────────────────────────────────────────────────────────────
+type Admission {
+  id: ID!
+  tenantId: ID!
+  studentName: String!
+  studentEmail: AWSEmail
+  dateOfBirth: String
+  grade: String
+  status: AdmissionStatus!
+  submittedAt: AWSDateTime
+  reviewedAt: AWSDateTime
+  reviewedByUserId: ID
+  notes: String
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type AdmissionConnection {
+  items: [Admission!]!
+  nextToken: String
+}
+
+input CreateAdmissionInput {
+  studentName: String!
+  studentEmail: AWSEmail
+  dateOfBirth: String
+  grade: String!
+}
+
+input UpdateAdmissionInput {
+  studentName: String
+  grade: String
+  notes: String
+}
+
+input ReviewAdmissionInput {
+  admissionId: ID!
+  decision: AdmissionStatus!  # APPROVED or REJECTED
+  notes: String
+}
+
+# ─── Storage ──────────────────────────────────────────────────────────────────
+type PresignedUploadUrl {
+  url: String!
+  fields: AWSJSON!   # S3 form fields for multipart POST
+  key: String!
+  expiresIn: Int!
+}
+
+type Document {
+  id: ID!
+  tenantId: ID!
+  entityType: String!
+  entityId: ID!
+  s3Key: String!
+  mimeType: String!
+  sizeBytes: Int!
+  createdAt: AWSDateTime!
+}
+
+input GenerateUploadUrlInput {
+  entityType: String!   # e.g. "admission", "user"
+  entityId: ID!
+  fileName: String!
+  contentType: String!
+  module: DocumentModule!
+}
+
+# ─── Admin (SUPER_ADMIN only) ─────────────────────────────────────────────────
+type PlatformStats {
+  totalTenants: Int!
+  totalUsers: Int!
+  totalAdmissions: Int!
+  activeTenantsLast30Days: Int!
+}
+
+# ─── Queries ──────────────────────────────────────────────────────────────────
+type Query {
+  # Users
+  me: User
+  listUsers(limit: Int, nextToken: String): UserConnection!
+  getUser(id: ID!): User
+
+  # Admissions
+  listAdmissions(status: AdmissionStatus, limit: Int, nextToken: String): AdmissionConnection!
+  getAdmission(id: ID!): Admission
+
+  # Tenants (SUPER_ADMIN only)
+  listTenants(limit: Int, nextToken: String): [Tenant!]!
+  getTenant(id: ID!): Tenant
+
+  # Admin
+  platformStats: PlatformStats
+}
+
+# ─── Mutations ────────────────────────────────────────────────────────────────
+type Mutation {
+  # Users
+  createUser(input: CreateUserInput!): User!
+  updateUser(id: ID!, input: UpdateUserInput!): User!
+  deactivateUser(id: ID!): User!
+
+  # Admissions
+  createAdmission(input: CreateAdmissionInput!): Admission!
+  updateAdmission(id: ID!, input: UpdateAdmissionInput!): Admission!
+  submitAdmission(id: ID!): Admission!
+  reviewAdmission(input: ReviewAdmissionInput!): Admission!
+  withdrawAdmission(id: ID!): Admission!
+
+  # Storage
+  generateUploadUrl(input: GenerateUploadUrlInput!): PresignedUploadUrl!
+
+  # Tenants (SUPER_ADMIN only)
+  createTenant(input: CreateTenantInput!): Tenant!
+  updateTenant(id: ID!, name: String): Tenant!
+  deactivateTenant(id: ID!): Tenant!
+}
