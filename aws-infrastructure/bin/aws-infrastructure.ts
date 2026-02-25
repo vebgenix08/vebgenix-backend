@@ -10,6 +10,8 @@ import { StorageStack } from '../lib/stacks/storage-stack';
 import { AsyncStack } from '../lib/stacks/async-stack';
 import { MonitoringStack } from '../lib/stacks/monitoring-stack';
 import { AppSyncStack } from '../lib/stacks/appsync-stack';
+import { FrontendStack } from '../lib/stacks/frontend-stack';
+import { GithubOidcStack } from '../lib/stacks/github-oidc-stack';
 
 const app = new cdk.App();
 
@@ -62,6 +64,21 @@ const appSyncStack = new AppSyncStack(app, `VebgenixAppSync-${config.stage}`, {
 appSyncStack.addDependency(authStack);
 appSyncStack.addDependency(networkStack);
 appSyncStack.addDependency(asyncStack);
+
+// 7. Frontend: S3 Bucket + CloudFront Distribution (connected via SSM)
+const frontendStack = new FrontendStack(app, `VebgenixFrontend-${config.stage}`, {
+  env, config,
+  appSyncApiUrl: appSyncStack.apiUrl,
+  userPoolId: authStack.userPool.userPoolId,
+  userPoolClientId: authStack.userPoolClientId,
+});
+frontendStack.addDependency(appSyncStack);
+frontendStack.addDependency(authStack);
+
+// 8. CI/CD OIDC: Passwordless GitHub Actions integration
+new GithubOidcStack(app, `VebgenixOidc-${config.stage}`, {
+  env, config,
+});
 
 // NOTE: DatabaseStack (VebgenixDatabase) omitted until AWS account plan allows RDS.
 // Deploy separately once account upgraded:

@@ -1,0 +1,1 @@
+bin/aws-infrastructure.ts(72,31): error TS2339: Property 'appClient' does not exist on type 'AuthStack'.

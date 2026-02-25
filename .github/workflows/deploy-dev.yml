@@ -1,0 +1,45 @@
+name: Deploy Backend to dev
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write # Required for AWS OIDC login
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: aws-infrastructure/package-lock.json
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Assumes the GithubDeployRole-vebgenix-backend role from the OIDC stack
+          role-to-assume: arn:aws:iam::998105438053:role/GitHubDeployRole-vebgenix-backend-dev
+          aws-region: ap-south-1
+
+      - name: Install dependencies
+        working-directory: aws-infrastructure
+        run: npm ci
+
+      - name: CDK Synth
+        working-directory: aws-infrastructure
+        run: npx cdk synth -c env=dev
+
+      - name: Deploy All Stacks
+        working-directory: aws-infrastructure
+        run: npx cdk deploy --all -c env=dev --require-approval never
