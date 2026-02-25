@@ -78,7 +78,7 @@ class EmailService {
     try {
       const subject = tenantName 
         ? `You've been invited to ${tenantName}` 
-        : `You've been invited to EduManage`;
+        : `You've been invited to Vebgenix`;
 
       const loginLinkHtml = tenantLoginUrl 
         ? `<p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
@@ -89,7 +89,7 @@ class EmailService {
 
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Welcome to EduManage!</h2>
+          <h2>Welcome to Vebgenix!</h2>
           <p>You've been invited to join ${tenantName || 'an organization'} as an administrator.</p>
           <p>Click the button below to set up your password and get started:</p>
           <div style="margin: 30px 0;">

@@ -17,7 +17,7 @@ import { User } from "./src/models/UserV2";
 import { EmailRoleMapping } from "./src/models/EmailRoleMapping";
 
 const MONGODB_URI =
-  process.env.MONGODB_URI || "mongodb://localhost:27017/edumanager";
+  process.env.MONGODB_URI || "mongodb://localhost:27017/vebgenix";
 console.log("MONGODB_URI configured:", MONGODB_URI.substring(0, 50) + "...");
 
 export async function createServer() {
@@ -227,13 +227,13 @@ async function connectToDatabase() {
             priority: 10,
           },
           {
-            email: "teacher@edumanager.com",
+            email: "teacher@vebgenix.com",
             role: "teacher",
             matchType: "exact",
             priority: 10,
           },
           {
-            email: "student@edumanager.com",
+            email: "student@vebgenix.com",
             role: "student",
             matchType: "exact",
             priority: 10,
