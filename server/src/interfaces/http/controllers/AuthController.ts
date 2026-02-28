@@ -3,6 +3,7 @@ import { CognitoJwtVerifier } from "aws-jwt-verify";
 import {
   CognitoIdentityProviderClient,
   ForgotPasswordCommand,
+  ConfirmForgotPasswordCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import prisma from "../../../infrastructure/prisma/client";
 
@@ -230,6 +231,73 @@ export class AuthController {
         `AuthController.forgotPassword error: ${error?.message || error}`,
       );
       return res.status(200).json(genericResponse);
+    }
+  }
+  // POST /api/auth/confirm-forgot-password (Public UI)
+  // Confirms the OTP code and sets the new password
+  static async confirmForgotPassword(req: Request, res: Response) {
+    try {
+      const { email, code, newPassword } = req.body;
+      if (!email || !code || !newPassword) {
+        return res
+          .status(400)
+          .json({ message: "email, code, and newPassword are required." });
+      }
+
+      if (newPassword.length < 8) {
+        return res
+          .status(400)
+          .json({ message: "Password must be at least 8 characters." });
+      }
+
+      const normalizedEmail = String(email).trim().toLowerCase();
+
+      const client = new CognitoIdentityProviderClient({
+        region: process.env.AWS_REGION || "ap-south-1",
+      });
+
+      await client.send(
+        new ConfirmForgotPasswordCommand({
+          ClientId: process.env.COGNITO_CLIENT_ID!,
+          Username: normalizedEmail,
+          ConfirmationCode: String(code).trim(),
+          Password: newPassword,
+        }),
+      );
+
+      return res
+        .status(200)
+        .json({ message: "Password reset successful. You can now log in." });
+    } catch (error: any) {
+      console.error(
+        `AuthController.confirmForgotPassword error: ${error?.message || error}`,
+      );
+      const code = error?.name;
+      if (code === "CodeMismatchException") {
+        return res
+          .status(400)
+          .json({
+            message: "The verification code is incorrect. Please try again.",
+          });
+      }
+      if (code === "ExpiredCodeException") {
+        return res
+          .status(400)
+          .json({
+            message:
+              "The verification code has expired. Please request a new one.",
+          });
+      }
+      if (code === "InvalidPasswordException") {
+        return res
+          .status(400)
+          .json({
+            message: error.message || "Password does not meet requirements.",
+          });
+      }
+      return res
+        .status(400)
+        .json({ message: error.message || "Failed to reset password." });
     }
   }
   /**
