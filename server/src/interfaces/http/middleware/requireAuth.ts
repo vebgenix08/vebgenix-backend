@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { supabase } from "../../../infrastructure/supabase/client";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
 import prisma from "../../../infrastructure/prisma/client";
 import { UserRole, CampusScope } from "../../../domain/User";
 import { resolvePermissions } from "../permissions/resolver";
@@ -12,44 +12,51 @@ export const requireAuth = async (
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
-    res
-      .status(401)
-      .json({
-        error: {
-          code: "UNAUTHORIZED",
-          message: "Missing Authorization header",
-        },
-      });
+    res.status(401).json({
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Missing Authorization header",
+      },
+    });
     return;
   }
 
   const token = authHeader.split(" ")[1];
 
   if (!token) {
-    res
-      .status(401)
-      .json({
-        error: { code: "UNAUTHORIZED", message: "Missing Bearer token" },
-      });
+    res.status(401).json({
+      error: { code: "UNAUTHORIZED", message: "Missing Bearer token" },
+    });
     return;
   }
 
   try {
-    // 1. Verify token with Supabase Auth
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
-      console.error("Auth Error:", error);
-      res
-        .status(401)
-        .json({
-          error: { code: "UNAUTHORIZED", message: "Invalid or expired token" },
-        });
+    // 1. Verify token with Cognito JWT Verifier
+    let payload;
+    try {
+      const verifier = CognitoJwtVerifier.create({
+        userPoolId: process.env.COGNITO_USER_POOL_ID!,
+        tokenUse: "id",
+        clientId: process.env.COGNITO_CLIENT_ID!,
+      });
+      payload = await verifier.verify(token);
+    } catch (error) {
+      console.error("Auth Error (Cognito):", error);
+      res.status(401).json({
+        error: { code: "UNAUTHORIZED", message: "Invalid or expired token" },
+      });
       return;
     }
+
+    const user = {
+      id: payload.sub,
+      email: payload.email?.toString(),
+      user_metadata: {
+        full_name: payload.name?.toString(),
+        role: payload["custom:role"]?.toString(),
+        campus_scope: payload["custom:campus_scope"]?.toString(),
+      },
+    };
 
     // 2. Fetch or Create Profile from Prisma
     // Use raw SQL to fetch profile and bypass Prisma enum validation
@@ -100,17 +107,15 @@ export const requireAuth = async (
       // Auto-create profile on first login if it doesn't exist
       // This handles users who authenticated with Supabase but don't have a profile yet
       if (!user.email) {
-        res
-          .status(401)
-          .json({
-            error: {
-              code: "UNAUTHORIZED",
-              message: "User email not found in auth token",
-            },
-          });
+        res.status(401).json({
+          error: {
+            code: "UNAUTHORIZED",
+            message: "User email not found in auth token",
+          },
+        });
         return;
       }
-      
+
       // Check if user is a PLATFORM user (e.g., super admin).
       // Platform users should NOT have a tenant profile auto-created.
       // If we are here, it means they logged in successfully (auth valid) but have no profile.
@@ -118,21 +123,26 @@ export const requireAuth = async (
       // because they should be using platform routes.
       // Or, if this IS a platform route (handled elsewhere?), requireAuth might be used?
       // Actually, requireAuth is tenant-scoped usually.
-      
+
       // Let's check platform_users table quickly via raw SQL to avoid model dependency issues if any
       try {
         const platformCheck = await prisma.$queryRawUnsafe(
-           `SELECT 1 FROM platform_users WHERE email = '${user.email}'`
+          `SELECT 1 FROM platform_users WHERE email = '${user.email}'`,
         );
         if (Array.isArray(platformCheck) && platformCheck.length > 0) {
-           console.warn(`Blocked auto-profile creation for Platform User: ${user.email}`);
-           res.status(403).json({
-             error: { code: "PLATFORM_USER", message: "Platform users cannot access tenant resources." }
-           });
-           return;
+          console.warn(
+            `Blocked auto-profile creation for Platform User: ${user.email}`,
+          );
+          res.status(403).json({
+            error: {
+              code: "PLATFORM_USER",
+              message: "Platform users cannot access tenant resources.",
+            },
+          });
+          return;
         }
       } catch (err) {
-         // Ignore check failure, proceed to tenant check
+        // Ignore check failure, proceed to tenant check
       }
 
       const fullName = user.user_metadata?.full_name || "";
@@ -164,8 +174,15 @@ export const requireAuth = async (
       try {
         const tenantId = (req as any).tenant?.tenantId;
         if (!tenantId) {
-           res.status(400).json({ error: { code: "TENANT_REQUIRED", message: "Tenant context missing for user initialization" } });
-           return;
+          res
+            .status(400)
+            .json({
+              error: {
+                code: "TENANT_REQUIRED",
+                message: "Tenant context missing for user initialization",
+              },
+            });
+          return;
         }
 
         profile = await prisma.profile.create({
@@ -176,7 +193,7 @@ export const requireAuth = async (
             role: role as any, // Type assertion safe due to validation above
             campusScope: campusScope as any,
             isActive: true,
-            tenant: { connect: { id: tenantId } }
+            tenant: { connect: { id: tenantId } },
           },
         });
 
@@ -189,25 +206,21 @@ export const requireAuth = async (
           createErr?.message || createErr,
         );
         // If profile creation fails (e.g., duplicate email), treat as unauthorized
-        res
-          .status(401)
-          .json({
-            error: {
-              code: "UNAUTHORIZED",
-              message: "Failed to initialize user profile",
-            },
-          });
+        res.status(401).json({
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Failed to initialize user profile",
+          },
+        });
         return;
       }
     }
 
     if (!profile.isActive) {
       console.warn(`Inactive user attempt: ${user.email}`);
-      res
-        .status(403)
-        .json({
-          error: { code: "FORBIDDEN", message: "Account is deactivated." },
-        });
+      res.status(403).json({
+        error: { code: "FORBIDDEN", message: "Account is deactivated." },
+      });
       return;
     }
 
@@ -215,14 +228,12 @@ export const requireAuth = async (
     const tenantId = (req as any).tenant?.tenantId;
     if (tenantId) {
       if (!profile.tenantId) {
-        res
-          .status(403)
-          .json({
-            error: {
-              code: "TENANT_MISMATCH",
-              message: "User profile is not associated with any tenant",
-            },
-          });
+        res.status(403).json({
+          error: {
+            code: "TENANT_MISMATCH",
+            message: "User profile is not associated with any tenant",
+          },
+        });
         return;
       }
 
@@ -230,14 +241,12 @@ export const requireAuth = async (
         console.warn(
           `Tenant isolation violation: User ${user.id} (profile tenant: ${profile.tenantId}) attempted to access resolved tenant: ${tenantId}`,
         );
-        res
-          .status(403)
-          .json({
-            error: {
-              code: "TENANT_MISMATCH",
-              message: `You do not have access to this tenant. Profile: ${profile.tenantId}, Request: ${tenantId}`,
-            },
-          });
+        res.status(403).json({
+          error: {
+            code: "TENANT_MISMATCH",
+            message: `You do not have access to this tenant. Profile: ${profile.tenantId}, Request: ${tenantId}`,
+          },
+        });
         return;
       }
     }
@@ -260,13 +269,29 @@ export const requireAuth = async (
 
     // 4. Resolve and attach permissions context (Phase 3+)
     // resolvePermissions is always scoped by tenantId+profileId
-    const resolvedTenantId = profile.tenantId || (req as any).tenant?.tenantId || "";
-    const resolved = resolvedTenantId && profile.id
-      ? await resolvePermissions({ tenantId: resolvedTenantId, profileId: profile.id }).catch((err) => {
-          console.warn("[requireAuth] resolvePermissions failed (non-fatal):", err?.message);
-          return { tenantWideKeys: new Set<string>(), campusKeys: new Map<string, Set<string>>(), allKeys: [] as string[] };
-        })
-      : { tenantWideKeys: new Set<string>(), campusKeys: new Map<string, Set<string>>(), allKeys: [] as string[] };
+    const resolvedTenantId =
+      profile.tenantId || (req as any).tenant?.tenantId || "";
+    const resolved =
+      resolvedTenantId && profile.id
+        ? await resolvePermissions({
+            tenantId: resolvedTenantId,
+            profileId: profile.id,
+          }).catch((err) => {
+            console.warn(
+              "[requireAuth] resolvePermissions failed (non-fatal):",
+              err?.message,
+            );
+            return {
+              tenantWideKeys: new Set<string>(),
+              campusKeys: new Map<string, Set<string>>(),
+              allKeys: [] as string[],
+            };
+          })
+        : {
+            tenantWideKeys: new Set<string>(),
+            campusKeys: new Map<string, Set<string>>(),
+            allKeys: [] as string[],
+          };
 
     (req as any).auth = {
       profile: (req as any).user,
@@ -292,14 +317,12 @@ export const requireAuth = async (
       );
     }
 
-    res
-      .status(500)
-      .json({
-        error: {
-          code: "INTERNAL_ERROR",
-          message: "Internal Server Error during Authentication",
-        },
-      });
+    res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "Internal Server Error during Authentication",
+      },
+    });
     return;
   }
 };

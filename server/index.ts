@@ -10,15 +10,8 @@ config({ path: path.resolve(__dirname, ".env"), override: true });
 
 import express from "express";
 import cors from "cors";
-import mongoose from "mongoose";
 import { authRouterV2 } from "./src/routes/authV2";
 import { authMiddleware as auth } from "./src/middleware/auth";
-import { User } from "./src/models/UserV2";
-import { EmailRoleMapping } from "./src/models/EmailRoleMapping";
-
-const MONGODB_URI =
-  process.env.MONGODB_URI || "mongodb://localhost:27017/vebgenix";
-console.log("MONGODB_URI configured:", MONGODB_URI.substring(0, 50) + "...");
 
 export async function createServer() {
   const app = express();
@@ -200,74 +193,5 @@ export async function createServer() {
     );
   }
 
-  // Connect to MongoDB asynchronously (non-blocking)
-  connectToDatabase();
-
   return app;
-}
-
-async function connectToDatabase() {
-  try {
-    console.log("Connecting to MongoDB...");
-    await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 5000,
-    });
-    console.log("Connected to MongoDB");
-
-    // Initialize email role mappings if empty (only on first run)
-    try {
-      const existingMappings = await EmailRoleMapping.countDocuments();
-      if (existingMappings === 0) {
-        const mappings = [
-          {
-            email: "dhanushags1567@gmail.com",
-            role: "admin",
-            matchType: "exact",
-            priority: 10,
-          },
-          {
-            email: "teacher@vebgenix.com",
-            role: "teacher",
-            matchType: "exact",
-            priority: 10,
-          },
-          {
-            email: "student@vebgenix.com",
-            role: "student",
-            matchType: "exact",
-            priority: 10,
-          },
-          { pattern: "admin", role: "admin", matchType: "domain", priority: 5 },
-          {
-            pattern: "teacher",
-            role: "teacher",
-            matchType: "domain",
-            priority: 5,
-          },
-          {
-            pattern: "student",
-            role: "student",
-            matchType: "domain",
-            priority: 5,
-          },
-        ];
-
-        for (const mapping of mappings) {
-          await EmailRoleMapping.create(mapping);
-        }
-        console.log("✓ Created default email role mappings");
-      }
-
-      const adminCount = await User.countDocuments({ role: "admin" });
-      if (adminCount > 0) {
-        console.log("✓ Using existing admin users from database");
-      }
-    } catch (initError) {
-      console.error("Error during initialization:", initError);
-    }
-  } catch (error) {
-    console.error("MongoDB connection error:", error);
-    console.log("App will continue running without database");
-  }
 }

@@ -220,6 +220,7 @@ model Application {
   @@index([status])
   @@index([tenantId])
   @@index([tenantId, campusId, status])
+  @@index([tenantId, campusId, createdAt, id])
   @@map("applications")
 }
 
@@ -296,6 +297,7 @@ model Student {
   @@index([tenantId])
   @@index([tenantId, campusId, status])
   @@index([tenantId, campusId, enrollmentDate(sort: Desc)])
+  @@index([tenantId, campusId, createdAt, id])
   // Prisma cannot represent partial indexes natively via @@unique with a condition right now
   // We handle students_tenant_campus_admission_number_uniq in raw SQL but not in models natively
   @@map("students")

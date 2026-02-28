@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "build:schema": "node scripts/build-schema.mjs"
+  },
+  "dependencies": {
+    "aws-amplify": "^6.16.2"
+  }
+}

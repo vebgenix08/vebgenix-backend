@@ -1,0 +1,4 @@
+# Auto-generated. Represents fees module.
+extend type Query {
+  _feesEmpty: String
+}

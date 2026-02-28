@@ -1,0 +1,5 @@
+# Auto-generated. Represents students module.
+# To be expanded later.
+extend type Query {
+  _studentsEmpty: String
+}

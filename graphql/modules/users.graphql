@@ -1,0 +1,4 @@
+# Auto-generated. Represents users module.
+extend type Query {
+  _usersEmpty: String
+}

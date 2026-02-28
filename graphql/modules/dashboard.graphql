@@ -1,0 +1,102 @@
+enum DateRangePreset {
+  TODAY
+  LAST_7_DAYS
+  LAST_30_DAYS
+  CUSTOM
+}
+
+input DateRangeInput {
+  preset: DateRangePreset!
+  fromDate: String
+  toDate: String
+}
+
+input DashboardOverviewInput {
+  campusId: ID!
+  range: DateRangeInput
+  timezone: String = "Asia/Kolkata"
+}
+
+input SuperAdminOverviewInput {
+  range: DateRangeInput
+  timezone: String = "Asia/Kolkata"
+}
+
+type DashboardTotals {
+  activeStudents: Int!
+  staff: Int!
+  admissionsToday: Int!
+  admissionsMTD: Int!
+  enquiriesToday: Int!
+  applicationsToday: Int!
+  approvalsPending: Int!
+  attendanceToday: Float # Percentage
+}
+
+type StatusCount {
+  status: String!
+  count: Int!
+}
+
+type DateCountPoint {
+  date: String!
+  count: Int!
+}
+
+type DateAmountPoint {
+  date: String!
+  amount: Float!
+}
+
+type AdmissionsMetrics {
+  byStatus: [StatusCount!]!
+  dailySubmissions: [DateCountPoint!]!
+  funnel: [StatusCount!]!
+}
+
+type StudentsMetrics {
+  activeCount: Int!
+}
+
+type FeesMetrics {
+  collectedDaily: [DateAmountPoint!]!
+  collectedThisMonth: Float!
+  collectedToday: Float!
+  dueTotal: Float
+  isReady: Boolean!
+}
+
+type RecentAdmission {
+  id: ID!
+  studentName: String
+  status: String!
+  createdAt: String!
+}
+
+type DashboardOverview {
+  totals: DashboardTotals!
+  admissions: AdmissionsMetrics!
+  students: StudentsMetrics!
+  fees: FeesMetrics
+  recentAdmissions: [RecentAdmission!]!
+  campusName: String
+  campusType: String
+  generatedAt: String!
+}
+
+type SuperAdminTotals {
+  tenants: Int!
+  users: Int!
+  students: Int!
+  staff: Int!
+  admins: Int!
+}
+
+type SuperAdminOverview {
+  totals: SuperAdminTotals!
+}
+
+extend type Query {
+  dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
+  superAdminOverview(input: SuperAdminOverviewInput): SuperAdminOverview!
+}

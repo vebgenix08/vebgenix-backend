@@ -1,0 +1,4 @@
+# Auto-generated. Represents templates module.
+extend type Query {
+  _templatesEmpty: String
+}

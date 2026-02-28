@@ -15,7 +15,9 @@
     "grant:admin-dashboard-perms": "ts-node --project tsconfig.json scripts/grant-admin-dashboard-perms.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.998.0",
     "@supabase/supabase-js": "^2.93.1",
+    "aws-jwt-verify": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",

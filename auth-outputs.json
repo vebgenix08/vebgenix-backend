@@ -1,0 +1,28 @@
+[
+    {
+        "OutputKey": "UserPoolClientId",
+        "OutputValue": "1lcbj3skbe22q2tqo290afva1d"
+    },
+    {
+        "OutputKey": "UserPoolId",
+        "OutputValue": "ap-south-1_d9f1iOb2r"
+    },
+    {
+        "OutputKey": "ExportsOutputRefUserPoolWebClient4C9370B02E2C9FF9",
+        "OutputValue": "1lcbj3skbe22q2tqo290afva1d",
+        "ExportName": "VebgenixAuth-dev:ExportsOutputRefUserPoolWebClient4C9370B02E2C9FF9"
+    },
+    {
+        "OutputKey": "ExportsOutputRefUserPool6BA7E5F296FD7236",
+        "OutputValue": "ap-south-1_d9f1iOb2r",
+        "ExportName": "VebgenixAuth-dev:ExportsOutputRefUserPool6BA7E5F296FD7236"
+    },
+    {
+        "OutputKey": "UserPoolArn",
+        "OutputValue": "arn:aws:cognito-idp:ap-south-1:998105438053:userpool/ap-south-1_d9f1iOb2r"
+    },
+    {
+        "OutputKey": "CognitoJwksUrl",
+        "OutputValue": "https://cognito-idp.ap-south-1.amazonaws.com/ap-south-1_d9f1iOb2r/.well-known/jwks.json"
+    }
+]

@@ -1,0 +1,12 @@
+type PageInfo {
+  nextCursor: String
+  hasNextPage: Boolean!
+}
+
+type Query {
+  _empty: String
+}
+
+type Mutation {
+  _empty: String
+}

@@ -1,0 +1,35 @@
+type Admission {
+  id: ID!
+  studentName: String!
+  status: String!
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type AdmissionEdge {
+  cursor: String!
+  node: Admission!
+}
+
+type AdmissionsConnection {
+  edges: [AdmissionEdge!]!
+  pageInfo: PageInfo!
+}
+
+input AdmissionFilter {
+  status: String
+  search: String
+}
+
+extend type Query {
+  listAdmissions(
+    filter: AdmissionFilter
+    limit: Int = 25
+    cursor: String
+  ): AdmissionsConnection!
+  getAdmission(id: ID!): Admission
+}
+
+extend type Mutation {
+  updateAdmissionStatus(id: ID!, status: String!): Admission!
+}
