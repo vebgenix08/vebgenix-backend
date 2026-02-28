@@ -85,6 +85,15 @@ export class AppSyncStack extends cdk.Stack {
     this.apiUrl = this.api.graphqlUrl;
     this.apiId = this.api.apiId;
 
+    // Explicitly extract the CfnSchema so resolvers can DependsOn it.
+    // This prevents a race condition where CloudFormation tries to create
+    // resolvers before AppSync has fully processed the schema update.
+    const cfnSchema = this.api.schema?.bind(this.api) as any;
+    const schemaNode = this.api.node.findChild("Schema");
+    const cfnSchemaResource = schemaNode
+      ? (schemaNode as any).node.defaultChild
+      : null;
+
     // ---------------------------------------------------------------
     // Shared Lambda env + IAM
     // ---------------------------------------------------------------
@@ -251,14 +260,25 @@ export class AppSyncStack extends cdk.Stack {
     // ---------------------------------------------------------------
     // Resolvers
     // ---------------------------------------------------------------
+    // Helper: create resolver and explicitly depend on schema resource
     const R =
-      (ds: appsync.LambdaDataSource) => (typeName: string, fieldName: string) =>
-        ds.createResolver(`${typeName}${fieldName}`, {
+      (ds: appsync.LambdaDataSource) =>
+      (typeName: string, fieldName: string) => {
+        const resolver = ds.createResolver(`${typeName}${fieldName}`, {
           typeName,
           fieldName,
           requestMappingTemplate: appsync.MappingTemplate.lambdaRequest(),
           responseMappingTemplate: appsync.MappingTemplate.lambdaResult(),
         });
+        // Ensure resolver waits for schema to be fully applied
+        if (cfnSchemaResource) {
+          resolver.node.defaultChild &&
+            (resolver.node.defaultChild as any).addDependency(
+              cfnSchemaResource,
+            );
+        }
+        return resolver;
+      };
 
     const users = R(usersDs);
     users("Query", "me");
