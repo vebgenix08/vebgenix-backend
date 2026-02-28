@@ -24,6 +24,7 @@ const ORDER = [
   "users.graphql",
   "fees.graphql",
   "templates.graphql",
+  "auditLogs.graphql",
 ];
 
 let finalSchema = "";

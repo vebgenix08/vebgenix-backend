@@ -184,6 +184,7 @@ extend type Query {
 extend type Query {
   _templatesEmpty: String
 }
+
 # --- auditLogs.graphql ---
 
 enum PlatformAuditTargetType {

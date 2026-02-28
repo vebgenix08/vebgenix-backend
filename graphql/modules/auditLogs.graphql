@@ -1,0 +1,58 @@
+enum PlatformAuditTargetType {
+  TENANT
+  CAMPUS
+  PROFILE
+  FEATURE
+}
+
+type PlatformAuditLogListItem {
+  id: ID!
+  at: String!
+  actorId: ID!
+  action: String!
+  targetType: PlatformAuditTargetType!
+  targetId: ID
+  metaSummary: String
+}
+
+type PlatformAuditLogDetail {
+  id: ID!
+  at: String!
+  actorId: ID!
+  action: String!
+  targetType: PlatformAuditTargetType!
+  targetId: ID
+  meta: AWSJSON
+}
+
+type PlatformAuditLogEdge {
+  cursor: String!
+  node: PlatformAuditLogListItem!
+}
+
+type PlatformAuditLogsConnection {
+  edges: [PlatformAuditLogEdge!]!
+  pageInfo: PageInfo!
+}
+
+input PlatformAuditLogsFilter {
+  actorId: ID
+  action: String
+  targetType: PlatformAuditTargetType
+  targetId: ID
+  fromAt: String
+  toAt: String
+}
+
+input ListPlatformAuditLogsInput {
+  filter: PlatformAuditLogsFilter
+  limit: Int! = 25
+  cursor: String
+}
+
+extend type Query {
+  listPlatformAuditLogs(
+    input: ListPlatformAuditLogsInput!
+  ): PlatformAuditLogsConnection!
+  getPlatformAuditLog(id: ID!): PlatformAuditLogDetail!
+}
