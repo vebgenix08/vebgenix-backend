@@ -31,28 +31,76 @@ jobs:
           role-to-assume: arn:aws:iam::998105438053:role/GitHubDeployRole-vebgenix-backend-dev
           aws-region: ap-south-1
 
-      - name: Install dependencies
-        working-directory: aws-infrastructure
-        run: npm ci
-
       - name: Build GraphQL Schema
         run: node scripts/build-schema.mjs
+
+      - name: Verify schema fields exist
+        run: |
+          echo "=== Verifying required fields exist in schema ==="
+          for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
+            if grep -q "$field" graphql/schema.graphql; then
+              echo "✅ $field found"
+            else
+              echo "❌ $field MISSING from schema!"
+              exit 1
+            fi
+          done
+
+      - name: Install CDK dependencies
+        working-directory: aws-infrastructure
+        run: npm ci
 
       - name: CDK Synth
         working-directory: aws-infrastructure
         run: npx cdk synth -c env=dev
 
-      # Phase 1: Deploy AppSync schema FIRST (without resolvers that reference new fields)
-      # This ensures AppSync has the new schema applied before any resolver tries to register.
-      - name: Phase 1 - Deploy AppSync Schema (VebgenixAppSync-dev)
-        working-directory: aws-infrastructure
-        run: npx cdk deploy VebgenixAppSync-dev -c env=dev --require-approval never
+      # ---------------------------------------------------------------
+      # PRE-APPLY SCHEMA VIA AWS CLI
+      # CloudFormation rolls back the AppSync schema when resolver creation
+      # fails, creating a chicken-and-egg problem. We break this by pushing
+      # the schema directly to AppSync before CDK runs, so the fields already
+      # exist when CloudFormation tries to create the resolvers.
+      # ---------------------------------------------------------------
+      - name: Pre-apply AppSync schema via AWS CLI
+        run: |
+          STACK_NAME="VebgenixAppSync-dev"
 
-      # Short pause to allow AppSync to propagate schema changes internally
-      - name: Wait for AppSync schema propagation
-        run: sleep 15
+          API_ID=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiId'].OutputValue" \
+            --output text 2>/dev/null || echo "")
 
-      # Phase 2: Deploy remaining stacks (resolvers reference fields that now exist in AppSync)
-      - name: Phase 2 - Deploy All Remaining Stacks
+          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
+            echo "Stack $STACK_NAME not yet deployed — skipping schema pre-apply (first deploy)."
+            exit 0
+          fi
+
+          echo "Pre-applying schema to AppSync API: $API_ID"
+
+          # Push the schema. AppSync requires base64 encoded content.
+          SCHEMA_B64=$(base64 -w 0 graphql/schema.graphql)
+          aws appsync start-schema-creation \
+            --api-id "$API_ID" \
+            --definition "$SCHEMA_B64"
+
+          echo "Waiting for schema to propagate in AppSync..."
+          for i in $(seq 1 40); do
+            STATUS=$(aws appsync get-schema-creation-status \
+              --api-id "$API_ID" \
+              --query "status" --output text)
+            echo "  [$i/40] Schema status: $STATUS"
+            if [ "$STATUS" = "SUCCESS" ] || [ "$STATUS" = "ACTIVE" ]; then
+              echo "✅ Schema applied and active. All fields are now available in AppSync."
+              break
+            fi
+            if [ "$STATUS" = "FAILED" ]; then
+              echo "❌ AppSync schema creation FAILED."
+              aws appsync get-schema-creation-status --api-id "$API_ID"
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Deploy All Stacks
         working-directory: aws-infrastructure
         run: npx cdk deploy --all -c env=dev --require-approval never
