@@ -133,12 +133,13 @@ export class AppSyncStack extends cdk.Stack {
         securityGroups: [sgLambda],
         environment: sharedEnv,
         tracing: lambda.Tracing.ACTIVE,
-        loggingFormat: lambda.LoggingFormat.JSON,
-        applicationLogLevelV2: lambda.ApplicationLogLevel.INFO,
-        systemLogLevelV2:
+        // Use logRetention instead of loggingFormat to avoid creating an
+        // explicit AWS::Logs::LogGroup resource (which fails if log group
+        // already exists from a previous Lambda deployment).
+        logRetention:
           config.stage === "prod"
-            ? lambda.SystemLogLevel.WARN
-            : lambda.SystemLogLevel.INFO,
+            ? logs.RetentionDays.THREE_MONTHS
+            : logs.RetentionDays.ONE_WEEK,
       });
       fn.addToRolePolicy(dbPolicy);
       return fn;
