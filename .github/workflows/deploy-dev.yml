@@ -22,13 +22,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: "npm"
           cache-dependency-path: aws-infrastructure/package-lock.json
 
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Assumes the GithubDeployRole-vebgenix-backend role from the OIDC stack
           role-to-assume: arn:aws:iam::998105438053:role/GitHubDeployRole-vebgenix-backend-dev
           aws-region: ap-south-1
 
@@ -36,10 +35,24 @@ jobs:
         working-directory: aws-infrastructure
         run: npm ci
 
+      - name: Build GraphQL Schema
+        run: node scripts/build-schema.mjs
+
       - name: CDK Synth
         working-directory: aws-infrastructure
         run: npx cdk synth -c env=dev
 
-      - name: Deploy All Stacks
+      # Phase 1: Deploy AppSync schema FIRST (without resolvers that reference new fields)
+      # This ensures AppSync has the new schema applied before any resolver tries to register.
+      - name: Phase 1 - Deploy AppSync Schema (VebgenixAppSync-dev)
+        working-directory: aws-infrastructure
+        run: npx cdk deploy VebgenixAppSync-dev -c env=dev --require-approval never
+
+      # Short pause to allow AppSync to propagate schema changes internally
+      - name: Wait for AppSync schema propagation
+        run: sleep 15
+
+      # Phase 2: Deploy remaining stacks (resolvers reference fields that now exist in AppSync)
+      - name: Phase 2 - Deploy All Remaining Stacks
         working-directory: aws-infrastructure
         run: npx cdk deploy --all -c env=dev --require-approval never
