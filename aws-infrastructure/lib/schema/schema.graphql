@@ -7,10 +7,27 @@ type PageInfo {
 
 type Query {
   _empty: String
+  dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
+  superAdminOverview(input: SuperAdminOverviewInput): SuperAdminOverview!
+  listAdmissions(
+    filter: AdmissionFilter
+    limit: Int = 25
+    cursor: String
+  ): AdmissionsConnection!
+  getAdmission(id: ID!): Admission
+  _studentsEmpty: String
+  _usersEmpty: String
+  _feesEmpty: String
+  _templatesEmpty: String
+  listPlatformAuditLogs(
+    input: ListPlatformAuditLogsInput!
+  ): PlatformAuditLogsConnection!
+  getPlatformAuditLog(id: ID!): PlatformAuditLogDetail!
 }
 
 type Mutation {
   _empty: String
+  updateAdmissionStatus(id: ID!, status: String!): Admission!
 }
 
 # --- dashboard.graphql ---
@@ -113,10 +130,6 @@ type SuperAdminOverview {
   totals: SuperAdminTotals!
 }
 
-extend type Query {
-  dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
-  superAdminOverview(input: SuperAdminOverviewInput): SuperAdminOverview!
-}
 
 # --- admissions.graphql ---
 
@@ -143,47 +156,25 @@ input AdmissionFilter {
   search: String
 }
 
-extend type Query {
-  listAdmissions(
-    filter: AdmissionFilter
-    limit: Int = 25
-    cursor: String
-  ): AdmissionsConnection!
-  getAdmission(id: ID!): Admission
-}
 
-extend type Mutation {
-  updateAdmissionStatus(id: ID!, status: String!): Admission!
-}
+
 
 # --- students.graphql ---
 
 # Auto-generated. Represents students module.
 # To be expanded later.
-extend type Query {
-  _studentsEmpty: String
-}
 
 # --- users.graphql ---
 
 # Auto-generated. Represents users module.
-extend type Query {
-  _usersEmpty: String
-}
 
 # --- fees.graphql ---
 
 # Auto-generated. Represents fees module.
-extend type Query {
-  _feesEmpty: String
-}
 
 # --- templates.graphql ---
 
 # Auto-generated. Represents templates module.
-extend type Query {
-  _templatesEmpty: String
-}
 
 # --- auditLogs.graphql ---
 
@@ -237,11 +228,4 @@ input ListPlatformAuditLogsInput {
   filter: PlatformAuditLogsFilter
   limit: Int! = 25
   cursor: String
-}
-
-extend type Query {
-  listPlatformAuditLogs(
-    input: ListPlatformAuditLogsInput!
-  ): PlatformAuditLogsConnection!
-  getPlatformAuditLog(id: ID!): PlatformAuditLogDetail!
 }
