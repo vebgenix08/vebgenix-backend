@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write # Required for AWS OIDC login
+  id-token: write
   contents: read
 
 jobs:
@@ -31,107 +31,74 @@ jobs:
           role-to-assume: arn:aws:iam::998105438053:role/GitHubDeployRole-vebgenix-backend-dev
           aws-region: ap-south-1
 
-      # Build the merged schema from all modules into one file
       - name: Build GraphQL Schema
         run: node scripts/build-schema.mjs
 
-      # Copy schema to the location CDK reads from (aws-infrastructure/lib/schema/)
-      # This guarantees CDK deploys exactly the same schema we validated
       - name: Copy schema to CDK input location
+        run: cp graphql/schema.graphql aws-infrastructure/lib/schema/schema.graphql
+
+      - name: Verify schema fields (local)
         run: |
-          cp graphql/schema.graphql aws-infrastructure/lib/schema/schema.graphql
-          echo "=== Verifying required fields in schema ==="
           for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
-            if grep -q "$field" aws-infrastructure/lib/schema/schema.graphql; then
-              echo "✅  $field found"
-            else
-              echo "❌  $field MISSING — aborting"
-              exit 1
-            fi
+            grep -q "$field" aws-infrastructure/lib/schema/schema.graphql \
+              && echo "✅ $field" \
+              || (echo "❌ $field MISSING" && exit 1)
           done
 
       - name: Install CDK dependencies
         working-directory: aws-infrastructure
         run: npm ci
 
-      - name: CDK Synth
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP A — Deploy schema + lambdas WITHOUT the 4 new resolvers.
+      # This updates the AppSync schema in CloudFormation without triggering
+      # any resolver creation that would race the schema propagation.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Step A - Deploy AppSync stack (schema only, no new resolvers)
         working-directory: aws-infrastructure
-        run: npx cdk synth -c env=dev
+        run: npx cdk deploy VebgenixAppSync-dev -c env=dev -c enableNewResolvers=false --require-approval never
 
-      # -----------------------------------------------------------------------
-      # PRE-APPLY AppSync schema via AWS CLI
-      # CloudFormation rolls back the schema when resolver creation races it.
-      # We break this by pushing the schema directly and polling until AppSync
-      # confirms all fields are live — BEFORE any CDK deploy runs.
-      # -----------------------------------------------------------------------
-      - name: Pre-apply AppSync schema via AWS CLI (verified)
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP B — Hard gate: verify all 4 fields exist in the LIVE AppSync
+      # schema via introspection before attempting resolver creation.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Step B - Verify schema is live in AppSync (introspection gate)
         run: |
           set -euo pipefail
-          STACK_NAME="VebgenixAppSync-dev"
-
-          echo "=== Stack outputs ==="
-          aws cloudformation describe-stacks \
-            --stack-name "$STACK_NAME" \
-            --query "Stacks[0].Outputs" \
-            --output table 2>/dev/null || echo "Stack not yet deployed — will deploy fresh."
 
           API_ID=$(aws cloudformation describe-stacks \
-            --stack-name "$STACK_NAME" \
+            --stack-name VebgenixAppSync-dev \
             --query "Stacks[0].Outputs[?contains(OutputKey,'Api') && contains(OutputKey,'Id')].OutputValue | [0]" \
-            --output text 2>/dev/null || echo "")
+            --output text)
 
-          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ] || [ "$API_ID" = "null" ]; then
-            echo "Stack not yet deployed — skipping schema pre-apply (first deploy)."
-            exit 0
-          fi
+          echo "AppSync API ID: $API_ID"
 
-          echo "Uploading schema to AppSync API: $API_ID"
-          aws appsync start-schema-creation \
-            --api-id "$API_ID" \
-            --definition fileb://aws-infrastructure/lib/schema/schema.graphql
-
-          echo "Waiting for schema to propagate..."
-          for i in $(seq 1 60); do
-            STATUS=$(aws appsync get-schema-creation-status \
-              --api-id "$API_ID" --query "status" --output text)
-            echo "  [$i/60] $STATUS"
-            [ "$STATUS" = "SUCCESS" ] && break
-            if [ "$STATUS" = "FAILED" ]; then
-              aws appsync get-schema-creation-status --api-id "$API_ID"
-              exit 1
-            fi
-            sleep 5
-          done
-
-          [ "$STATUS" = "SUCCESS" ] || { echo "❌ Schema did not reach SUCCESS"; exit 1; }
-
-          echo "Verifying remote schema via introspection..."
           aws appsync get-introspection-schema \
             --api-id "$API_ID" \
             --format SDL \
             --outfile /tmp/remote-schema.graphql
 
+          echo "=== Remote schema field check ==="
           for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
             if grep -q "$field" /tmp/remote-schema.graphql; then
-              echo "✅  Remote AppSync has: $field"
+              echo "✅ Remote AppSync has: $field"
             else
-              echo "❌  Remote AppSync MISSING: $field — aborting deploy"
+              echo "❌ Remote AppSync MISSING: $field — aborting. Schema propagation not complete."
               exit 1
             fi
           done
-          echo "All fields confirmed live in AppSync. Proceeding to CDK deploy."
+          echo "All fields confirmed live. Proceeding to create resolvers."
 
-      # -----------------------------------------------------------------------
-      # PHASE 1: Deploy the AppSync stack first (schema + resolvers together,
-      # but now fields already exist in AppSync so no 404 race condition)
-      # -----------------------------------------------------------------------
-      - name: Deploy AppSync Stack
+      # ─────────────────────────────────────────────────────────────────────
+      # STEP C — Deploy the 4 new resolvers. Schema is guaranteed live.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Step C - Deploy new resolvers (enableNewResolvers=true)
         working-directory: aws-infrastructure
-        run: npx cdk deploy VebgenixAppSync-dev -c env=dev --require-approval never
+        run: npx cdk deploy VebgenixAppSync-dev -c env=dev -c enableNewResolvers=true --require-approval never
 
-      # -----------------------------------------------------------------------
-      # PHASE 2: Deploy all remaining stacks
-      # -----------------------------------------------------------------------
+      # ─────────────────────────────────────────────────────────────────────
+      # Deploy all remaining non-AppSync stacks
+      # ─────────────────────────────────────────────────────────────────────
       - name: Deploy All Remaining Stacks
         working-directory: aws-infrastructure
-        run: npx cdk deploy --all -c env=dev --require-approval never
+        run: npx cdk deploy --all -c env=dev -c enableNewResolvers=true --require-approval never

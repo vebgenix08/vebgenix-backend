@@ -308,15 +308,26 @@ export class AppSyncStack extends cdk.Stack {
     R(storageDs)("Mutation", "generateUploadUrl");
     R(adminDs)("Query", "platformStats");
 
-    // Dashboard resolvers
-    const dashboard = R(dashboardDs);
-    dashboard("Query", "dashboardOverview");
-    dashboard("Query", "superAdminOverview");
+    // ---------------------------------------------------------------
+    // New resolvers gated by context flag.
+    // Deploy FIRST without these (schema only), verify schema is live
+    // via introspection, THEN deploy again with enableNewResolvers=true.
+    // This eliminates the CloudFormation resolver-before-schema race.
+    // ---------------------------------------------------------------
+    const enableNewResolvers =
+      this.node.tryGetContext("enableNewResolvers") === "true";
 
-    // Audit Logs resolvers (SUPER_ADMIN)
-    const auditLogs = R(auditLogsDs);
-    auditLogs("Query", "listPlatformAuditLogs");
-    auditLogs("Query", "getPlatformAuditLog");
+    if (enableNewResolvers) {
+      // Dashboard resolvers
+      const dashboard = R(dashboardDs);
+      dashboard("Query", "dashboardOverview");
+      dashboard("Query", "superAdminOverview");
+
+      // Audit Logs resolvers (SUPER_ADMIN)
+      const auditLogs = R(auditLogsDs);
+      auditLogs("Query", "listPlatformAuditLogs");
+      auditLogs("Query", "getPlatformAuditLog");
+    }
 
     // ---------------------------------------------------------------
     // Outputs
