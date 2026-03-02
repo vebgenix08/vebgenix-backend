@@ -130,6 +130,33 @@ jobs:
           echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
 
       # ─────────────────────────────────────────────────────────────────────
+      # Pre-deploy IAM fix: directly attach secretsmanager policy to Lambda
+      # roles so the Lambdas can read secrets regardless of CDK deploy state.
+      # CDK will idempotently manage the same policy going forward.
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Ensure Lambda roles have SecretsManager permission
+        run: |
+          set -euo pipefail
+          POLICY_DOC='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"secretsmanager:GetSecretValue","Resource":"arn:aws:secretsmanager:ap-south-1:998105438053:secret:vebgenix/dev/db-master*"}]}'
+
+          for FN in vebgenix-dashboard-resolver-dev vebgenix-audit-logs-resolver-dev; do
+            ROLE_ARN=$(aws lambda get-function-configuration \
+              --function-name "$FN" \
+              --query "Role" --output text 2>/dev/null || echo "")
+            if [ -z "$ROLE_ARN" ]; then
+              echo "Lambda $FN not found yet, skipping"
+              continue
+            fi
+            ROLE_NAME="${ROLE_ARN##*/}"
+            echo "Attaching SecretsManager policy to $ROLE_NAME"
+            aws iam put-role-policy \
+              --role-name "$ROLE_NAME" \
+              --policy-name "SecretsManagerDirectAccess" \
+              --policy-document "$POLICY_DOC"
+            echo "Done: $FN"
+          done
+
+      # ─────────────────────────────────────────────────────────────────────
       # Wait for AppSync stack to reach a stable state before deploying
       # ─────────────────────────────────────────────────────────────────────
       - name: Wait for AppSync stack to stabilize
