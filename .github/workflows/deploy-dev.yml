@@ -35,10 +35,13 @@ jobs:
         run: node scripts/build-schema.mjs
 
       - name: Copy schema to CDK input location
-        run: cp graphql/schema.graphql aws-infrastructure/lib/schema/schema.graphql
+        run: |
+          mkdir -p aws-infrastructure/lib/schema
+          cp graphql/schema.graphql aws-infrastructure/lib/schema/schema.graphql
 
       - name: Verify schema fields (local)
         run: |
+          set -euo pipefail
           for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
             grep -q "$field" aws-infrastructure/lib/schema/schema.graphql \
               && echo "✅ $field" \
@@ -71,12 +74,17 @@ jobs:
             --query "Stacks[0].Outputs[?contains(OutputKey,'Api') && contains(OutputKey,'Id')].OutputValue | [0]" \
             --output text)
 
+          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
+            echo "❌ Could not resolve AppSync API ID from stack outputs"
+            exit 1
+          fi
+
           echo "AppSync API ID: $API_ID"
 
           aws appsync get-introspection-schema \
             --api-id "$API_ID" \
             --format SDL \
-            /tmp/remote-schema.graphql
+            --outfile /tmp/remote-schema.graphql
 
           echo "=== Remote schema field check ==="
           for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
@@ -87,7 +95,8 @@ jobs:
               exit 1
             fi
           done
-          echo "All fields confirmed live. Proceeding to create resolvers."
+
+          echo "✅ All fields confirmed live. Proceeding to create resolvers."
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP C — Deploy the 4 new resolvers. Schema is guaranteed live.
@@ -108,6 +117,5 @@ jobs:
             VebgenixStorage-dev \
             VebgenixAsync-dev \
             VebgenixMonitoring-dev \
-            VebgenixFrontend-dev \
             VebgenixOidc-dev \
             -c env=dev -c enableNewResolvers=true --require-approval never
