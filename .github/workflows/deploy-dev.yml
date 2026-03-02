@@ -78,9 +78,11 @@ jobs:
       # Install Prisma + generate client (with Lambda binary) + copy runtime
       # into lambda/node_modules so Lambda can require('@prisma/client')
       # ─────────────────────────────────────────────────────────────────────
-      - name: Install root deps and generate Prisma client
-        run: npm ci
+      - name: Install server deps and generate Prisma client
         working-directory: server
+        run: |
+          npm ci
+          npx prisma generate --schema=prisma/schema.prisma
 
       - name: Copy Prisma runtime into Lambda asset folder
         run: |
@@ -124,9 +126,9 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       # STEP A — Deploy schema + lambdas WITHOUT the 4 new resolvers.
       # ─────────────────────────────────────────────────────────────────────
-      - name: Step A - Deploy AppSync stack (schema only, no new resolvers)
+      - name: Step A - Deploy AppSync stack (schema + lambdas + resolvers)
         working-directory: aws-infrastructure
-        run: npx cdk deploy VebgenixAppSync-dev -c env=dev -c enableNewResolvers=false --require-approval never
+        run: npx cdk deploy VebgenixAppSync-dev -c env=dev --require-approval never
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP B — Force-push schema, wait for SUCCESS, verify via
@@ -172,12 +174,7 @@ jobs:
           echo "Checking Query fields via python3..."
           python3 -c "import json,sys; d=json.load(open('/tmp/introspection.json')); qt=next((t for t in d['data']['__schema']['types'] if t['name']=='Query'),None); fields={f['name'] for f in (qt.get('fields') or [])}; print('Query fields:',sorted(fields)); req=['dashboardOverview','superAdminOverview','listPlatformAuditLogs','getPlatformAuditLog']; missing=[f for f in req if f not in fields]; [print('OK',f) for f in req if f in fields]; [print('MISSING',f) for f in missing]; sys.exit(1 if missing else 0)"
 
-      # ─────────────────────────────────────────────────────────────────────
-      # STEP C — Deploy the 4 new resolvers (fields are guaranteed live).
-      # ─────────────────────────────────────────────────────────────────────
-      - name: Step C - Deploy new resolvers (enableNewResolvers=true)
-        working-directory: aws-infrastructure
-        run: npx cdk deploy VebgenixAppSync-dev -c env=dev -c enableNewResolvers=true --require-approval never
+      # Step C is now merged into Step A — single deploy handles everything
 
       # ─────────────────────────────────────────────────────────────────────
       # Deploy remaining stacks (NOT AppSync — already deployed in steps A+C)
