@@ -97,8 +97,17 @@ jobs:
         run: npx cdk deploy VebgenixAppSync-dev -c env=dev -c enableNewResolvers=true --require-approval never
 
       # ─────────────────────────────────────────────────────────────────────
-      # Deploy all remaining non-AppSync stacks
+      # Deploy remaining stacks (NOT AppSync — already deployed in steps A+C)
       # ─────────────────────────────────────────────────────────────────────
-      - name: Deploy All Remaining Stacks
+      - name: Deploy Remaining Stacks (excluding AppSync)
         working-directory: aws-infrastructure
-        run: npx cdk deploy --all -c env=dev -c enableNewResolvers=true --require-approval never
+        run: |
+          npx cdk deploy \
+            VebgenixNetwork-dev \
+            VebgenixAuth-dev \
+            VebgenixStorage-dev \
+            VebgenixAsync-dev \
+            VebgenixMonitoring-dev \
+            VebgenixFrontend-dev \
+            VebgenixOidc-dev \
+            -c env=dev -c enableNewResolvers=true --require-approval never
