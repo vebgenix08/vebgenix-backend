@@ -74,7 +74,32 @@ jobs:
               || (echo "MISSING $field" && exit 1)
           done
 
+      # ─────────────────────────────────────────────────────────────────────
+      # Install Prisma + generate client (with Lambda binary) + copy runtime
+      # into lambda/node_modules so Lambda can require('@prisma/client')
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Install root deps and generate Prisma client
+        run: npm ci
+        working-directory: server
+
+      - name: Copy Prisma runtime into Lambda asset folder
+        run: |
+          set -euo pipefail
+          mkdir -p aws-infrastructure/lambda/node_modules/@prisma
+          mkdir -p aws-infrastructure/lambda/node_modules/.prisma
+
+          cp -R server/node_modules/@prisma/client \
+            aws-infrastructure/lambda/node_modules/@prisma/
+
+          cp -R server/node_modules/.prisma \
+            aws-infrastructure/lambda/node_modules/
+
+          echo "Prisma runtime copied:"
+          ls aws-infrastructure/lambda/node_modules/@prisma/
+          ls aws-infrastructure/lambda/node_modules/.prisma/
+
       - name: Install CDK dependencies
+
         working-directory: aws-infrastructure
         run: npm ci
 
