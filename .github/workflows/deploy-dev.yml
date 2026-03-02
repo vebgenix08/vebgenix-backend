@@ -44,19 +44,37 @@ jobs:
           mkdir -p aws-infrastructure/lib/schema
           cp graphql/schema.graphql aws-infrastructure/lib/schema/schema.graphql
 
-      - name: Verify schema fields (local) + checksum
+      - name: Verify schema fields (local) + checksum + ordering guard
         run: |
           set -euo pipefail
+          SCHEMA=aws-infrastructure/lib/schema/schema.graphql
+
           echo "=== Local schema checksum ==="
-          sha256sum aws-infrastructure/lib/schema/schema.graphql
-          echo "=== extend type Query count ==="
-          grep -c "extend type Query" aws-infrastructure/lib/schema/schema.graphql || echo "0"
-          echo "=== Field check ==="
+          sha256sum "$SCHEMA"
+
+          echo "=== First 20 lines of schema ==="
+          head -20 "$SCHEMA"
+
+          echo "=== type Query / extend type Query line numbers ==="
+          grep -n "^type Query\|^extend type Query" "$SCHEMA" || true
+
+          echo "=== Schema ordering guard ==="
+          Q_LINE=$(grep -n "^type Query" "$SCHEMA" | head -n1 | cut -d: -f1 || echo "")
+          E_LINE=$(grep -n "^extend type Query" "$SCHEMA" | head -n1 | cut -d: -f1 || echo "")
+          if [ -n "$E_LINE" ] && [ -n "$Q_LINE" ] && [ "$E_LINE" -lt "$Q_LINE" ]; then
+            echo "❌ FATAL: 'extend type Query' (line $E_LINE) appears BEFORE 'type Query' (line $Q_LINE)"
+            echo "AppSync will silently drop all extensions. Fix build-schema.mjs ordering."
+            exit 1
+          fi
+          echo "✅ Ordering OK — type Query (line ${Q_LINE:-?}) before extend type Query (line ${E_LINE:-?})"
+
+          echo "=== Required field check ==="
           for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
-            grep -q "$field" aws-infrastructure/lib/schema/schema.graphql \
+            grep -q "$field" "$SCHEMA" \
               && echo "✅ $field" \
               || (echo "❌ $field MISSING" && exit 1)
           done
+
 
       - name: Install CDK dependencies
         working-directory: aws-infrastructure
