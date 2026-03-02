@@ -110,7 +110,7 @@ export class AppSyncStack extends cdk.Stack {
 
     const dbPolicy = new iam.PolicyStatement({
       actions: ["secretsmanager:GetSecretValue"],
-      resources: [dbSecretArn],
+      resources: [`${dbSecretArn}*`], // * covers the random suffix AWS appends
     });
 
     // ---------------------------------------------------------------

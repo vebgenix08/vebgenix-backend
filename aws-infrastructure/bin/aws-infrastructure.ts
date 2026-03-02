@@ -52,7 +52,7 @@ const asyncStack = new AsyncStack(app, `VebgenixAsync-${config.stage}`, {
   vpc: networkStack.vpc,
   sgLambda: networkStack.sgLambda,
   dbProxyEndpoint: `placeholder-proxy-${config.stage}`,
-  dbSecretArn: `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
+  dbSecretArn: `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master`,
   emailBucket: storageStack.bucket,
 });
 asyncStack.addDependency(networkStack);
@@ -74,7 +74,7 @@ const appSyncStack = new AppSyncStack(app, `VebgenixAppSync-${config.stage}`, {
   eventBus: asyncStack.eventBus,
   documentsBucket: storageStack.bucket,
   dbProxyEndpoint: `placeholder-proxy-${config.stage}`,
-  dbSecretArn: `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
+  dbSecretArn: `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master`,
 });
 appSyncStack.addDependency(authStack);
 appSyncStack.addDependency(networkStack);
