@@ -7,6 +7,7 @@ import * as events from "aws-cdk-lib/aws-events";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import { EnvConfig } from "../../config/types";
 import * as path from "path";
@@ -108,10 +109,14 @@ export class AppSyncStack extends cdk.Stack {
       NODE_OPTIONS: "--enable-source-maps",
     };
 
-    const dbPolicy = new iam.PolicyStatement({
-      actions: ["secretsmanager:GetSecretValue"],
-      resources: [`${dbSecretArn}*`], // * covers the random suffix AWS appends
-    });
+    // ✅ CDK-idiomatic secret access — generates correct ARN + wildcard automatically
+    const dbSecret = dbSecretArn.startsWith("arn:")
+      ? secretsmanager.Secret.fromSecretCompleteArn(
+          this,
+          "DbSecret",
+          dbSecretArn,
+        )
+      : secretsmanager.Secret.fromSecretNameV2(this, "DbSecret", dbSecretArn);
 
     // ---------------------------------------------------------------
     // Helper: create domain Lambda + AppSync datasource
@@ -121,8 +126,8 @@ export class AppSyncStack extends cdk.Stack {
         functionName: `vebgenix-${fnName}-${config.stage}`,
         runtime: lambda.Runtime.NODEJS_20_X,
         handler,
-        // Deploy the entire lambda/ folder so shared/ is always included
-        code: lambda.Code.fromAsset("lambda"),
+        // Entire lambda/ folder packaged so shared/ utilities are always available
+        code: lambda.Code.fromAsset(path.resolve(__dirname, "../../lambda")),
         timeout: cdk.Duration.seconds(30),
         memorySize: 256,
         vpc,
@@ -130,15 +135,15 @@ export class AppSyncStack extends cdk.Stack {
         securityGroups: [sgLambda],
         environment: sharedEnv,
         tracing: lambda.Tracing.ACTIVE,
-        // Use logRetention instead of loggingFormat to avoid creating an
-        // explicit AWS::Logs::LogGroup resource (which fails if log group
-        // already exists from a previous Lambda deployment).
         logRetention:
           config.stage === "prod"
             ? logs.RetentionDays.THREE_MONTHS
             : logs.RetentionDays.ONE_WEEK,
       });
-      fn.addToRolePolicy(dbPolicy);
+
+      // ✅ Let CDK generate the correct IAM policy (handles ARN suffix automatically)
+      dbSecret.grantRead(fn);
+
       return fn;
     };
 
