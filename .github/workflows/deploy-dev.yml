@@ -49,6 +49,8 @@ jobs:
           set -euo pipefail
           echo "=== Local schema checksum ==="
           sha256sum aws-infrastructure/lib/schema/schema.graphql
+          echo "=== extend type Query count ==="
+          grep -c "extend type Query" aws-infrastructure/lib/schema/schema.graphql || echo "0"
           echo "=== Field check ==="
           for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
             grep -q "$field" aws-infrastructure/lib/schema/schema.graphql \
@@ -74,10 +76,8 @@ jobs:
             exit 1
           fi
 
-          # Confirm we are targeting the correct API
           API_NAME=$(aws appsync get-graphql-api --api-id "$API_ID" --query "graphqlApi.name" --output text)
           echo "✅ AppSync API ID: $API_ID  (name: $API_NAME)"
-
           echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
 
       # ─────────────────────────────────────────────────────────────────────
@@ -88,16 +88,20 @@ jobs:
         run: npx cdk deploy VebgenixAppSync-dev -c env=dev -c enableNewResolvers=false --require-approval never
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP B — Force-push schema via AppSync API, poll until SUCCESS,
-      # then verify with get-type (deterministic, no CLI file issues).
+      # STEP B — Force-push schema, wait for SUCCESS, verify merged Query
+      # fields via introspection JSON + python3 (get-type SDL only returns
+      # the BASE type, not extend type fields — so we use introspection).
       # ─────────────────────────────────────────────────────────────────────
-      - name: Step B - Force apply schema & verify via get-type (hard gate)
+      - name: Step B - Force apply schema & verify via introspection JSON
         run: |
           set -euo pipefail
           API_ID="${APPSYNC_API_ID}"
-          echo "Applying schema to API: $API_ID"
 
-          # Force-push schema using fileb:// (most reliable)
+          echo "=== Schema file being applied ==="
+          sha256sum aws-infrastructure/lib/schema/schema.graphql
+          wc -l aws-infrastructure/lib/schema/schema.graphql
+
+          echo "Force-applying schema to API: $API_ID"
           aws appsync start-schema-creation \
             --api-id "$API_ID" \
             --definition fileb://aws-infrastructure/lib/schema/schema.graphql
@@ -118,25 +122,49 @@ jobs:
 
           [ "$STATUS" = "SUCCESS" ] || { echo "❌ Schema timed out"; exit 1; }
 
-          echo "=== Verifying Query type fields via get-type ==="
-          QUERY_DEF=$(aws appsync get-type \
+          # Allow AppSync internal propagation after SUCCESS
+          echo "Schema SUCCESS — waiting 15s for internal AppSync propagation..."
+          sleep 15
+
+          # NOTE: get-type --format SDL only returns the BASE type definition,
+          # NOT fields added via 'extend type Query'. Use introspection JSON instead.
+          echo "=== Verifying merged Query fields via introspection JSON ==="
+          aws appsync get-introspection-schema \
             --api-id "$API_ID" \
-            --type-name Query \
-            --format SDL \
-            --query "type.definition" \
-            --output text)
+            --format JSON \
+            /tmp/introspection.json
 
-          echo "--- Remote Query SDL ---"
-          echo "$QUERY_DEF"
-          echo "------------------------"
+          python3 - <<'PYEOF'
+import json, sys
 
-          for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
-            echo "$QUERY_DEF" | grep -q "$field" \
-              && echo "✅ Remote Query has: $field" \
-              || { echo "❌ Remote Query missing: $field — schema did not apply correctly"; exit 1; }
-          done
+with open('/tmp/introspection.json') as f:
+    data = json.load(f)
 
-          echo "✅ All 4 fields confirmed in live AppSync. Proceeding to resolver deploy."
+types = data['data']['__schema']['types']
+query_type = next((t for t in types if t['name'] == 'Query'), None)
+
+if not query_type:
+    print('❌ Query type not found in introspection schema', file=sys.stderr)
+    sys.exit(1)
+
+fields = {f['name'] for f in (query_type.get('fields') or [])}
+print(f"All Query fields: {sorted(fields)}")
+
+required = ['dashboardOverview', 'superAdminOverview', 'listPlatformAuditLogs', 'getPlatformAuditLog']
+missing = [f for f in required if f not in fields]
+
+for f in required:
+    if f in fields:
+        print(f'✅ {f}')
+    else:
+        print(f'❌ {f} MISSING')
+
+if missing:
+    print(f'\n❌ Schema verification failed. Missing: {missing}', file=sys.stderr)
+    sys.exit(1)
+
+print('\n✅ All required fields confirmed in live AppSync schema.')
+PYEOF
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP C — Deploy the 4 new resolvers (fields are guaranteed live).
