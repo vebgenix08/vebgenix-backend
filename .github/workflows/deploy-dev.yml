@@ -54,16 +54,15 @@ jobs:
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP A — Deploy schema + lambdas WITHOUT the 4 new resolvers.
-      # This updates the AppSync schema in CloudFormation without triggering
-      # any resolver creation that would race the schema propagation.
       # ─────────────────────────────────────────────────────────────────────
       - name: Step A - Deploy AppSync stack (schema only, no new resolvers)
         working-directory: aws-infrastructure
         run: npx cdk deploy VebgenixAppSync-dev -c env=dev -c enableNewResolvers=false --require-approval never
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP B — Hard gate: verify all 4 fields exist in the LIVE AppSync
-      # schema via introspection before attempting resolver creation.
+      # STEP B — Hard gate: verify all 4 fields exist in LIVE AppSync schema
+      # via introspection before attempting resolver creation.
+      # NOTE: Older AWS CLI uses positional outfile (no --outfile flag).
       # ─────────────────────────────────────────────────────────────────────
       - name: Step B - Verify schema is live in AppSync (introspection gate)
         run: |
@@ -81,10 +80,11 @@ jobs:
 
           echo "AppSync API ID: $API_ID"
 
+          # POSitional outfile (works with older AWS CLI on runners)
           aws appsync get-introspection-schema \
             --api-id "$API_ID" \
             --format SDL \
-            --outfile /tmp/remote-schema.graphql
+            /tmp/remote-schema.graphql
 
           echo "=== Remote schema field check ==="
           for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
@@ -99,7 +99,7 @@ jobs:
           echo "✅ All fields confirmed live. Proceeding to create resolvers."
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP C — Deploy the 4 new resolvers. Schema is guaranteed live.
+      # STEP C — Deploy the 4 new resolvers.
       # ─────────────────────────────────────────────────────────────────────
       - name: Step C - Deploy new resolvers (enableNewResolvers=true)
         working-directory: aws-infrastructure
