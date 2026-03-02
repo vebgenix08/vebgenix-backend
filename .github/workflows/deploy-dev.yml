@@ -31,6 +31,9 @@ jobs:
           role-to-assume: arn:aws:iam::998105438053:role/GitHubDeployRole-vebgenix-backend-dev
           aws-region: ap-south-1
 
+      - name: AWS CLI version (debug)
+        run: aws --version
+
       - name: Build GraphQL Schema
         run: node scripts/build-schema.mjs
 
@@ -52,6 +55,23 @@ jobs:
         working-directory: aws-infrastructure
         run: npm ci
 
+      - name: Resolve AppSync API ID (export env)
+        run: |
+          set -euo pipefail
+          API_ID=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixAppSync-dev \
+            --query "Stacks[0].Outputs[?contains(OutputKey,'Api') && contains(OutputKey,'Id')].OutputValue | [0]" \
+            --output text)
+
+          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
+            echo "❌ Could not resolve AppSync API ID from stack outputs"
+            aws cloudformation describe-stacks --stack-name VebgenixAppSync-dev --query "Stacks[0].Outputs" --output table || true
+            exit 1
+          fi
+
+          echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
+          echo "✅ AppSync API ID: $API_ID"
+
       # ─────────────────────────────────────────────────────────────────────
       # STEP A — Deploy schema + lambdas WITHOUT the 4 new resolvers.
       # ─────────────────────────────────────────────────────────────────────
@@ -60,43 +80,74 @@ jobs:
         run: npx cdk deploy VebgenixAppSync-dev -c env=dev -c enableNewResolvers=false --require-approval never
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP B — Hard gate: verify all 4 fields exist in LIVE AppSync schema
-      # via introspection before attempting resolver creation.
-      # NOTE: Older AWS CLI uses positional outfile (no --outfile flag).
+      # STEP B — FORCE APPLY schema via AppSync API + wait for propagation.
+      # This makes the process deterministic and kills rollback loops.
       # ─────────────────────────────────────────────────────────────────────
-      - name: Step B - Verify schema is live in AppSync (introspection gate)
+      - name: Step B - Force apply schema & wait until fields appear (hard gate)
         run: |
           set -euo pipefail
 
-          API_ID=$(aws cloudformation describe-stacks \
-            --stack-name VebgenixAppSync-dev \
-            --query "Stacks[0].Outputs[?contains(OutputKey,'Api') && contains(OutputKey,'Id')].OutputValue | [0]" \
-            --output text)
+          API_ID="${APPSYNC_API_ID}"
+          echo "Using AppSync API ID: $API_ID"
 
-          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
-            echo "❌ Could not resolve AppSync API ID from stack outputs"
+          echo "Starting schema creation via AppSync API..."
+          # Try fileb:// first; fallback to base64 string if runner CLI doesn't support fileb.
+          if ! aws appsync start-schema-creation \
+            --api-id "$API_ID" \
+            --definition fileb://aws-infrastructure/lib/schema/schema.graphql; then
+            echo "fileb:// failed; falling back to base64..."
+            SCHEMA_B64=$(base64 -w 0 aws-infrastructure/lib/schema/schema.graphql)
+            aws appsync start-schema-creation \
+              --api-id "$API_ID" \
+              --definition "$SCHEMA_B64"
+          fi
+
+          echo "Polling schema creation status until SUCCESS..."
+          for i in $(seq 1 60); do
+            STATUS=$(aws appsync get-schema-creation-status --api-id "$API_ID" --query status --output text)
+            echo "  [$i/60] Schema creation status: $STATUS"
+            if [ "$STATUS" = "SUCCESS" ]; then
+              break
+            fi
+            if [ "$STATUS" = "FAILED" ]; then
+              echo "❌ Schema creation FAILED:"
+              aws appsync get-schema-creation-status --api-id "$API_ID"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          if [ "${STATUS:-}" != "SUCCESS" ]; then
+            echo "❌ Schema did not reach SUCCESS in time."
             exit 1
           fi
 
-          echo "AppSync API ID: $API_ID"
+          echo "Schema creation SUCCESS. Now polling introspection until fields are visible..."
+          # IMPORTANT: even after SUCCESS, AppSync propagation can lag. We wait until fields appear.
+          for i in $(seq 1 60); do
+            aws appsync get-introspection-schema --api-id "$API_ID" --format SDL /tmp/remote-schema.graphql || true
 
-          # POSitional outfile (works with older AWS CLI on runners)
-          aws appsync get-introspection-schema \
-            --api-id "$API_ID" \
-            --format SDL \
-            /tmp/remote-schema.graphql
+            MISSING=0
+            for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
+              if grep -q "$field" /tmp/remote-schema.graphql; then
+                echo "✅ Remote has: $field"
+              else
+                echo "⏳ Remote missing: $field"
+                MISSING=1
+              fi
+            done
 
-          echo "=== Remote schema field check ==="
-          for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
-            if grep -q "$field" /tmp/remote-schema.graphql; then
-              echo "✅ Remote AppSync has: $field"
-            else
-              echo "❌ Remote AppSync MISSING: $field — aborting. Schema propagation not complete."
-              exit 1
+            if [ "$MISSING" -eq 0 ]; then
+              echo "✅ All fields are now visible in remote schema."
+              exit 0
             fi
+
+            echo "Waiting for schema propagation... [$i/60]"
+            sleep 5
           done
 
-          echo "✅ All fields confirmed live. Proceeding to create resolvers."
+          echo "❌ Timed out waiting for schema fields to become visible via introspection."
+          exit 1
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP C — Deploy the 4 new resolvers.
