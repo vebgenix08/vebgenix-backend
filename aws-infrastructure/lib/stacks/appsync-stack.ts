@@ -101,7 +101,7 @@ export class AppSyncStack extends cdk.Stack {
     const sharedEnv = {
       STAGE: config.stage,
       DB_PROXY_ENDPOINT: dbProxyEndpoint,
-      DB_SECRET_ARN: dbSecretArn,
+      DB_SECRET_ARN: dbSecretArn, // plain ARN / name — valid SecretId for GetSecretValue
       DB_NAME: "vebgenix",
       EVENT_BUS_NAME: eventBus.eventBusName,
       DOCUMENTS_BUCKET: documentsBucket.bucketName,
@@ -109,14 +109,17 @@ export class AppSyncStack extends cdk.Stack {
       NODE_OPTIONS: "--enable-source-maps",
     };
 
-    // ✅ CDK-idiomatic secret access — generates correct ARN + wildcard automatically
-    const dbSecret = dbSecretArn.startsWith("arn:")
-      ? secretsmanager.Secret.fromSecretCompleteArn(
-          this,
-          "DbSecret",
-          dbSecretArn,
-        )
-      : secretsmanager.Secret.fromSecretNameV2(this, "DbSecret", dbSecretArn);
+    // Extract secret name from ARN or use directly
+    // fromSecretNameV2 generates arn:...:secret:name-?????? wildcard IAM resource,
+    // which correctly matches the actual suffixed ARN at authorization time.
+    const secretName = dbSecretArn.startsWith("arn:")
+      ? dbSecretArn.split(":secret:")[1] // "vebgenix/dev/db-master"
+      : dbSecretArn;
+    const dbSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      "DbSecret",
+      secretName,
+    );
 
     // ---------------------------------------------------------------
     // Helper: create domain Lambda + AppSync datasource
