@@ -10,6 +10,12 @@ permissions:
   id-token: write
   contents: read
 
+# Serialize deploys — never run two deploy-dev workflows in parallel.
+# cancel-in-progress: false means a queued run will wait, not be cancelled.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -122,6 +128,34 @@ jobs:
           API_NAME=$(aws appsync get-graphql-api --api-id "$API_ID" --query "graphqlApi.name" --output text)
           echo "AppSync API ID: $API_ID  (name: $API_NAME)"
           echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Wait for AppSync stack to reach a stable state before deploying
+      # ─────────────────────────────────────────────────────────────────────
+      - name: Wait for AppSync stack to stabilize
+        run: |
+          set -euo pipefail
+          echo "Checking VebgenixAppSync-dev stack status..."
+          for i in $(seq 1 30); do
+            STATUS=$(aws cloudformation describe-stacks \
+              --stack-name VebgenixAppSync-dev \
+              --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+            echo "  [$i/30] $STATUS"
+            case "$STATUS" in
+              *IN_PROGRESS*)
+                echo "Stack in progress, waiting 20s..."
+                sleep 20
+                ;;
+              *ROLLBACK_COMPLETE*|*FAILED*)
+                echo "Stack in bad state: $STATUS — manual intervention may be needed"
+                exit 1
+                ;;
+              *)
+                echo "Stack stable: $STATUS"
+                break
+                ;;
+            esac
+          done
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP A — Deploy schema + lambdas WITHOUT the 4 new resolvers.
