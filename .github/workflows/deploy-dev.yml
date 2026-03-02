@@ -44,7 +44,7 @@ jobs:
           mkdir -p aws-infrastructure/lib/schema
           cp graphql/schema.graphql aws-infrastructure/lib/schema/schema.graphql
 
-      - name: Verify schema fields (local) + checksum + ordering guard
+      - name: Verify schema fields, ordering guard, and checksum
         run: |
           set -euo pipefail
           SCHEMA=aws-infrastructure/lib/schema/schema.graphql
@@ -62,25 +62,23 @@ jobs:
           Q_LINE=$(grep -n "^type Query" "$SCHEMA" | head -n1 | cut -d: -f1 || echo "")
           E_LINE=$(grep -n "^extend type Query" "$SCHEMA" | head -n1 | cut -d: -f1 || echo "")
           if [ -n "$E_LINE" ] && [ -n "$Q_LINE" ] && [ "$E_LINE" -lt "$Q_LINE" ]; then
-            echo "❌ FATAL: 'extend type Query' (line $E_LINE) appears BEFORE 'type Query' (line $Q_LINE)"
-            echo "AppSync will silently drop all extensions. Fix build-schema.mjs ordering."
+            echo "FATAL: extend type Query (line $E_LINE) appears BEFORE type Query (line $Q_LINE)"
             exit 1
           fi
-          echo "✅ Ordering OK — type Query (line ${Q_LINE:-?}) before extend type Query (line ${E_LINE:-?})"
+          echo "Ordering OK — type Query (line ${Q_LINE:-?}) before extend (line ${E_LINE:-?})"
 
           echo "=== Required field check ==="
           for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
             grep -q "$field" "$SCHEMA" \
-              && echo "✅ $field" \
-              || (echo "❌ $field MISSING" && exit 1)
+              && echo "OK $field" \
+              || (echo "MISSING $field" && exit 1)
           done
-
 
       - name: Install CDK dependencies
         working-directory: aws-infrastructure
         run: npm ci
 
-      - name: Resolve AppSync API ID (export env)
+      - name: Resolve AppSync API ID
         run: |
           set -euo pipefail
           API_ID=$(aws cloudformation describe-stacks \
@@ -89,13 +87,13 @@ jobs:
             --output text)
 
           if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
-            echo "❌ Could not resolve AppSync API ID"
+            echo "Could not resolve AppSync API ID"
             aws cloudformation describe-stacks --stack-name VebgenixAppSync-dev --query "Stacks[0].Outputs" --output table || true
             exit 1
           fi
 
           API_NAME=$(aws appsync get-graphql-api --api-id "$API_ID" --query "graphqlApi.name" --output text)
-          echo "✅ AppSync API ID: $API_ID  (name: $API_NAME)"
+          echo "AppSync API ID: $API_ID  (name: $API_NAME)"
           echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
 
       # ─────────────────────────────────────────────────────────────────────
@@ -106,16 +104,15 @@ jobs:
         run: npx cdk deploy VebgenixAppSync-dev -c env=dev -c enableNewResolvers=false --require-approval never
 
       # ─────────────────────────────────────────────────────────────────────
-      # STEP B — Force-push schema, wait for SUCCESS, verify merged Query
-      # fields via introspection JSON + python3 (get-type SDL only returns
-      # the BASE type, not extend type fields — so we use introspection).
+      # STEP B — Force-push schema, wait for SUCCESS, verify via
+      # introspection JSON parsed with python3 (no heredoc needed).
       # ─────────────────────────────────────────────────────────────────────
-      - name: Step B - Force apply schema & verify via introspection JSON
+      - name: Step B - Force apply schema and verify fields via introspection
         run: |
           set -euo pipefail
           API_ID="${APPSYNC_API_ID}"
 
-          echo "=== Schema file being applied ==="
+          echo "Schema file being applied:"
           sha256sum aws-infrastructure/lib/schema/schema.graphql
           wc -l aws-infrastructure/lib/schema/schema.graphql
 
@@ -124,7 +121,6 @@ jobs:
             --api-id "$API_ID" \
             --definition fileb://aws-infrastructure/lib/schema/schema.graphql
 
-          echo "Polling until schema creation status = SUCCESS..."
           STATUS=""
           for i in $(seq 1 60); do
             STATUS=$(aws appsync get-schema-creation-status \
@@ -138,51 +134,18 @@ jobs:
             sleep 5
           done
 
-          [ "$STATUS" = "SUCCESS" ] || { echo "❌ Schema timed out"; exit 1; }
-
-          # Allow AppSync internal propagation after SUCCESS
-          echo "Schema SUCCESS — waiting 15s for internal AppSync propagation..."
+          [ "$STATUS" = "SUCCESS" ] || { echo "Schema timed out"; exit 1; }
+          echo "Schema SUCCESS. Waiting 15s for AppSync propagation..."
           sleep 15
 
-          # NOTE: get-type --format SDL only returns the BASE type definition,
-          # NOT fields added via 'extend type Query'. Use introspection JSON instead.
-          echo "=== Verifying merged Query fields via introspection JSON ==="
+          echo "Downloading introspection schema (JSON)..."
           aws appsync get-introspection-schema \
             --api-id "$API_ID" \
             --format JSON \
             /tmp/introspection.json
 
-          python3 - <<'PYEOF'
-import json, sys
-
-with open('/tmp/introspection.json') as f:
-    data = json.load(f)
-
-types = data['data']['__schema']['types']
-query_type = next((t for t in types if t['name'] == 'Query'), None)
-
-if not query_type:
-    print('❌ Query type not found in introspection schema', file=sys.stderr)
-    sys.exit(1)
-
-fields = {f['name'] for f in (query_type.get('fields') or [])}
-print(f"All Query fields: {sorted(fields)}")
-
-required = ['dashboardOverview', 'superAdminOverview', 'listPlatformAuditLogs', 'getPlatformAuditLog']
-missing = [f for f in required if f not in fields]
-
-for f in required:
-    if f in fields:
-        print(f'✅ {f}')
-    else:
-        print(f'❌ {f} MISSING')
-
-if missing:
-    print(f'\n❌ Schema verification failed. Missing: {missing}', file=sys.stderr)
-    sys.exit(1)
-
-print('\n✅ All required fields confirmed in live AppSync schema.')
-PYEOF
+          echo "Checking Query fields via python3..."
+          python3 -c "import json,sys; d=json.load(open('/tmp/introspection.json')); qt=next((t for t in d['data']['__schema']['types'] if t['name']=='Query'),None); fields={f['name'] for f in (qt.get('fields') or [])}; print('Query fields:',sorted(fields)); req=['dashboardOverview','superAdminOverview','listPlatformAuditLogs','getPlatformAuditLog']; missing=[f for f in req if f not in fields]; [print('OK',f) for f in req if f in fields]; [print('MISSING',f) for f in missing]; sys.exit(1 if missing else 0)"
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP C — Deploy the 4 new resolvers (fields are guaranteed live).
