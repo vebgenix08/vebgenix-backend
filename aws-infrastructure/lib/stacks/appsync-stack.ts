@@ -116,16 +116,13 @@ export class AppSyncStack extends cdk.Stack {
     // ---------------------------------------------------------------
     // Helper: create domain Lambda + AppSync datasource
     // ---------------------------------------------------------------
-    const makeLambda = (
-      logicalId: string,
-      fnName: string,
-      assetPath: string,
-    ) => {
+    const makeLambda = (logicalId: string, fnName: string, handler: string) => {
       const fn = new lambda.Function(this, logicalId, {
         functionName: `vebgenix-${fnName}-${config.stage}`,
         runtime: lambda.Runtime.NODEJS_20_X,
-        handler: "index.handler",
-        code: lambda.Code.fromAsset(assetPath),
+        handler,
+        // Deploy the entire lambda/ folder so shared/ is always included
+        code: lambda.Code.fromAsset("lambda"),
         timeout: cdk.Duration.seconds(30),
         memorySize: 256,
         vpc,
@@ -151,7 +148,7 @@ export class AppSyncStack extends cdk.Stack {
     const usersLambda = makeLambda(
       "UsersLambda",
       "users-resolver",
-      "lambda/users-resolver",
+      "users-resolver/index.handler",
     );
     usersLambda.addToRolePolicy(
       new iam.PolicyStatement({
@@ -174,7 +171,7 @@ export class AppSyncStack extends cdk.Stack {
     const admissionsLambda = makeLambda(
       "AdmissionsLambda",
       "admissions-resolver",
-      "lambda/admissions-resolver",
+      "admissions-resolver/index.handler",
     );
     admissionsLambda.addToRolePolicy(
       new iam.PolicyStatement({
@@ -189,7 +186,7 @@ export class AppSyncStack extends cdk.Stack {
     const tenantsLambda = makeLambda(
       "TenantsLambda",
       "tenants-resolver",
-      "lambda/tenants-resolver",
+      "tenants-resolver/index.handler",
     );
     tenantsLambda.addToRolePolicy(
       new iam.PolicyStatement({
@@ -206,7 +203,7 @@ export class AppSyncStack extends cdk.Stack {
     const storageLambda = makeLambda(
       "StorageLambda",
       "storage-resolver",
-      "lambda/storage-resolver",
+      "storage-resolver/index.handler",
     );
     documentsBucket.grantPut(storageLambda);
     documentsBucket.grantRead(storageLambda);
@@ -217,7 +214,7 @@ export class AppSyncStack extends cdk.Stack {
     const adminLambda = makeLambda(
       "AdminLambda",
       "admin-resolver",
-      "lambda/admin-resolver",
+      "admin-resolver/index.handler",
     );
 
     // ---------------------------------------------------------------
@@ -226,7 +223,7 @@ export class AppSyncStack extends cdk.Stack {
     const dashboardLambda = makeLambda(
       "DashboardLambda",
       "dashboard-resolver",
-      "lambda/dashboard-resolver",
+      "dashboard-resolver/index.handler",
     );
 
     // ---------------------------------------------------------------
@@ -235,7 +232,7 @@ export class AppSyncStack extends cdk.Stack {
     const auditLogsLambda = makeLambda(
       "AuditLogsLambda",
       "audit-logs-resolver",
-      "lambda/audit-logs-resolver",
+      "audit-logs-resolver/index.handler",
     );
 
     // ---------------------------------------------------------------
