@@ -76,7 +76,7 @@ jobs:
           aws appsync get-introspection-schema \
             --api-id "$API_ID" \
             --format SDL \
-            --outfile /tmp/remote-schema.graphql
+            > /tmp/remote-schema.graphql
 
           echo "=== Remote schema field check ==="
           for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
