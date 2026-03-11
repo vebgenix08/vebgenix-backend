@@ -1,5 +1,6 @@
-import { Request, Response } from 'express';
-import { supabase } from '../../../infrastructure/supabase/client';
+import { Request, Response } from "express";
+import prisma from "../../../infrastructure/prisma/client";
+import { CampusType } from "@prisma/client";
 
 /**
  * GET /api/tenant/me
@@ -13,8 +14,8 @@ export async function getTenantMe(req: Request, res: Response): Promise<void> {
     if (!tenant || !user) {
       res.status(500).json({
         error: {
-          code: 'MIDDLEWARE_ERROR',
-          message: 'Tenant or user not resolved',
+          code: "MIDDLEWARE_ERROR",
+          message: "Tenant or user not resolved",
         },
       });
       return;
@@ -23,76 +24,91 @@ export async function getTenantMe(req: Request, res: Response): Promise<void> {
     // 1. Get campuses user can access
     let campusesUserCanAccess: any[] = [];
 
-    // Fallback if tenantId in profile is missing/mismatch?
-    // profile.tenantId should match tenant.tenantId enforced by requireAuth.
+    // Cast user to any for compatibility
+    const userAny = user as any;
     
-    // Explicitly cast user to any to access allCampusesAccess which might not be on the Type definition yet
-    const hasAllAccess = (user as any).allCampusesAccess === true;
+    // ORG_OWNER and ORG_ADMIN always have full campus visibility
+    const tenantRole = (req as any).auth?.tenant_role ?? "";
+    const isOrgAdmin = tenantRole === "ORG_OWNER" || tenantRole === "ORG_ADMIN";
+    const hasAllAccess = isOrgAdmin || userAny.allCampusesAccess === true;
+
+    // Use tenant ID from request context (which comes from resolveTenant)
+    const contextTenantId = tenant.tenantId;
 
     if (hasAllAccess) {
       // User has access to all campuses in the tenant
-      const { data: allCampuses, error: campusError } = await supabase
-        .from('campuses')
-        .select('id, name, campus_type, is_active')
-        .eq('tenant_id', tenant.tenantId)
-        .eq('is_active', true);
-
-      if (campusError) throw campusError;
+      const allCampuses = await prisma.campus.findMany({
+        where: {
+          tenantId: contextTenantId,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          campusType: true,
+          isActive: true,
+        },
+      });
       campusesUserCanAccess = allCampuses || [];
     } else {
       // Get explicit campus access
-      // Note: We need to join properly. Supabase JS client syntax for joining:
-      const { data: accessRecords, error: accessError } = await supabase
-        .from('user_campus_access')
-        .select(`
-          campus_id,
-          campuses!inner (
-            id,
-            name,
-            campus_type,
-            is_active
-          )
-        `)
-        .eq('user_id', user.id)
-        .eq('tenant_id', tenant.tenantId)
-        .eq('campuses.is_active', true); 
+      const accessRecords = await prisma.userCampusAccess.findMany({
+        where: {
+          profileId: user.id,
+          tenantId: contextTenantId,
+          campus: {
+            isActive: true,
+          },
+        },
+        include: {
+          campus: {
+            select: {
+              id: true,
+              name: true,
+              campusType: true,
+              isActive: true,
+            },
+          },
+        },
+      });
 
-      if (accessError) throw accessError;
-
-      campusesUserCanAccess = (accessRecords || [])
-        .map((record: any) => record.campuses);
+      campusesUserCanAccess = (accessRecords || []).map(
+        (record: any) => record.campus,
+      );
     }
 
     // 2. Get enabled features for tenant
-    const { data: features, error: featuresError } = await supabase
-      .from('tenant_features')
-      .select('feature_key')
-      .eq('tenant_id', tenant.tenantId)
-      .eq('enabled', true);
+    const features = await prisma.tenantFeature.findMany({
+      where: {
+        tenantId: contextTenantId,
+        enabled: true,
+      },
+      select: {
+        featureKey: true,
+      },
+    });
 
-    if (featuresError) {
-       console.error('Feature fetch error:', featuresError);
-       // Don't crash entire response for features
-    }
-
-    const featuresList = (features || []).map((f: any) => ({ feature_key: f.feature_key, enabled: true }));
+    const featuresList = (features || []).map((f: any) => ({
+      feature_key: f.featureKey,
+      enabled: true,
+    }));
 
     const campuses = (campusesUserCanAccess || []).map((c: any) => ({
       id: c.id,
       name: c.name,
-      campus_type: c.campus_type || c.campusType,
-      is_active: c.is_active ?? c.isActive ?? true,
+      campus_type: c.campusType,
+      is_active: c.isActive,
     }));
 
     res.json({
-      tenant: { id: tenant.tenantId, name: tenant.name, subdomain: tenant.subdomain },
+      tenant: { id: contextTenantId, name: tenant.name, slug: tenant.slug },
       user: {
         id: user.id,
         email: user.email,
         full_name: user.fullName,
         role: user.role,
-        all_campuses_access: user.allCampusesAccess,
-        allCampusesAccess: user.allCampusesAccess,
+        all_campuses_access: userAny.allCampusesAccess,
+        allCampusesAccess: userAny.allCampusesAccess,
       },
       campuses,
       campusesUserCanAccess: campuses,
@@ -101,11 +117,11 @@ export async function getTenantMe(req: Request, res: Response): Promise<void> {
     });
     return; // Ensure return
   } catch (error) {
-    console.error('Get tenant/me error:', error);
+    console.error("Get tenant/me error:", error);
     res.status(500).json({
       error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Failed to fetch tenant information',
+        code: "INTERNAL_ERROR",
+        message: "Failed to fetch tenant information",
       },
     });
     return; // Ensure return
@@ -122,28 +138,29 @@ export async function getCampuses(req: Request, res: Response): Promise<void> {
     if (!tenant) {
       res.status(500).json({
         error: {
-          code: 'MIDDLEWARE_ERROR',
-          message: 'Tenant not resolved',
+          code: "MIDDLEWARE_ERROR",
+          message: "Tenant not resolved",
         },
       });
       return;
     }
 
-    const { data: campuses, error } = await supabase
-      .from('campuses')
-      .select('*')
-      .eq('tenant_id', tenant.tenantId)
-      .order('created_at', { ascending: true });
-
-    if (error) throw error;
+    const campuses = await prisma.campus.findMany({
+      where: {
+        tenantId: tenant.tenantId,
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
 
     res.json({ campuses: campuses || [] });
   } catch (error) {
-    console.error('Get campuses error:', error);
+    console.error("Get campuses error:", error);
     res.status(500).json({
       error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Failed to fetch campuses',
+        code: "INTERNAL_ERROR",
+        message: "Failed to fetch campuses",
       },
     });
   }
@@ -159,8 +176,8 @@ export async function createCampus(req: Request, res: Response): Promise<void> {
     if (!tenant) {
       res.status(500).json({
         error: {
-          code: 'MIDDLEWARE_ERROR',
-          message: 'Tenant not resolved',
+          code: "MIDDLEWARE_ERROR",
+          message: "Tenant not resolved",
         },
       });
       return;
@@ -171,55 +188,59 @@ export async function createCampus(req: Request, res: Response): Promise<void> {
     if (!name || !campus_type) {
       res.status(400).json({
         error: {
-          code: 'VALIDATION_ERROR',
-          message: 'name and campus_type are required',
+          code: "VALIDATION_ERROR",
+          message: "name and campus_type are required",
         },
       });
       return;
     }
 
-    if (!['SCHOOL', 'PU'].includes(campus_type)) {
+    if (!["SCHOOL", "PU"].includes(campus_type)) {
       res.status(400).json({
         error: {
-          code: 'VALIDATION_ERROR',
-          message: 'campus_type must be SCHOOL or PU',
+          code: "VALIDATION_ERROR",
+          message: "campus_type must be SCHOOL or PU",
         },
       });
       return;
     }
 
-    const { data: campus, error } = await supabase
-      .from('campuses')
-      .insert({
-        tenant_id: tenant.tenantId,
-        name,
-        campus_type,
-        is_active: true,
-      })
-      .select()
-      .single();
+    // Check uniqueness
+    const existing = await prisma.campus.findUnique({
+      where: {
+        tenantId_name: {
+          tenantId: tenant.tenantId,
+          name,
+        },
+      },
+    });
 
-    if (error) {
-      if (error.code === '23505') {
-        // Unique constraint violation
-        res.status(409).json({
-          error: {
-            code: 'CAMPUS_EXISTS',
-            message: 'A campus with this name already exists',
-          },
-        });
-        return;
-      }
-      throw error;
+    if (existing) {
+      res.status(409).json({
+        error: {
+          code: "CAMPUS_EXISTS",
+          message: "A campus with this name already exists",
+        },
+      });
+      return;
     }
+
+    const campus = await prisma.campus.create({
+      data: {
+        tenantId: tenant.tenantId,
+        name,
+        campusType: campus_type as CampusType,
+        isActive: true,
+      },
+    });
 
     res.status(201).json({ campus });
   } catch (error) {
-    console.error('Create campus error:', error);
+    console.error("Create campus error:", error);
     res.status(500).json({
       error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Failed to create campus',
+        code: "INTERNAL_ERROR",
+        message: "Failed to create campus",
       },
     });
   }
@@ -229,14 +250,17 @@ export async function createCampus(req: Request, res: Response): Promise<void> {
  * PATCH /api/tenant/features
  * ADMIN only - Update feature flags
  */
-export async function updateFeatures(req: Request, res: Response): Promise<void> {
+export async function updateFeatures(
+  req: Request,
+  res: Response,
+): Promise<void> {
   try {
     const tenant = (req as any).tenant;
     if (!tenant) {
       res.status(500).json({
         error: {
-          code: 'MIDDLEWARE_ERROR',
-          message: 'Tenant not resolved',
+          code: "MIDDLEWARE_ERROR",
+          message: "Tenant not resolved",
         },
       });
       return;
@@ -247,8 +271,8 @@ export async function updateFeatures(req: Request, res: Response): Promise<void>
     if (!Array.isArray(features)) {
       res.status(400).json({
         error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Request body must be an array of { feature_key, enabled }',
+          code: "VALIDATION_ERROR",
+          message: "Request body must be an array of { feature_key, enabled }",
         },
       });
       return;
@@ -256,38 +280,47 @@ export async function updateFeatures(req: Request, res: Response): Promise<void>
 
     // Validate each feature
     for (const feature of features) {
-      if (!feature.feature_key || typeof feature.enabled !== 'boolean') {
+      if (!feature.feature_key || typeof feature.enabled !== "boolean") {
         res.status(400).json({
           error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Each feature must have feature_key (string) and enabled (boolean)',
+            code: "VALIDATION_ERROR",
+            message:
+              "Each feature must have feature_key (string) and enabled (boolean)",
           },
         });
         return;
       }
     }
 
-    // Upsert features
-    const featuresToUpsert = features.map((f: any) => ({
-      tenant_id: tenant.tenantId,
-      feature_key: f.feature_key,
-      enabled: f.enabled,
-    }));
+    // Upsert features transactionally
+    const ops = features.map((f: any) =>
+      prisma.tenantFeature.upsert({
+        where: {
+          tenantId_featureKey: {
+            tenantId: tenant.tenantId,
+            featureKey: f.feature_key,
+          },
+        },
+        update: {
+          enabled: f.enabled,
+        },
+        create: {
+          tenantId: tenant.tenantId,
+          featureKey: f.feature_key,
+          enabled: f.enabled,
+        },
+      }),
+    );
 
-    const { data, error } = await supabase
-      .from('tenant_features')
-      .upsert(featuresToUpsert, { onConflict: 'tenant_id,feature_key' })
-      .select();
-
-    if (error) throw error;
+    const data = await prisma.$transaction(ops);
 
     res.json({ features: data || [] });
   } catch (error) {
-    console.error('Update features error:', error);
+    console.error("Update features error:", error);
     res.status(500).json({
       error: {
-        code: 'INTERNAL_ERROR',
-        message: 'Failed to update features',
+        code: "INTERNAL_ERROR",
+        message: "Failed to update features",
       },
     });
   }

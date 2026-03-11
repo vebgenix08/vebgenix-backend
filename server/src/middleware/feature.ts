@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../infrastructure/supabase/client';
+import prisma from '../infrastructure/prisma/client';
 
 export const FEATURES = {
   ADMISSIONS: 'ADMISSIONS',
@@ -35,15 +35,19 @@ export const requireFeature = (featureKey: string) => {
       }
 
       // 2. Check feature flag in DB
-      // We check tenant_features table
-      const { data, error } = await supabase
-        .from('tenant_features')
-        .select('enabled')
-        .eq('tenant_id', (req as any).tenant.tenantId)
-        .eq('feature_key', featureKey)
-        .single();
+      const tenantId = (req as any).tenant.tenantId;
+      
+      const feature = await prisma.tenantFeature.findUnique({
+        where: {
+          tenantId_featureKey: {
+            tenantId,
+            featureKey
+          }
+        },
+        select: { enabled: true }
+      });
 
-      if (error || !data || !data.enabled) {
+      if (!feature || !feature.enabled) {
         res.status(403).json({ 
           error: { 
             code: 'FEATURE_DISABLED', 

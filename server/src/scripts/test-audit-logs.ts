@@ -2,6 +2,7 @@
  * Run this script to test the Platform Audit Logs API end-to-end.
  * Usage: npx ts-node src/scripts/test-audit-logs.ts <GRAPHQL_ENDPOINT> <SUPER_ADMIN_TOKEN> <NON_ADMIN_TOKEN>
  */
+// @ts-ignore - node-fetch types not installed
 import fetch from "node-fetch";
 
 async function runTests() {

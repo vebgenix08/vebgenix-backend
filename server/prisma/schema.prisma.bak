@@ -1,0 +1,609 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  ACCOUNTANT
+  STAFF
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum PersonaRole {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  STAFF
+  STUDENT
+  PARENT
+}
+
+enum StaffType {
+  PRINCIPAL
+  HOD
+  TEACHER
+  ACCOUNTANT
+  CLERK
+  OTHER
+}
+
+enum CampusType {
+  SCHOOL
+  PU
+  DEGREE
+}
+
+enum CampusScope {
+  SCHOOL
+  PU
+  ALL
+}
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  CLOSED
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  INTERVIEW_SCHEDULED
+  APPROVED
+  REJECTED
+  MIGRATED
+}
+
+enum Gender {
+  Male
+  Female
+  Other
+}
+
+enum DocumentType {
+  AADHAR
+  MARKS_CARD
+  TC
+}
+
+enum ReviewDecision {
+  RECOMMEND
+  NOT_RECOMMEND
+  HOLD
+}
+
+enum StudentStatus {
+  ACTIVE
+  ALUMNI
+  WITHDRAWN
+  SUSPENDED
+}
+
+// Models
+
+model Profile {
+  id                String       @id @default(uuid()) @db.Uuid
+  tenantId          String       @map("tenant_id") @db.Uuid
+  email             String?
+  fullName          String?      @map("full_name")
+  role              UserRole
+  personaRole       PersonaRole? @map("persona_role")
+  staffType         StaffType?   @map("staff_type")
+  campusScope       CampusScope? @map("campus_scope")
+  allCampusesAccess Boolean      @default(false) @map("all_campuses_access")
+  isActive          Boolean      @default(true) @map("is_active")
+  lastLoginAt       DateTime?    @map("last_login_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tenant             Tenant                @relation(fields: [tenantId], references: [id])
+  employee           Employee?
+  campusAccess       UserCampusAccess[]
+  enquiries          Enquiry[]             @relation("AssignedTo")
+  applicationReviews ApplicationReview[]
+  verifiedDocuments  ApplicationDocument[]
+  profilePermissions ProfilePermission[]   @relation("ProfileToPermissions")
+  grantedPermissions ProfilePermission[]   @relation("GrantedByProfile")
+
+  // Auth Relations
+  linkedAuthUsers   UserProfileLink[]
+  membershipPrimary TenantMembership[] @relation("MembershipPrimaryProfile")
+
+  @@index([email])
+  @@map("profiles")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  details    Json?
+  ipAddress  String?  @map("ip_address")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  tenantId   String   @map("tenant_id") @db.Uuid
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId, createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model Enquiry {
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  fullName       String        @map("full_name")
+  email          String?
+  phone          String
+  studentDob     DateTime?     @map("student_dob") @db.Date
+  gradeApplied   String        @map("grade_applied")
+  previousSchool String?       @map("previous_school")
+  parentName     String?       @map("parent_name")
+  status         EnquiryStatus @default(NEW)
+  assignedToId   String?       @map("assigned_to") @db.Uuid
+  notes          String?
+  campusScope    CampusScope   @map("campus_scope")
+  campusId       String        @map("campus_id") @db.Uuid
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  campus       Campus        @relation(fields: [campusId], references: [id])
+  assignedTo   Profile?      @relation("AssignedTo", fields: [assignedToId], references: [id])
+  applications Application[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([tenantId])
+  @@index([tenantId, campusId, createdAt])
+  @@map("enquiries")
+}
+
+model Application {
+  id        String  @id @default(uuid()) @db.Uuid
+  tenantId  String  @map("tenant_id") @db.Uuid
+  enquiryId String? @map("enquiry_id") @db.Uuid
+
+  // Applicant Details
+  fullName    String   @map("full_name")
+  dob         DateTime @db.Date
+  gender      Gender?
+  nationality String?
+  bloodGroup  String?  @map("blood_group")
+
+  // Contact Details
+  email   String?
+  phone   String
+  address Json?
+
+  // Parent Details
+  fatherName  String? @map("father_name")
+  fatherPhone String? @map("father_phone")
+  motherName  String? @map("mother_name")
+  motherPhone String? @map("mother_phone")
+
+  // Academic Details
+  gradeApplyingFor        String   @map("grade_applying_for")
+  academicYear            String   @map("academic_year")
+  stream                  String?
+  previousSchool          String?  @map("previous_school")
+  previousGradePercentage Decimal? @map("previous_grade_percentage") @db.Decimal(5, 2)
+
+  // Status
+  status       ApplicationStatus @default(DRAFT)
+  stageHistory Json?             @default("[]") @map("stage_history")
+  approvedAt   DateTime?         @map("approved_at") @db.Timestamptz
+
+  campusScope CampusScope @map("campus_scope")
+  campusId    String      @map("campus_id") @db.Uuid
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tenant    Tenant                @relation(fields: [tenantId], references: [id])
+  campus    Campus                @relation(fields: [campusId], references: [id])
+  enquiry   Enquiry?              @relation(fields: [enquiryId], references: [id])
+  student   Student?
+  documents ApplicationDocument[]
+  reviews   ApplicationReview[]
+
+  @@index([status])
+  @@index([tenantId])
+  @@index([tenantId, campusId, status])
+  @@index([tenantId, campusId, createdAt, id])
+  @@map("applications")
+}
+
+model ApplicationDocument {
+  id            String       @id @default(uuid()) @db.Uuid
+  applicationId String       @map("application_id") @db.Uuid
+  documentType  DocumentType @map("document_type")
+  fileUrl       String       @map("file_url")
+  isVerified    Boolean      @default(false) @map("is_verified")
+  verifiedById  String?      @map("verified_by") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  verifiedBy  Profile?    @relation(fields: [verifiedById], references: [id])
+
+  @@map("application_documents")
+}
+
+model ApplicationReview {
+  id            String          @id @default(uuid()) @db.Uuid
+  applicationId String          @map("application_id") @db.Uuid
+  reviewerId    String?         @map("reviewer_id") @db.Uuid
+  comments      String?
+  decision      ReviewDecision?
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reviewer    Profile?    @relation(fields: [reviewerId], references: [id])
+
+  @@map("application_reviews")
+}
+
+model Student {
+  id               String  @id @default(uuid()) @db.Uuid
+  tenantId         String  @map("tenant_id") @db.Uuid
+  applicationId    String  @unique @map("application_id") @db.Uuid
+  authUserId       String? @unique @map("auth_user_id") @db.Uuid
+  portalAuthUserId String? @unique @map("portal_auth_user_id") @db.Uuid // DEPRECATED — use authUserId
+
+  // Unique Identifiers
+  registrationNumber String  @map("reg_no")
+  admissionNumber    String? @map("admission_number")
+
+  // Personal Info
+  fullName    String    @map("full_name")
+  email       String?   @map("student_email")
+  parentEmail String?   @map("parent_email")
+  parentPhone String?   @map("parent_phone")
+  dob         DateTime? @db.Date
+
+  // Academic Placement
+  currentGrade   String  @map("current_grade")
+  currentSection String? @map("current_section")
+  stream         String?
+
+  // System
+  campusType CampusType @map("campus_type")
+  campusId   String     @map("campus_id") @db.Uuid
+
+  status         StudentStatus @default(ACTIVE)
+  enrollmentDate DateTime?     @default(now()) @map("enrollment_date") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  campus      Campus      @relation(fields: [campusId], references: [id])
+  application Application @relation(fields: [applicationId], references: [id])
+
+  @@unique([tenantId, campusId, registrationNumber])
+  @@index([registrationNumber])
+  @@index([tenantId])
+  @@index([tenantId, campusId, status])
+  @@index([tenantId, campusId, enrollmentDate(sort: Desc)])
+  @@index([tenantId, campusId, createdAt, id])
+  @@map("students")
+}
+
+model Tenant {
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String
+  slug               String?  @unique
+  isActive           Boolean  @default(true) @map("is_active")
+  onboardingComplete Boolean  @default(false) @map("onboarding_complete")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  profiles           Profile[]
+  employees          Employee[]
+  campuses           Campus[]
+  userCampusAccess   UserCampusAccess[]
+  enquiries          Enquiry[]
+  applications       Application[]
+  students           Student[]
+  features           TenantFeature[]
+  AuditLog           AuditLog[]
+  profilePermissions ProfilePermission[]
+  memberships        TenantMembership[]
+
+  @@map("tenants")
+}
+
+model TenantFeature {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  featureKey String   @map("feature_key")
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, featureKey])
+  @@map("tenant_features")
+}
+
+// PlatformUser DELETED — platform super admins now use AuthUser + AuthUserGlobalRole
+
+model PlatformAuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  at         DateTime @default(now()) @db.Timestamptz
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String
+  targetType String   @map("target_type")
+  targetId   String?  @map("target_id") @db.Uuid
+  meta       Json?
+
+  @@index([at(sort: Desc), id(sort: Desc)])
+  @@index([actorId])
+  @@index([targetType])
+  @@map("platform_audit_logs")
+}
+
+model Campus {
+  id         String     @id @default(uuid()) @db.Uuid
+  tenantId   String     @map("tenant_id") @db.Uuid
+  name       String
+  campusType CampusType @map("campus_type")
+  isActive   Boolean    @default(true) @map("is_active")
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userCampusAccess UserCampusAccess[]
+  enquiries        Enquiry[]
+  applications     Application[]
+  students         Student[]
+
+  @@unique([tenantId, name])
+  @@map("campuses")
+}
+
+model Employee {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  profileId    String    @unique @map("profile_id") @db.Uuid
+  employeeCode String?   @map("employee_code")
+  phone        String?
+  designation  String?
+  department   String?
+  joinedOn     DateTime? @map("joined_on") @db.Date
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  profile Profile @relation(fields: [profileId], references: [id])
+
+  @@unique([tenantId, employeeCode])
+  @@index([tenantId])
+  @@map("employees")
+}
+
+model UserCampusAccess {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  profileId String   @map("profile_id") @db.Uuid
+  campusId  String   @map("campus_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  profile Profile @relation(fields: [profileId], references: [id])
+  campus  Campus  @relation(fields: [campusId], references: [id])
+
+  @@unique([profileId, campusId])
+  @@index([tenantId])
+  @@index([profileId])
+  @@map("user_campus_access")
+}
+
+// ─── Unified Auth System ────────────────────────────────────────────
+
+enum AuthStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+enum ResetTokenPurpose {
+  INVITE_SET_PASSWORD
+  FORGOT_PASSWORD
+}
+
+enum GlobalRole {
+  PLATFORM_SUPER_ADMIN
+  PLATFORM_SUPPORT
+}
+
+enum MembershipRole {
+  ORG_OWNER
+  ORG_ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+  STAFF
+  ACCOUNTANT
+}
+
+enum RelationshipType {
+  SELF
+  CHILD
+  WARD
+  SPOUSE
+  OTHER
+}
+
+model AuthUser {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  phone        String?    @unique
+  passwordHash String?
+  status       AuthStatus @default(ACTIVE)
+  mfaEnabled   Boolean    @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  globalRoles  AuthUserGlobalRole[]
+  memberships  TenantMembership[]
+  profileLinks UserProfileLink[]
+  sessions     AuthSession[]
+  resetTokens  PasswordResetToken[]
+}
+
+model AuthUserGlobalRole {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @db.Uuid
+  role      GlobalRole
+  createdAt DateTime   @default(now())
+
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+model TenantMembership {
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @db.Uuid
+  tenantId       String           @db.Uuid
+  role           MembershipRole
+  campusScope    CampusScope      @default(ALL)
+  status         MembershipStatus @default(ACTIVE)
+  isPrimaryAdmin Boolean          @default(false) @map("is_primary_admin")
+
+  primaryProfileId String?   @db.Uuid
+  invitedByUserId  String?   @map("invited_by_user_id") @db.Uuid
+  invitedAt        DateTime? @map("invited_at") @db.Timestamptz
+  activatedAt      DateTime? @map("activated_at") @db.Timestamptz
+  disabledAt       DateTime? @map("disabled_at") @db.Timestamptz
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           AuthUser             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  primaryProfile Profile?             @relation("MembershipPrimaryProfile", fields: [primaryProfileId], references: [id])
+  inviteTokens   PasswordResetToken[]
+
+  @@unique([userId, tenantId, role])
+  @@index([tenantId, role])
+}
+
+model UserProfileLink {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @db.Uuid
+  profileId    String           @db.Uuid
+  relationship RelationshipType @default(SELF)
+  isPrimary    Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+
+  user    AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profileId])
+  @@index([profileId])
+}
+
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  refreshTokenHash String
+  userAgent        String?
+  ip               String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id            String            @id @default(uuid()) @db.Uuid
+  userId        String            @db.Uuid
+  tokenHash     String            @map("token_hash")
+  purpose       ResetTokenPurpose
+  tenantId      String?           @map("tenant_id") @db.Uuid
+  membershipId  String?           @map("membership_id") @db.Uuid
+  expiresAt     DateTime          @map("expires_at")
+  usedAt        DateTime?         @map("used_at")
+  attemptCount  Int               @default(0) @map("attempt_count")
+  lastAttemptAt DateTime?         @map("last_attempt_at") @db.Timestamptz
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  user       AuthUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membership TenantMembership? @relation(fields: [membershipId], references: [id])
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model Permission {
+  id        String   @id @default(cuid())
+  key       String   @unique // e.g. "fees.collect", "dashboard.view.finance"
+  label     String
+  module    String? // e.g. "dashboard", "admissions", "users"
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  profilePermissions ProfilePermission[]
+
+  @@map("permissions")
+}
+
+model ProfilePermission {
+  id                 String   @id @default(cuid())
+  tenantId           String   @map("tenant_id") @db.Uuid
+  profileId          String   @map("profile_id") @db.Uuid
+  permissionId       String   @map("permission_id")
+  campusId           String?  @map("campus_id") @db.Uuid // null = tenant-wide grant
+  grantedByProfileId String?  @map("granted_by_profile_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile    Profile    @relation("ProfileToPermissions", fields: [profileId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedBy  Profile?   @relation("GrantedByProfile", fields: [grantedByProfileId], references: [id], onDelete: SetNull)
+
+  // Unique: one record per (tenant, profile, permission, campus) combination
+  // campusId null is treated as a distinct value via NULLS NOT DISTINCT in PG - handled at app level
+  @@unique([tenantId, profileId, permissionId, campusId])
+  @@index([tenantId, profileId])
+  @@index([tenantId, profileId, campusId])
+  @@index([tenantId, campusId])
+  @@map("profile_permissions")
+}

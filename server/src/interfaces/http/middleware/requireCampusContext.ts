@@ -8,74 +8,80 @@ export interface CampusInfo {
 }
 
 /**
- * Middleware to validate campus access
- * Requires: resolveTenant and requireAuth to be run first
+ * Middleware to validate campus access.
+ * Requires: resolveTenant and requireAuth to be run first.
+ *
+ * Bypass: ORG_OWNER and ORG_ADMIN always have access to all campuses.
  */
 export const requireCampusContext = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tenantId = (req as any).tenant?.tenantId;
     const campusId = req.header('X-Campus-Id');
 
-    // Tenant context must be present (resolveTenant should run first)
     if (!tenantId) {
-       return res.status(500).json({ code: 'TENANT_CONTEXT_MISSING', message: 'Tenant context missing' });
+      return res.status(500).json({ code: 'TENANT_CONTEXT_MISSING', message: 'Tenant context missing' });
     }
 
-    // Missing X-Campus-Id header -> 400 CAMPUS_REQUIRED
     if (!campusId) {
       return res.status(400).json({ code: 'CAMPUS_REQUIRED', message: 'X-Campus-Id header is required' });
     }
 
-    // 1. Validate Campus belongs to Tenant
-    const campus = await prisma.campus.findUnique({
-      where: { id: campusId },
-    });
+    // 1. Validate campus exists and belongs to this tenant
+    const campus = await prisma.campus.findUnique({ where: { id: campusId } });
 
-    // Campus not found or belongs to another tenant -> 404 CAMPUS_NOT_FOUND
     if (!campus || campus.tenantId !== tenantId) {
       return res.status(404).json({ code: 'CAMPUS_NOT_FOUND', message: 'Campus not found' });
     }
 
-    // Optional: Validate campus is active (not explicitly requested in A2 strict list, but good practice, kept from previous impl)
     if (!campus.isActive) {
-      return res.status(404).json({ code: 'CAMPUS_NOT_FOUND', message: 'Campus is inactive' }); // Mask as not found
+      return res.status(404).json({ code: 'CAMPUS_NOT_FOUND', message: 'Campus is inactive' });
     }
 
-    // 2. Validate User Access
+    // 2. Validate user access
     const userId = (req as any).user?.id;
     if (!userId) {
-        return res.status(401).json({ code: 'UNAUTHORIZED', message: 'User context missing' });
+      return res.status(401).json({ code: 'UNAUTHORIZED', message: 'User context missing' });
     }
-    
-    // Fetch user profile with campus access
-    const profile = await prisma.profile.findUnique({
+
+    // ORG_OWNER and ORG_ADMIN are tenant-wide admins — bypass campus access check
+    const authTenantRole: string = (req as any).auth?.tenant_role ?? '';
+    const isOrgAdmin = authTenantRole === 'ORG_OWNER' || authTenantRole === 'ORG_ADMIN';
+
+    if (!isOrgAdmin) {
+      // Check profile.allCampusesAccess first (simple, no join needed)
+      const profile = await prisma.profile.findUnique({
         where: { id: userId },
-        include: { campusAccess: true }
-    });
+        select: { allCampusesAccess: true },
+      });
 
-    if (!profile) {
+      if (!profile) {
         return res.status(401).json({ code: 'USER_NOT_FOUND', message: 'User profile not found' });
-    }
+      }
 
-    let hasAccess = false;
-    // allow if profile.all_campuses_access=true
-    if (profile.allCampusesAccess) {
-        hasAccess = true;
-    } else {
-        // OR user exists in user_campus_access for that campus
-        hasAccess = profile.campusAccess.some(ca => ca.campusId === campusId);
-    }
+      let hasAccess = profile.allCampusesAccess === true;
 
-    // else -> 403 CAMPUS_FORBIDDEN
-    if (!hasAccess) {
+      if (!hasAccess) {
+        // Fall back to user_campus_access table via raw SQL (relation may not be in Prisma schema)
+        const rows = await prisma.$queryRawUnsafe<{ count: string }[]>(
+          `SELECT count(*)::text as count FROM user_campus_access
+           WHERE profile_id = $1::uuid AND campus_id = $2::uuid AND tenant_id = $3::uuid`,
+          userId,
+          campusId,
+          tenantId,
+        );
+        hasAccess = parseInt(rows[0]?.count ?? '0', 10) > 0;
+      }
+
+      if (!hasAccess) {
         return res.status(403).json({ code: 'CAMPUS_FORBIDDEN', message: 'You do not have access to this campus' });
+      }
     }
 
-    // 3. Attach Context
+    // 3. Attach campus context for downstream middleware/controllers
     (req as any).campus = {
       campusId: campus.id,
       campusType: campus.campusType,
-      name: campus.name
+      name: campus.name,
     };
 
     return next();

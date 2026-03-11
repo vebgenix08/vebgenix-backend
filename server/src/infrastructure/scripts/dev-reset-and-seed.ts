@@ -16,6 +16,7 @@ import {
   AdminSetUserPasswordCommand,
   AdminGetUserCommand,
   AdminUpdateUserAttributesCommand,
+  AdminAddUserToGroupCommand,
   MessageActionType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import * as dotenv from "dotenv";
@@ -116,6 +117,22 @@ async function getOrCreateCognitoUser(
     }),
   );
 
+  // Add to group matching role name (if group exists)
+  if (role) {
+    try {
+      await cognitoClient.send(
+        new AdminAddUserToGroupCommand({
+          UserPoolId: USER_POOL_ID,
+          Username: normalizedEmail,
+          GroupName: role,
+        }),
+      );
+      console.log(`      ✅ Added to group: ${role}`);
+    } catch (err: any) {
+      console.warn(`      ⚠️ Could not add to group ${role}: ${err.message}`);
+    }
+  }
+
   return {
     id: userId!,
     email: normalizedEmail,
@@ -174,19 +191,16 @@ async function devResetAndSeed() {
       "SUPER_ADMIN",
     );
 
-    // Upsert into platform_users
-    await prisma.platformUser.upsert({
+    // Upsert into auth_users
+    await prisma.authUser.upsert({
       where: { email: PLATFORM_SUPER_ADMIN_EMAIL },
       create: {
         id: superAdminAuth.id,
         email: PLATFORM_SUPER_ADMIN_EMAIL,
-        fullName: "Super Admin",
-        role: "SUPER_ADMIN",
-        isActive: true,
+        status: "ACTIVE",
       },
       update: {
-        role: "SUPER_ADMIN",
-        isActive: true,
+        status: "ACTIVE",
       },
     });
 
@@ -205,13 +219,13 @@ async function devResetAndSeed() {
     const tenantA = await prisma.tenant.create({
       data: {
         name: "Tenant A",
-        subdomain: "a",
+        slug: "a",
         isActive: true,
         onboardingComplete: false,
       },
     });
 
-    console.log(`   ✅ Tenant created: ${tenantA.id} (subdomain: a)`);
+    console.log(`   ✅ Tenant created: ${tenantA.id} (slug: a)`);
 
     const campusSchool = await prisma.campus.create({
       data: {
@@ -318,28 +332,19 @@ async function devResetAndSeed() {
       // Campus access
       if (!u.allCampuses && u.restrictedTo) {
         await prisma.userCampusAccess.deleteMany({
-          where: { userId: auth.id },
+          where: { profileId: auth.id },
         });
         await prisma.userCampusAccess.create({
           data: {
             tenantId: tenantA.id,
-            userId: auth.id,
+            profileId: auth.id,
             campusId: u.restrictedTo,
           },
         });
       } else if (u.allCampuses) {
         await prisma.userCampusAccess.deleteMany({
-          where: { userId: auth.id },
+          where: { profileId: auth.id },
         });
-      }
-
-      // Lock as first admin
-      if (u.role === "ADMIN" && u.email === TENANT_A_ADMIN_EMAIL) {
-        await prisma.tenant.update({
-          where: { id: tenantA.id },
-          data: { firstAdminId: auth.id },
-        });
-        console.log("      🔒 Locked as First Admin");
       }
     }
 

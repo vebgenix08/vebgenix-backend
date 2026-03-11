@@ -1,0 +1,41 @@
+{
+    "Role": {
+        "Path": "/",
+        "RoleName": "VebgenixAppSync-dev-DashboardLambdaServiceRoleC0DAF-rpuI9wlJulk8",
+        "RoleId": "AROA6QY5YK5SXIJUCERPE",
+        "Arn": "arn:aws:iam::998105438053:role/VebgenixAppSync-dev-DashboardLambdaServiceRoleC0DAF-rpuI9wlJulk8",
+        "CreateDate": "2026-03-02T07:09:01+00:00",
+        "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "Service": "lambda.amazonaws.com"
+                    },
+                    "Action": "sts:AssumeRole"
+                }
+            ]
+        },
+        "Description": "",
+        "MaxSessionDuration": 3600,
+        "Tags": [
+            {
+                "Key": "owner",
+                "Value": "platform-team"
+            },
+            {
+                "Key": "stage",
+                "Value": "dev"
+            },
+            {
+                "Key": "project",
+                "Value": "vebgenix"
+            }
+        ],
+        "RoleLastUsed": {
+            "LastUsedDate": "2026-03-02T18:45:04+00:00",
+            "Region": "ap-south-1"
+        }
+    }
+}

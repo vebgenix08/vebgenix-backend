@@ -44,8 +44,11 @@ class EmailService {
 
     if (!SMTP_HOST || !SMTP_PORT || !SMTP_EMAIL || !SMTP_APP_PASSWORD) {
       console.warn('[EmailService] SMTP credentials not configured. Emails will not be sent.');
+      console.warn('DEBUG: SMTP_HOST:', SMTP_HOST, 'SMTP_PORT:', SMTP_PORT, 'SMTP_EMAIL:', SMTP_EMAIL);
       return;
     }
+
+    console.log('[EmailService] SMTP initialized with:', SMTP_HOST, SMTP_PORT, SMTP_EMAIL);
 
     this.config = {
       host: SMTP_HOST,

@@ -1,6 +1,7 @@
 "use strict";
 
 const { getPrisma } = require("../shared/db");
+const { extractIdentity } = require("../shared/identity");
 
 /**
  * AuditLogsLambda — AppSync resolver for platform audit log queries
@@ -11,13 +12,12 @@ const { getPrisma } = require("../shared/db");
 exports.handler = async (event) => {
   const { info, arguments: args, identity } = event;
   const fieldName = info.fieldName;
-  const claims = identity?.claims || {};
-  const groups = claims["cognito:groups"] || [];
+  const { isSuperAdmin } = extractIdentity(identity);
 
   console.log(JSON.stringify({ fieldName }));
 
   // Authorization: SUPER_ADMIN only
-  if (!groups.includes("SUPER_ADMIN")) {
+  if (!isSuperAdmin) {
     throw new Error("Unauthorized: SUPER_ADMIN access required");
   }
 
@@ -97,7 +97,7 @@ async function listPlatformAuditLogs(prisma, input) {
         at: log.at.toISOString(),
         actorId: log.actorId,
         action: log.action,
-        targetType: log.targetType,
+        targetType: normalizeTargetType(log.targetType),
         targetId: log.targetId,
         metaSummary,
       },
@@ -114,6 +114,14 @@ async function listPlatformAuditLogs(prisma, input) {
   };
 }
 
+// Map free-form DB targetType strings to valid GraphQL enum values
+const VALID_TARGET_TYPES = new Set(["TENANT", "CAMPUS", "PROFILE", "FEATURE"]);
+function normalizeTargetType(raw) {
+  if (!raw) return "TENANT";
+  const upper = raw.toUpperCase().replace(/[^A-Z]/g, "");
+  return VALID_TARGET_TYPES.has(upper) ? upper : "TENANT";
+}
+
 async function getPlatformAuditLog(prisma, id) {
   const log = await prisma.platformAuditLog.findUnique({ where: { id } });
   if (!log) throw new Error("Audit log not found");
@@ -123,7 +131,7 @@ async function getPlatformAuditLog(prisma, id) {
     at: log.at.toISOString(),
     actorId: log.actorId,
     action: log.action,
-    targetType: log.targetType,
+    targetType: normalizeTargetType(log.targetType),
     targetId: log.targetId,
     meta: log.meta,
   };

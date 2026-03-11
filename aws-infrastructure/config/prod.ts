@@ -1,15 +1,15 @@
-import { EnvConfig } from './types';
+import { EnvConfig } from "./types";
 
 export const prodConfig: EnvConfig = {
-  stage: 'prod',
-  region: 'ap-south-1',
-  account: '998105438053',
+  stage: "prod",
+  region: "ap-south-1",
+  account: "998105438053",
 
   // Tagging
   tags: {
-    project: 'vebgenix',
-    stage: 'prod',
-    owner: 'platform-team',
+    project: "vebgenix",
+    stage: "prod",
+    owner: "platform-team",
   },
 
   // Network
@@ -18,7 +18,8 @@ export const prodConfig: EnvConfig = {
   enableNat: false,
 
   // Database
-  dbInstanceClass: 'db.t3.small',
+  enableDatabase: false,
+  dbInstanceClass: "t3.small",
   dbMultiAz: true,
   dbBackupRetentionDays: 30,
   dbDeletionProtection: true,

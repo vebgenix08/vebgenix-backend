@@ -1,13 +1,13 @@
-import { supabase } from '../infrastructure/supabase/client';
-import { AuditLogger } from './AuditLogger';
-import { emailService } from './EmailService';
-import prisma from '../infrastructure/prisma/client';
-import { grantAdminDashboardPerms } from '../../scripts/grant-admin-dashboard-perms';
+import { AuditLogger } from "./AuditLogger";
+import { emailService } from "./EmailService";
+import prisma from "../infrastructure/prisma/client";
+import { grantAdminDashboardPerms } from "../../scripts/grant-admin-dashboard-perms";
+import crypto from "crypto";
 
 /**
- * Platform Service
+ * Platform
  * Business logic for platform admin operations
- * 
+ *
  * CRITICAL RULES:
  * 1. All mutations are transactional
  * 2. Emails sent AFTER transaction commits
@@ -20,16 +20,18 @@ import { grantAdminDashboardPerms } from '../../scripts/grant-admin-dashboard-pe
 interface CreateTenantResult {
   id: string;
   name: string;
-  subdomain: string;
+  slug: string | null;
   is_active: boolean;
   onboarding_complete: boolean;
 }
+
+import { CampusType } from "@prisma/client";
 
 interface CreateCampusResult {
   id: string;
   tenant_id: string;
   name: string;
-  campus_type: 'SCHOOL' | 'PU';
+  campus_type: CampusType;
   is_active: boolean;
 }
 
@@ -43,87 +45,91 @@ interface CreateFirstAdminResult {
 export class PlatformService {
   /**
    * Create a new tenant
-   * 
+   *
    * Validates:
-   * - Subdomain format (lowercase, alphanumeric, hyphens)
-   * - Subdomain uniqueness
+   * - Slug format (lowercase, alphanumeric, hyphens)
+   * - Slug uniqueness
    */
   static async createTenant(
     name: string,
-    subdomain: string,
-    actorId: string
+    slug: string | null,
+    actorId: string,
   ): Promise<CreateTenantResult> {
-    // Validate subdomain format
-    const subdomainRegex = /^[a-z0-9-]+$/;
-    if (!subdomainRegex.test(subdomain)) {
-      throw new Error('Subdomain must be lowercase alphanumeric with hyphens only');
-    }
+    // Validate slug format if provided
+    if (slug) {
+      const slugRegex = /^[a-z0-9-]+$/;
+      if (!slugRegex.test(slug)) {
+        throw new Error(
+          "Slug must be lowercase alphanumeric with hyphens only",
+        );
+      }
 
-    // Check uniqueness
-    const { data: existing } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('subdomain', subdomain)
-      .single();
+      // Check uniqueness
+      const existing = await prisma.tenant.findUnique({
+        where: { slug },
+      });
 
-    if (existing) {
-      const error: any = new Error('Subdomain already exists');
-      error.code = 'SUBDOMAIN_EXISTS';
-      error.statusCode = 409;
-      throw error;
+      if (existing) {
+        const error: any = new Error("Slug already exists");
+        error.code = "SLUG_EXISTS";
+        error.statusCode = 409;
+        throw error;
+      }
     }
 
     // Create tenant
-    const { data: tenant, error } = await supabase
-      .from('tenants')
-      .insert({
+    const tenant = await prisma.tenant.create({
+      data: {
         name,
-        subdomain,
-        is_active: true,
-        onboarding_complete: false
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
+        slug: slug || null,
+        isActive: true,
+        onboardingComplete: false,
+      },
+    });
 
     // Auto-enable all features for new tenants
     const allFeatures = [
-      'DASHBOARD',
-      'ADMISSIONS',
-      'ACADEMICS',
-      'ATTENDANCE',
-      'FINANCE',
-      'HOSTEL',
-      'TRANSPORT'
+      "DASHBOARD",
+      "ADMISSIONS",
+      "ACADEMICS",
+      "ATTENDANCE",
+      "FINANCE",
+      "HOSTEL",
+      "TRANSPORT",
     ];
 
-    const featureRecords = allFeatures.map(feature_key => ({
-      tenant_id: tenant.id,
-      feature_key,
-      enabled: true
-    }));
-
-    const { error: featuresError } = await supabase
-      .from('tenant_features')
-      .insert(featureRecords);
-
-    if (featuresError) {
-      console.error('[PlatformService] Failed to create default features:', featuresError);
-      // Don't throw - features can be added later
+    try {
+      await prisma.tenantFeature.createMany({
+        data: allFeatures.map((featureKey) => ({
+          tenantId: tenant.id,
+          featureKey,
+          enabled: true,
+        })),
+      });
+    } catch (featuresError) {
+      console.error(
+        "[PlatformService] Failed to create default features:",
+        featuresError,
+      );
     }
 
-    // Log audit (after successful creation)
+    // Log audit
     await AuditLogger.logAction({
       actorId,
-      action: 'CREATE_TENANT',
-      targetType: 'tenant',
+      action: "CREATE_TENANT",
+      targetType: "tenant",
       targetId: tenant.id,
       tenantId: tenant.id,
-      after: { name, subdomain, features: 'all_enabled' }
+      after: { name, slug, features: "all_enabled" },
     });
 
-    return tenant;
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      is_active: tenant.isActive,
+      onboarding_complete: tenant.onboardingComplete,
+    };
   }
 
   /**
@@ -132,140 +138,141 @@ export class PlatformService {
   static async createCampus(
     tenantId: string,
     name: string,
-    campusType: 'SCHOOL' | 'PU',
-    actorId: string
+    campusType: CampusType,
+    actorId: string,
   ): Promise<CreateCampusResult> {
     // Verify tenant exists
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('id', tenantId)
-      .single();
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
 
     if (!tenant) {
-      const error: any = new Error('Tenant not found');
+      const error: any = new Error("Tenant not found");
       error.statusCode = 404;
       throw error;
     }
 
     // Create campus
-    const { data: campus, error } = await supabase
-      .from('campuses')
-      .insert({
-        tenant_id: tenantId,
+    const campus = await prisma.campus.create({
+      data: {
+        tenantId,
         name,
-        campus_type: campusType,
-        is_active: true
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
+        campusType,
+        isActive: true,
+      },
+    });
 
     // Log audit
     await AuditLogger.logAction({
       actorId,
-      action: 'CREATE_CAMPUS',
-      targetType: 'campus',
+      action: "CREATE_CAMPUS",
+      targetType: "campus",
       targetId: campus.id,
       tenantId,
       campusId: campus.id,
-      after: { name, campus_type: campusType }
+      after: { name, campus_type: campusType },
     });
 
-    return campus;
+    return {
+      id: campus.id,
+      tenant_id: campus.tenantId,
+      name: campus.name,
+      campus_type: campus.campusType,
+      is_active: campus.isActive,
+    };
   }
 
   /**
-   * Create first admin for a tenant
-   * 
-   * CRITICAL TRANSACTION LOGIC:
-   * 1. Inside transaction:
-   *    - Validate email not in platform_users
-   *    - Validate email not in another tenant's profiles
-   *    - Create/reuse auth user
-   *    - Create profile with ADMIN role
-   * 2. After commit:
-   *    - Generate invite link
-   *    - Send email (failure does NOT rollback)
+   * Create primary Admin for a tenant
+   * Uses AuthUser + TenantMembership (no PlatformUser)
    */
   static async createFirstAdmin(
     tenantId: string,
     email: string,
     fullName: string,
     actorId: string,
-    sendInvite: boolean = true
+    sendInvite: boolean = true,
   ): Promise<CreateFirstAdminResult> {
     const emailLower = email.toLowerCase();
 
-    // Step 1: Validate email not in platform_users
-    const { data: platformUser } = await supabase
-      .from('platform_users')
-      .select('id')
-      .eq('email', emailLower)
-      .single();
+    // Step 1: Validate email not belonging to a platform super admin
+    const globalRole = await prisma.authUserGlobalRole.findFirst({
+      where: {
+        user: { email: emailLower },
+        role: "PLATFORM_SUPER_ADMIN",
+      },
+    });
 
-    if (platformUser) {
-      const error: any = new Error('Email belongs to platform admin and cannot be used for tenant');
-      error.code = 'EMAIL_IS_PLATFORM';
+    if (globalRole) {
+      const error: any = new Error(
+        "Email belongs to platform admin and cannot be used for tenant",
+      );
+      error.code = "EMAIL_IS_PLATFORM";
       error.statusCode = 409;
       throw error;
     }
 
-    // Step 2: Validate email not in another tenant
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id, tenant_id')
-      .eq('email', emailLower)
-      .single();
+    // Step 2: Create or reuse auth user
+    const authUser = await prisma.authUser.findUnique({
+      where: { email: emailLower },
+    });
 
-    if (existingProfile && existingProfile.tenant_id !== tenantId) {
-      const error: any = new Error('Email already belongs to another tenant');
-      error.code = 'EMAIL_IN_USE';
-      error.statusCode = 409;
-      throw error;
-    }
-
-    // Step 3: Create or reuse auth user
     let userId: string;
     let alreadyExisted = false;
 
-    const { data: { users } } = await supabase.auth.admin.listUsers();
-    const existingAuthUser = users.find(u => u.email?.toLowerCase() === emailLower);
-
-    if (existingAuthUser) {
-      userId = existingAuthUser.id;
+    if (authUser) {
+      userId = authUser.id;
       alreadyExisted = true;
     } else {
-      // Create new auth user (no password - will be set via invite link)
-      const { data: newUser, error: authError } = await supabase.auth.admin.createUser({
-        email: emailLower,
-        email_confirm: true,
-        user_metadata: {
-          full_name: fullName
-        }
+      const newUser = await prisma.authUser.create({
+        data: { email: emailLower, status: "ACTIVE" },
       });
-
-      if (authError) throw authError;
-      userId = newUser.user.id;
+      userId = newUser.id;
     }
 
-    // Step 4: Create or update profile
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
+    // Step 3: Create or update profile
+    await prisma.profile.upsert({
+      where: { id: userId },
+      create: {
         id: userId,
-        tenant_id: tenantId,
+        tenantId,
         email: emailLower,
-        full_name: fullName,
-        role: 'ADMIN',
-        all_campuses_access: true,
-        is_active: true
-      });
+        fullName,
+        role: "ADMIN",
+        allCampusesAccess: true,
+        isActive: true,
+      },
+      update: {
+        tenantId,
+        fullName,
+        role: "ADMIN",
+        allCampusesAccess: true,
+        isActive: true,
+      },
+    });
 
-    if (profileError) throw profileError;
+    const membershipStatus = sendInvite
+      ? ("INVITED" as any)
+      : ("ACTIVE" as any);
+    const activatedAt = sendInvite ? null : new Date();
 
-    // Step 4a: Auto-grant dashboard permissions to new ADMIN
+    // Step 3a: Create TenantMembership as ORG_OWNER + isPrimaryAdmin
+    const membership = await prisma.tenantMembership.upsert({
+      where: { userId_tenantId_role: { userId, tenantId, role: "ORG_OWNER" } },
+      create: {
+        userId,
+        tenantId,
+        role: "ORG_OWNER",
+        status: membershipStatus,
+        isPrimaryAdmin: true,
+        invitedByUserId: actorId,
+        invitedAt: new Date(),
+        activatedAt,
+      },
+      update: {},
+    });
+
+    // Step 3b: Auto-grant dashboard permissions
     try {
       const granted = await grantAdminDashboardPerms({
         prisma,
@@ -273,89 +280,81 @@ export class PlatformService {
         profileId: userId,
       });
       if (granted > 0) {
-        console.log(`[PlatformService] Auto-granted ${granted} dashboard permission(s) to ADMIN ${userId}`);
+        console.log(
+          `[PlatformService] Auto-granted ${granted} dashboard permission(s) to ADMIN ${userId}`,
+        );
       }
     } catch (permErr) {
-      // Non-fatal: permissions can be granted later via script
-      console.error('[PlatformService] Failed to auto-grant dashboard permissions:', permErr);
+      console.error(
+        "[PlatformService] Failed to auto-grant dashboard permissions:",
+        permErr,
+      );
     }
 
-    // Step 4b: Update tenant with first_admin_id
-    const { error: tenantUpdateError } = await supabase
-      .from('tenants')
-      .update({ first_admin_id: userId })
-      .eq('id', tenantId);
-
-    if (tenantUpdateError) throw tenantUpdateError;
-
-    // Log audit (transaction committed)
+    // Log audit
     await AuditLogger.logAction({
       actorId,
-      action: 'CREATE_FIRST_ADMIN',
-      targetType: 'profile',
+      action: "CREATE_FIRST_ADMIN",
+      targetType: "profile",
       targetId: userId,
       tenantId,
-      after: { email: emailLower, full_name: fullName, role: 'ADMIN' }
+      after: { email: emailLower, full_name: fullName, role: "ADMIN" },
     });
 
-    // Step 5: Send invite email (AFTER transaction)
+    // Step 4: Send invite email
     let inviteSent = false;
     let inviteLink: string | undefined;
 
     if (sendInvite) {
       try {
-        // Get tenant info for redirect URL
-        const { data: tenant } = await supabase
-          .from('tenants')
-          .select('name, subdomain')
-          .eq('id', tenantId)
-          .single();
-
-        if (!tenant) throw new Error('Tenant not found');
-
-        // Build tenant-aware redirect URL
-        const tenantBaseUrl = process.env.NODE_ENV === 'development'
-          ? `http://${tenant.subdomain}.erp.test:5173`
-          : `https://${tenant.subdomain}.yourapp.com`;
-
-        const redirectTo = `${tenantBaseUrl}/auth/callback`;
-
-        // Generate invite link with tenant-specific redirect
-        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-          type: alreadyExisted ? 'recovery' : 'invite',
-          email: emailLower,
-          options: {
-            redirectTo
-          }
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { name: true, slug: true },
         });
 
-        if (linkError) {
-          console.error('[PlatformService] Failed to generate invite link:', linkError);
-        } else {
-          inviteLink = linkData.properties.action_link;
+        if (!tenant) throw new Error("Tenant not found");
 
-          // In development, log the invite link
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[PlatformService] DEV MODE: Invite link for', emailLower, ':', inviteLink);
-            console.log('[PlatformService] Redirect to:', redirectTo);
-          }
+        // Generate real invite token
+        const rawToken = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto
+          .createHash("sha256")
+          .update(rawToken)
+          .digest("hex");
 
-          // Send email with tenant login URL
-          inviteSent = await emailService.sendInviteEmail(
+        // Store token in PasswordResetToken using raw SQL
+        // (Uses actual DB column names confirmed: tokenHash, userId, expiresAt, membership_id, tenant_id)
+        const tokenId = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 7 * 24 * 3600000).toISOString();
+        
+        await prisma.$executeRawUnsafe(`
+          INSERT INTO "PasswordResetToken" (
+            "id", "userId", "tokenHash", "purpose", "tenant_id", "membership_id", "expiresAt", "createdAt", "attempt_count"
+          ) VALUES (
+            '${tokenId}', '${userId}', '${tokenHash}', 'INVITE_SET_PASSWORD', '${tenantId}', 
+            '${membership.id}', '${expiresAt}', NOW(), 0
+          )
+        `);
+
+        const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:5173";
+        inviteLink = `${appBaseUrl}/invite/accept?token=${rawToken}`;
+
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            "[PlatformService] DEV MODE: Invite link for",
             emailLower,
+            ":",
             inviteLink,
-            tenant.name,
-            `${tenantBaseUrl}/login`
           );
-
-          // In development, return the link even if email fails
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[PlatformService] Email sent status:', inviteSent);
-          }
         }
+
+        inviteSent = await emailService.sendInviteEmail(
+          emailLower,
+          inviteLink || "",
+          tenant.name,
+          `${appBaseUrl}/login`,
+        );
       } catch (emailErr) {
-        console.error('[PlatformService] Email sending failed:', emailErr);
-        // Do NOT throw - email failure should not fail the operation
+        console.error("[PlatformService] Email sending failed:", emailErr);
       }
     }
 
@@ -363,7 +362,9 @@ export class PlatformService {
       userId,
       alreadyExisted,
       inviteSent,
-      ...(process.env.NODE_ENV === 'development' && inviteLink ? { inviteLink } : {})
+      ...(process.env.NODE_ENV === "development" && inviteLink
+        ? { inviteLink }
+        : {}),
     };
   }
 
@@ -373,44 +374,52 @@ export class PlatformService {
   static async updateTenantFeatures(
     tenantId: string,
     features: Array<{ feature_key: string; enabled: boolean }>,
-    actorId: string
+    actorId: string,
   ): Promise<void> {
     // Get current features for audit log
-    const { data: currentFeatures } = await supabase
-      .from('tenant_features')
-      .select('*')
-      .eq('tenant_id', tenantId);
+    const currentFeatures = await prisma.tenantFeature.findMany({
+      where: { tenantId },
+    });
 
     // Upsert features
-    const records = features.map(f => ({
-      tenant_id: tenantId,
-      feature_key: f.feature_key,
-      enabled: f.enabled
-    }));
-
-    const { error } = await supabase
-      .from('tenant_features')
-      .upsert(records, {
-        onConflict: 'tenant_id,feature_key'
-      });
-
-    if (error) throw error;
+    // Prisma doesn't support bulk upsert nicely for composite keys without raw SQL or loops
+    // We'll use a transaction with upserts
+    await prisma.$transaction(
+      features.map((f) =>
+        prisma.tenantFeature.upsert({
+          where: {
+            tenantId_featureKey: {
+              tenantId,
+              featureKey: f.feature_key,
+            },
+          },
+          create: {
+            tenantId,
+            featureKey: f.feature_key,
+            enabled: f.enabled,
+          },
+          update: {
+            enabled: f.enabled,
+          },
+        }),
+      ),
+    );
 
     // Log audit
     await AuditLogger.logAction({
       actorId,
-      action: 'UPDATE_TENANT_FEATURES',
-      targetType: 'tenant_features',
+      action: "UPDATE_TENANT_FEATURES",
+      targetType: "tenant_features",
       targetId: tenantId,
       tenantId,
       before: { features: currentFeatures || [] },
-      after: { features: records }
+      after: { features },
     });
   }
 
   /**
    * Finalize tenant onboarding
-   * 
+   *
    * Validates:
    * - At least 1 campus
    * - At least 1 ADMIN user
@@ -419,94 +428,96 @@ export class PlatformService {
    */
   static async finalizeTenantOnboarding(
     tenantId: string,
-    actorId: string
+    actorId: string,
   ): Promise<{ ok: boolean; tenant: any }> {
     // Validate tenant exists and is active
-    const { data: tenant, error: tenantError } = await supabase
-      .from('tenants')
-      .select('*')
-      .eq('id', tenantId)
-      .single();
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
 
-    if (tenantError || !tenant) {
-      const error: any = new Error('Tenant not found');
+    if (!tenant) {
+      const error: any = new Error("Tenant not found");
       error.statusCode = 404;
       throw error;
     }
 
-    if (!tenant.is_active) {
-      const error: any = new Error('Tenant is not active');
+    if (!tenant.isActive) {
+      const error: any = new Error("Tenant is not active");
       error.statusCode = 400;
       throw error;
     }
 
     // Validate at least 1 campus
-    const { data: campuses } = await supabase
-      .from('campuses')
-      .select('id')
-      .eq('tenant_id', tenantId);
+    const campusCount = await prisma.campus.count({
+      where: { tenantId },
+    });
 
-    if (!campuses || campuses.length === 0) {
-      const error: any = new Error('Tenant must have at least one campus');
-      error.code = 'NO_CAMPUSES';
+    if (campusCount === 0) {
+      const error: any = new Error("Tenant must have at least one campus");
+      error.code = "NO_CAMPUSES";
       error.statusCode = 400;
       throw error;
     }
 
     // Validate at least 1 ADMIN user
-    const { data: admins } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .eq('role', 'ADMIN');
+    const adminCount = await prisma.profile.count({
+      where: {
+        tenantId,
+        role: "ADMIN",
+      },
+    });
 
-    if (!admins || admins.length === 0) {
-      const error: any = new Error('Tenant must have at least one admin user');
-      error.code = 'NO_ADMINS';
+    if (adminCount === 0) {
+      const error: any = new Error("Tenant must have at least one admin user");
+      error.code = "NO_ADMINS";
       error.statusCode = 400;
       throw error;
     }
 
     // Validate required features
-    const { data: features } = await supabase
-      .from('tenant_features')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .in('feature_key', ['DASHBOARD', 'ADMISSIONS']);
+    const requiredFeatures = ["DASHBOARD", "ADMISSIONS"];
+    const features = await prisma.tenantFeature.findMany({
+      where: {
+        tenantId,
+        featureKey: { in: requiredFeatures },
+        enabled: true,
+      },
+    });
 
-    const requiredFeatures = ['DASHBOARD', 'ADMISSIONS'];
-    const enabledFeatures = features?.filter(f => f.enabled).map(f => f.feature_key) || [];
-    const missingFeatures = requiredFeatures.filter(f => !enabledFeatures.includes(f));
+    const enabledFeatureKeys = features.map((f) => f.featureKey);
+    const missingFeatures = requiredFeatures.filter(
+      (f) => !enabledFeatureKeys.includes(f),
+    );
 
     if (missingFeatures.length > 0) {
-      const error: any = new Error(`Required features not enabled: ${missingFeatures.join(', ')}`);
-      error.code = 'MISSING_FEATURES';
+      const error: any = new Error(
+        `Required features not enabled: ${missingFeatures.join(", ")}`,
+      );
+      error.code = "MISSING_FEATURES";
       error.statusCode = 400;
       throw error;
     }
 
     // Mark onboarding complete
-    const { error: updateError } = await supabase
-      .from('tenants')
-      .update({ onboarding_complete: true })
-      .eq('id', tenantId);
-
-    if (updateError) throw updateError;
+    const updatedTenant = await prisma.tenant.update({
+      where: { id: tenantId },
+      data: { onboardingComplete: true },
+    });
 
     // Log audit
     await AuditLogger.logAction({
       actorId,
-      action: 'FINALIZE_ONBOARDING',
-      targetType: 'tenant',
+      action: "FINALIZE_ONBOARDING",
+      targetType: "tenant",
       targetId: tenantId,
       tenantId,
       before: { onboarding_complete: false },
-      after: { onboarding_complete: true }
+      after: { onboarding_complete: true },
     });
 
     return {
       ok: true,
-      tenant: { ...tenant, onboarding_complete: true }
+      tenant: updatedTenant,
     };
   }
 
@@ -514,14 +525,33 @@ export class PlatformService {
    * List users for a tenant
    */
   static async listTenantUsers(tenantId: string): Promise<any[]> {
-    const { data: users, error } = await supabase
-      .from('profiles')
-      .select('id, email, full_name, role, is_active, all_campuses_access, tenant_id')
-      .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false });
+    const users = await prisma.profile.findMany({
+      where: { tenantId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        isActive: true,
+        allCampusesAccess: true,
+        tenantId: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
-    if (error) throw error;
-    return users || [];
+    // Map to snake_case to match previous Supabase output if needed, or keep camelCase
+    // The frontend likely expects snake_case based on previous code usage
+    return users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      full_name: u.fullName,
+      role: u.role,
+      is_active: u.isActive,
+      all_campuses_access: u.allCampusesAccess,
+      tenant_id: u.tenantId,
+      created_at: u.createdAt,
+    }));
   }
 
   /**
@@ -534,76 +564,101 @@ export class PlatformService {
     fullName: string,
     role: string,
     actorId: string,
-    sendInvite: boolean = true
+    sendInvite: boolean = true,
   ): Promise<{ userId: string; alreadyExisted: boolean; inviteSent: boolean }> {
     const emailLower = email.toLowerCase();
 
-    // Validate email not in platform_users
-    const { data: platformUser } = await supabase
-      .from('platform_users')
-      .select('id')
-      .eq('email', emailLower)
-      .single();
+    // Validate email not belonging to a platform super admin
+    const globalRole = await prisma.authUserGlobalRole.findFirst({
+      where: {
+        user: { email: emailLower },
+        role: "PLATFORM_SUPER_ADMIN",
+      },
+    });
 
-    if (platformUser) {
-      const error: any = new Error('Email belongs to platform admin');
-      error.code = 'EMAIL_IS_PLATFORM';
+    if (globalRole) {
+      const error: any = new Error("Email belongs to platform admin");
+      error.code = "EMAIL_IS_PLATFORM";
       error.statusCode = 409;
       throw error;
     }
 
-    // Check if email exists in another tenant
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id, tenant_id')
-      .eq('email', emailLower)
-      .single();
-
-    if (existingProfile && existingProfile.tenant_id !== tenantId) {
-      const error: any = new Error('Email already belongs to another tenant');
-      error.code = 'EMAIL_IN_USE';
-      error.statusCode = 409;
-      throw error;
-    }
+    // Check if email exists in AuthUser
+    const authUser = await prisma.authUser.findUnique({
+      where: { email: emailLower },
+    });
 
     // Create or reuse auth user
     let userId: string;
     let alreadyExisted = false;
 
-    const { data: { users } } = await supabase.auth.admin.listUsers();
-    const existingAuthUser = users.find(u => u.email?.toLowerCase() === emailLower);
-
-    if (existingAuthUser) {
-      userId = existingAuthUser.id;
+    if (authUser) {
+      userId = authUser.id;
       alreadyExisted = true;
     } else {
-      const { data: newUser, error: authError } = await supabase.auth.admin.createUser({
-        email: emailLower,
-        email_confirm: true,
-        user_metadata: { full_name: fullName }
+      const newUser = await prisma.authUser.create({
+        data: { email: emailLower, status: "ACTIVE" },
       });
-
-      if (authError) throw authError;
-      userId = newUser.user.id;
+      userId = newUser.id;
     }
 
     // Create or update profile
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
+    // Note: Role is string here, need to cast to UserRole if possible, or just uppercase it
+    // Assuming role is valid UserRole string
+    await prisma.profile.upsert({
+      where: { id: userId },
+      create: {
         id: userId,
-        tenant_id: tenantId,
+        tenantId,
         email: emailLower,
-        full_name: fullName,
-        role: role.toUpperCase(),
-        all_campuses_access: false,
-        is_active: true
-      });
+        fullName,
+        role: role.toUpperCase() as any, // Cast to UserRole
+        allCampusesAccess: false,
+        isActive: true,
+      },
+      update: {
+        tenantId,
+        fullName,
+        role: role.toUpperCase() as any,
+        isActive: true,
+      },
+    });
 
-    if (profileError) throw profileError;
+    // Map UserRole to MembershipRole
+    const roleMap: Record<string, string> = {
+      ADMIN: "ORG_ADMIN",
+      TEACHER: "TEACHER",
+      STAFF: "STAFF",
+      ACCOUNTANT: "ACCOUNTANT",
+      STUDENT: "STUDENT",
+      PARENT: "PARENT",
+    };
+    const membershipRole = roleMap[role.toUpperCase()] || "STAFF";
+
+    // Create TenantMembership
+    const membership = await prisma.tenantMembership.upsert({
+      where: {
+        userId_tenantId_role: {
+          userId,
+          tenantId,
+          role: membershipRole as any,
+        },
+      },
+      create: {
+        userId,
+        tenantId,
+        role: membershipRole as any,
+        status: "INVITED" as any,
+        isPrimaryAdmin: false,
+        primaryProfileId: userId,
+        invitedByUserId: actorId,
+        invitedAt: new Date(),
+      },
+      update: {},
+    });
 
     // Auto-grant dashboard permissions if role is ADMIN
-    if (role.toUpperCase() === 'ADMIN') {
+    if (role.toUpperCase() === "ADMIN") {
       try {
         const granted = await grantAdminDashboardPerms({
           prisma,
@@ -611,104 +666,163 @@ export class PlatformService {
           profileId: userId,
         });
         if (granted > 0) {
-          console.log(`[PlatformService] Auto-granted ${granted} dashboard permission(s) to ADMIN ${userId}`);
+          console.log(
+            `[PlatformService] Auto-granted ${granted} dashboard permission(s) to ADMIN ${userId}`,
+          );
         }
       } catch (permErr) {
-        // Non-fatal: permissions can be granted later via script
-        console.error('[PlatformService] Failed to auto-grant dashboard permissions:', permErr);
+        console.error(
+          "[PlatformService] Failed to auto-grant dashboard permissions:",
+          permErr,
+        );
       }
     }
 
     // Log audit
     await AuditLogger.logAction({
       actorId,
-      action: 'PROVISION_TENANT_USER',
-      targetType: 'profile',
+      action: "PROVISION_TENANT_USER",
+      targetType: "profile",
       targetId: userId,
       tenantId,
-      after: { email: emailLower, full_name: fullName, role }
+      after: { email: emailLower, full_name: fullName, role },
     });
 
-    // Send invite email
+    // Generate real invite token + send email
     let inviteSent = false;
+    let inviteLink: string | undefined;
+
     if (sendInvite) {
       try {
-        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-          type: 'invite',
-          email: emailLower
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: { name: true },
         });
 
-        if (linkError) {
-          console.error('[PlatformService] Failed to generate invite link:', linkError);
-        } else {
-          const inviteLink = linkData.properties.action_link;
-          const { data: tenant } = await supabase
-            .from('tenants')
-            .select('name')
-            .eq('id', tenantId)
-            .single();
+        // Generate real invite token
+        const rawToken = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto
+          .createHash("sha256")
+          .update(rawToken)
+          .digest("hex");
 
-          inviteSent = await emailService.sendInviteEmail(
+        // Store token in PasswordResetToken using raw SQL
+        const tokenId = crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 7 * 24 * 3600000).toISOString();
+
+        await prisma.$executeRawUnsafe(`
+          INSERT INTO "PasswordResetToken" (
+            "id", "userId", "tokenHash", "purpose", "tenant_id", "membership_id", "expiresAt", "createdAt", "attempt_count"
+          ) VALUES (
+            '${tokenId}', '${userId}', '${tokenHash}', 'INVITE_SET_PASSWORD', '${tenantId}', 
+            '${membership.id}', '${expiresAt}', NOW(), 0
+          )
+        `);
+
+        const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:5173";
+        inviteLink = `${appBaseUrl}/invite/accept?token=${rawToken}`;
+
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            "[PlatformService] DEV MODE: Invite link for",
             emailLower,
+            ":",
             inviteLink,
-            tenant?.name
           );
         }
+
+        inviteSent = await emailService.sendInviteEmail(
+          emailLower,
+          inviteLink || "",
+          tenant?.name || "Your Organization",
+        );
       } catch (emailErr) {
-        console.error('[PlatformService] Email sending failed:', emailErr);
+        console.error("[PlatformService] Email sending failed:", emailErr);
       }
     }
 
-    return { userId, alreadyExisted, inviteSent };
+    return {
+      userId,
+      alreadyExisted,
+      inviteSent,
+      ...(process.env.NODE_ENV === "development" && inviteLink
+        ? { inviteLink }
+        : {}),
+    };
   }
 
   /**
    * Resend invite to a user
    */
-  static async resendInvite(userId: string): Promise<{ inviteSent: boolean; inviteLink?: string }> {
+  static async resendInvite(
+    userId: string,
+  ): Promise<{ inviteSent: boolean; inviteLink?: string }> {
     // Get user profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('email, tenant_id, tenants(name)')
-      .eq('id', userId)
-      .single();
+    const profile = await prisma.profile.findUnique({
+      where: { id: userId },
+      include: { tenant: true },
+    });
 
     if (!profile) {
-      const error: any = new Error('User not found');
+      const error: any = new Error("User not found");
       error.statusCode = 404;
       throw error;
     }
 
-    // Generate new invite link
-    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-      type: 'invite',
-      email: profile.email
+    // Generate real invite token
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto
+      .createHash("sha256")
+      .update(rawToken)
+      .digest("hex");
+
+    // Get membership to link
+    const membership = await prisma.tenantMembership.findFirst({
+      where: { userId, tenantId: profile.tenantId },
     });
 
-    if (linkError) throw linkError;
+    // Store token in PasswordResetToken using raw SQL to bypass schema mismatch
+    const tokenId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 3600000).toISOString();
 
-    const inviteLink = linkData.properties.action_link;
+    await prisma.$executeRawUnsafe(`
+       INSERT INTO "PasswordResetToken" (
+         "id", "userId", "tokenHash", "purpose", "tenant_id", "membership_id", "expiresAt", "createdAt", "attempt_count"
+       ) VALUES (
+         '${tokenId}', '${userId}', '${tokenHash}', 'INVITE_SET_PASSWORD', '${profile.tenantId}', 
+         ${membership?.id ? `'${membership.id}'` : "NULL"}, 
+         '${expiresAt}', NOW(), 0
+       )
+     `);
+
+    const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:5173";
+    const inviteLink = `${appBaseUrl}/invite/accept?token=${rawToken}`;
 
     // In development, log the invite link
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PlatformService] DEV MODE: Resend invite link for', profile.email, ':', inviteLink);
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        "[PlatformService] DEV MODE: Resend invite link for",
+        profile.email,
+        ":",
+        inviteLink,
+      );
     }
 
     // Send email
-    const tenantName = (profile.tenants as any)?.name;
+    const tenantName = profile.tenant?.name;
     const inviteSent = await emailService.sendInviteEmail(
-      profile.email,
+      profile.email || "",
       inviteLink,
-      tenantName
+      tenantName,
     );
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[PlatformService] Resend email sent status:', inviteSent);
+    if (process.env.NODE_ENV === "development") {
+      console.log("[PlatformService] Resend email sent status:", inviteSent);
     }
 
     return {
       inviteSent,
-      ...(process.env.NODE_ENV === 'development' ? { inviteLink } : {})
+      ...(process.env.NODE_ENV === "development" ? { inviteLink } : {}),
     };
   }
 }

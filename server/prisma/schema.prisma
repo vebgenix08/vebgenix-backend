@@ -90,22 +90,72 @@ enum StudentStatus {
   SUSPENDED
 }
 
+enum AuthStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+enum ResetTokenPurpose {
+  INVITE_SET_PASSWORD
+  FORGOT_PASSWORD
+}
+
+enum GlobalRole {
+  PLATFORM_SUPER_ADMIN
+  PLATFORM_SUPPORT
+}
+
+enum MembershipRole {
+  ORG_OWNER
+  ORG_ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+  STAFF
+  ACCOUNTANT
+}
+
+enum RelationshipType {
+  SELF
+  CHILD
+  WARD
+  SPOUSE
+  OTHER
+}
+
+enum TemplateType {
+  ADMISSION_FORM
+  FEE_STRUCTURE
+  DOC_CHECKLIST
+  COMMUNICATION
+}
+
 // Models
 
 model Profile {
-  id                String       @id @db.Uuid // Links to auth.users.id
+  id                String       @id @default(uuid()) @db.Uuid
   tenantId          String       @map("tenant_id") @db.Uuid
-  email             String       @unique
+  email             String?
   fullName          String?      @map("full_name")
-  role              UserRole
-  personaRole       PersonaRole? @map("persona_role")  // Phase 2 backfill populates this
-  staffType         StaffType?   @map("staff_type")    // Meaningful when personaRole=STAFF
+  
+  // Deprecated Role Fields - Use TenantMembership + RoleDefinition instead
+  role              UserRole?    
+  personaRole       PersonaRole? @map("persona_role")
+  staffType         StaffType?   @map("staff_type")
+  
   campusScope       CampusScope? @map("campus_scope")
   allCampusesAccess Boolean      @default(false) @map("all_campuses_access")
   isActive          Boolean      @default(true) @map("is_active")
   lastLoginAt       DateTime?    @map("last_login_at") @db.Timestamptz
-  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   tenant             Tenant                @relation(fields: [tenantId], references: [id])
@@ -114,10 +164,59 @@ model Profile {
   enquiries          Enquiry[]             @relation("AssignedTo")
   applicationReviews ApplicationReview[]
   verifiedDocuments  ApplicationDocument[]
+  
+  // Deprecated Permission Model
   profilePermissions ProfilePermission[]   @relation("ProfileToPermissions")
   grantedPermissions ProfilePermission[]   @relation("GrantedByProfile")
 
+  // Auth Relations
+  linkedAuthUsers   UserProfileLink[]
+  membershipPrimary TenantMembership[] @relation("MembershipPrimaryProfile")
+
+  @@index([email])
   @@map("profiles")
+}
+
+model RoleDefinition {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  name        String
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system") // e.g. Primary Owner
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  permissions RolePermission[]
+  members     MemberRole[]
+
+  @@unique([tenantId, name])
+  @@map("role_definitions")
+}
+
+model RolePermission {
+  id             String         @id @default(uuid()) @db.Uuid
+  roleId         String         @map("role_id") @db.Uuid
+  permissionKey  String         @map("permission_key") // e.g. "admissions.view"
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  role           RoleDefinition @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionKey])
+  @@map("role_permissions")
+}
+
+model MemberRole {
+  id           String           @id @default(uuid()) @db.Uuid
+  membershipId String           @map("membership_id") @db.Uuid
+  roleId       String           @map("role_id") @db.Uuid
+  assignedAt   DateTime         @default(now()) @map("assigned_at") @db.Timestamptz
+
+  membership   TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role         RoleDefinition   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, roleId])
+  @@map("member_roles")
 }
 
 model AuditLog {
@@ -174,6 +273,7 @@ model Application {
   id        String  @id @default(uuid()) @db.Uuid
   tenantId  String  @map("tenant_id") @db.Uuid
   enquiryId String? @map("enquiry_id") @db.Uuid
+  applicantId String? @map("applicant_id") @db.Uuid
 
   // Applicant Details
   fullName    String   @map("full_name")
@@ -195,7 +295,8 @@ model Application {
 
   // Academic Details
   gradeApplyingFor        String   @map("grade_applying_for")
-  academicYear            String   @map("academic_year")
+  academicYear            String   @map("academic_year") // Deprecated string
+  academicYearId          String?  @map("academic_year_id") @db.Uuid
   stream                  String?
   previousSchool          String?  @map("previous_school")
   previousGradePercentage Decimal? @map("previous_grade_percentage") @db.Decimal(5, 2)
@@ -211,12 +312,15 @@ model Application {
   updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  tenant    Tenant                @relation(fields: [tenantId], references: [id])
-  campus    Campus                @relation(fields: [campusId], references: [id])
-  enquiry   Enquiry?              @relation(fields: [enquiryId], references: [id])
-  student   Student?
-  documents ApplicationDocument[]
-  reviews   ApplicationReview[]
+  tenant          Tenant                @relation(fields: [tenantId], references: [id])
+  campus          Campus                @relation(fields: [campusId], references: [id])
+  enquiry         Enquiry?              @relation(fields: [enquiryId], references: [id])
+  student         Student?
+  documents       ApplicationDocument[]
+  reviews         ApplicationReview[]
+  academicYearRef AcademicYear?         @relation(fields: [academicYearId], references: [id])
+  applicant       Applicant?            @relation(fields: [applicantId], references: [id])
+  offer           AdmissionOffer?
 
   @@index([status])
   @@index([tenantId])
@@ -260,7 +364,10 @@ model Student {
   id               String  @id @default(uuid()) @db.Uuid
   tenantId         String  @map("tenant_id") @db.Uuid
   applicationId    String  @unique @map("application_id") @db.Uuid
-  portalAuthUserId String? @unique @map("portal_auth_user_id") @db.Uuid
+  
+  // Deprecated Auth Link
+  authUserId       String? @unique @map("auth_user_id") @db.Uuid
+  portalAuthUserId String? @unique @map("portal_auth_user_id") @db.Uuid 
 
   // Unique Identifiers
   registrationNumber String  @map("reg_no")
@@ -292,6 +399,10 @@ model Student {
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   campus      Campus      @relation(fields: [campusId], references: [id])
   application Application @relation(fields: [applicationId], references: [id])
+  
+  // New Auth Link
+  authLink    StudentAuthLink?
+  feeAssignments StudentFeeAssignment[]
 
   @@unique([tenantId, campusId, registrationNumber])
   @@index([registrationNumber])
@@ -299,32 +410,51 @@ model Student {
   @@index([tenantId, campusId, status])
   @@index([tenantId, campusId, enrollmentDate(sort: Desc)])
   @@index([tenantId, campusId, createdAt, id])
-  // Prisma cannot represent partial indexes natively via @@unique with a condition right now
-  // We handle students_tenant_campus_admission_number_uniq in raw SQL but not in models natively
   @@map("students")
+}
+
+model StudentAuthLink {
+  id         String   @id @default(uuid()) @db.Uuid
+  studentId  String   @unique @map("student_id") @db.Uuid
+  authUserId String   @unique @map("auth_user_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  authUser   AuthUser @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+
+  @@map("student_auth_links")
 }
 
 model Tenant {
   id                 String   @id @default(uuid()) @db.Uuid
   name               String
-  subdomain          String   @unique
+  slug               String?  @unique
   isActive           Boolean  @default(true) @map("is_active")
   onboardingComplete Boolean  @default(false) @map("onboarding_complete")
-  firstAdminId       String?  @map("first_admin_id") @db.Uuid
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  profiles            Profile[]
-  employees           Employee[]
-  campuses            Campus[]
-  userCampusAccess    UserCampusAccess[]
-  enquiries           Enquiry[]
-  applications        Application[]
-  students            Student[]
-  features            TenantFeature[]
-  AuditLog            AuditLog[]
-  profilePermissions  ProfilePermission[]
+  profiles           Profile[]
+  employees          Employee[]
+  campuses           Campus[]
+  userCampusAccess   UserCampusAccess[]
+  enquiries          Enquiry[]
+  applications       Application[]
+  students           Student[]
+  features           TenantFeature[]
+  AuditLog           AuditLog[]
+  profilePermissions ProfilePermission[]
+  memberships        TenantMembership[]
+  roleDefinitions    RoleDefinition[]
+  
+  // New
+  academicYears      AcademicYear[]
+  programs           Program[]
+  templates          Template[]
+  applicants         Applicant[]
+  feeHeads           FeeHead[]
+  feeStructures      FeeStructure[]
 
   @@map("tenants")
 }
@@ -341,17 +471,6 @@ model TenantFeature {
 
   @@unique([tenantId, featureKey])
   @@map("tenant_features")
-}
-
-model PlatformUser {
-  id        String   @id @db.Uuid // Links to auth.users.id
-  email     String   @unique
-  fullName  String?  @map("full_name")
-  role      String   @default("SUPER_ADMIN")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-
-  @@map("platform_users")
 }
 
 model PlatformAuditLog {
@@ -384,6 +503,7 @@ model Campus {
   enquiries        Enquiry[]
   applications     Application[]
   students         Student[]
+  sections         Section[]
 
   @@unique([tenantId, name])
   @@map("campuses")
@@ -392,7 +512,7 @@ model Campus {
 model Employee {
   id           String    @id @default(uuid()) @db.Uuid
   tenantId     String    @map("tenant_id") @db.Uuid
-  authUserId   String    @unique @map("auth_user_id") @db.Uuid
+  profileId    String    @unique @map("profile_id") @db.Uuid
   employeeCode String?   @map("employee_code")
   phone        String?
   designation  String?
@@ -403,7 +523,7 @@ model Employee {
 
   // Relations
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  profile Profile @relation(fields: [authUserId], references: [id])
+  profile Profile @relation(fields: [profileId], references: [id])
 
   @@unique([tenantId, employeeCode])
   @@index([tenantId])
@@ -413,31 +533,145 @@ model Employee {
 model UserCampusAccess {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @map("tenant_id") @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
+  profileId String   @map("profile_id") @db.Uuid
   campusId  String   @map("campus_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  profile Profile @relation(fields: [userId], references: [id])
+  profile Profile @relation(fields: [profileId], references: [id])
   campus  Campus  @relation(fields: [campusId], references: [id])
 
-  @@unique([userId, campusId])
+  @@unique([profileId, campusId])
   @@index([tenantId])
-  @@index([userId])
+  @@index([profileId])
   @@map("user_campus_access")
 }
 
-// ─── Permissions System (Phase 1) ────────────────────────────────────────────
+model AuthUser {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  phone        String?    @unique
+  passwordHash String?
+  status       AuthStatus @default(ACTIVE)
+  mfaEnabled   Boolean    @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  globalRoles  AuthUserGlobalRole[]
+  memberships  TenantMembership[]
+  profileLinks UserProfileLink[]
+  sessions     AuthSession[]
+  resetTokens  PasswordResetToken[]
+  
+  // New
+  studentLink  StudentAuthLink?
+}
+
+model AuthUserGlobalRole {
+  id        String     @id @default(uuid()) @db.Uuid
+  userId    String     @db.Uuid
+  role      GlobalRole
+  createdAt DateTime   @default(now())
+
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+model TenantMembership {
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @db.Uuid
+  tenantId       String           @db.Uuid
+  
+  // Deprecated Role - use memberRoles instead
+  role           MembershipRole?
+  
+  campusScope    CampusScope      @default(ALL)
+  status         MembershipStatus @default(ACTIVE)
+  isPrimaryAdmin Boolean          @default(false) @map("is_primary_admin")
+
+  primaryProfileId String?   @db.Uuid
+  invitedByUserId  String?   @map("invited_by_user_id") @db.Uuid
+  invitedAt        DateTime? @map("invited_at") @db.Timestamptz
+  activatedAt      DateTime? @map("activated_at") @db.Timestamptz
+  disabledAt       DateTime? @map("disabled_at") @db.Timestamptz
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user           AuthUser             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  primaryProfile Profile?             @relation("MembershipPrimaryProfile", fields: [primaryProfileId], references: [id])
+  inviteTokens   PasswordResetToken[]
+  
+  // New
+  memberRoles    MemberRole[]
+
+  @@unique([userId, tenantId, role]) // NOTE: This unique constraint might need relaxation in future if multiple roles allowed per user without deprecated role field
+  @@index([tenantId, role])
+}
+
+model UserProfileLink {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String           @db.Uuid
+  profileId    String           @db.Uuid
+  relationship RelationshipType @default(SELF)
+  isPrimary    Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+
+  user    AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profileId])
+  @@index([profileId])
+}
+
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @db.Uuid
+  refreshTokenHash String
+  userAgent        String?
+  ip               String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id            String            @id @default(uuid()) @db.Uuid
+  userId        String            @db.Uuid
+  tokenHash     String            @map("token_hash")
+  purpose       ResetTokenPurpose
+  tenantId      String?           @map("tenant_id") @db.Uuid
+  membershipId  String?           @map("membership_id") @db.Uuid
+  expiresAt     DateTime          @map("expires_at")
+  usedAt        DateTime?         @map("used_at")
+  attemptCount  Int               @default(0) @map("attempt_count")
+  lastAttemptAt DateTime?         @map("last_attempt_at") @db.Timestamptz
+  createdAt     DateTime          @default(now()) @map("created_at")
+
+  user       AuthUser          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membership TenantMembership? @relation(fields: [membershipId], references: [id])
+
+  @@index([userId])
+  @@index([tokenHash])
+}
 
 model Permission {
   id        String   @id @default(cuid())
   key       String   @unique // e.g. "fees.collect", "dashboard.view.finance"
   label     String
-  module    String?  // e.g. "dashboard", "admissions", "users"
+  module    String? // e.g. "dashboard", "admissions", "users"
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  // Deprecated
   profilePermissions ProfilePermission[]
 
   @@map("permissions")
@@ -453,16 +687,183 @@ model ProfilePermission {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  tenant          Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  profile         Profile    @relation("ProfileToPermissions", fields: [profileId], references: [id], onDelete: Cascade)
-  permission      Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  grantedBy       Profile?   @relation("GrantedByProfile", fields: [grantedByProfileId], references: [id], onDelete: SetNull)
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  profile    Profile    @relation("ProfileToPermissions", fields: [profileId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  grantedBy  Profile?   @relation("GrantedByProfile", fields: [grantedByProfileId], references: [id], onDelete: SetNull)
 
-  // Unique: one record per (tenant, profile, permission, campus) combination
-  // campusId null is treated as a distinct value via NULLS NOT DISTINCT in PG - handled at app level
   @@unique([tenantId, profileId, permissionId, campusId])
   @@index([tenantId, profileId])
   @@index([tenantId, profileId, campusId])
   @@index([tenantId, campusId])
   @@map("profile_permissions")
+}
+
+// Phase 3: Academic & Settings Models
+
+model AcademicYear {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String   // "2024-2025"
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  isActive  Boolean  @default(false) @map("is_active")
+  isClosed  Boolean  @default(false) @map("is_closed")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  applications Application[]
+  
+  @@unique([tenantId, name])
+  @@map("academic_years")
+}
+
+model Program {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String   // "High School"
+  type      String?  // "K12", "DEGREE"
+  
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  classes   Class[]
+  
+  @@unique([tenantId, name])
+  @@map("programs")
+}
+
+model Class {
+  id        String   @id @default(uuid()) @db.Uuid
+  programId String   @map("program_id") @db.Uuid
+  name      String   // "Grade 10"
+  
+  program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  sections  Section[]
+  
+  @@unique([programId, name])
+  @@map("classes")
+}
+
+model Section {
+  id        String   @id @default(uuid()) @db.Uuid
+  classId   String   @map("class_id") @db.Uuid
+  campusId  String   @map("campus_id") @db.Uuid
+  name      String   // "A"
+  
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  campus    Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  
+  @@unique([classId, campusId, name])
+  @@map("sections")
+}
+
+model Template {
+  id        String       @id @default(uuid()) @db.Uuid
+  tenantId  String       @map("tenant_id") @db.Uuid
+  type      TemplateType @map("type")
+  name      String
+  
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  versions  TemplateVersion[]
+  
+  @@unique([tenantId, type, name])
+  @@map("templates")
+}
+
+model TemplateVersion {
+  id         String   @id @default(uuid()) @db.Uuid
+  templateId String   @map("template_id") @db.Uuid
+  version    Int
+  content    Json     // The schema or fee structure
+  isPublished Boolean @default(false) @map("is_published")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  @@unique([templateId, version])
+  @@map("template_versions")
+}
+
+// Phase 4: Admissions Models
+
+model Applicant {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  fullName  String   @map("full_name")
+  email     String?
+  phone     String
+  dob       DateTime? @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  applications Application[]
+  
+  @@unique([tenantId, phone, dob])
+  @@map("applicants")
+}
+
+model AdmissionOffer {
+  id            String   @id @default(uuid()) @db.Uuid
+  applicationId String   @unique @map("application_id") @db.Uuid
+  status        String   // ISSUED, ACCEPTED, DECLINED, EXPIRED
+  expiryDate    DateTime @map("expiry_date") @db.Date
+  feeSnapshot   Json     @map("fee_snapshot")
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  application   Application @relation(fields: [applicationId], references: [id])
+  
+  @@map("admission_offers")
+}
+
+// Phase 5: Finance Models
+
+model FeeHead {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  type      String   // RECURRING, ONE_TIME
+  
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  
+  @@unique([tenantId, name])
+  @@map("fee_heads")
+}
+
+model FeeStructure {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  versions  FeeStructureVersion[]
+  
+  @@map("fee_structures")
+}
+
+model FeeStructureVersion {
+  id             String   @id @default(uuid()) @db.Uuid
+  feeStructureId String   @map("fee_structure_id") @db.Uuid
+  version        Int
+  isActive       Boolean  @default(false) @map("is_active")
+  content        Json     // List of heads, amounts, due dates
+  createdAt      DateTime @default(now()) @map("created_at")
+  
+  feeStructure   FeeStructure @relation(fields: [feeStructureId], references: [id])
+  
+  @@unique([feeStructureId, version])
+  @@map("fee_structure_versions")
+}
+
+model StudentFeeAssignment {
+  id        String   @id @default(uuid()) @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  
+  // Snapshot of what was assigned
+  structureName    String @map("structure_name")
+  structureVersion Int    @map("structure_version")
+  snapshotContent  Json   @map("snapshot_content")
+  
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  
+  student    Student @relation(fields: [studentId], references: [id])
+  
+  @@map("student_fee_assignments")
 }

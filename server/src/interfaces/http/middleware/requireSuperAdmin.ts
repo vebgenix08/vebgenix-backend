@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import { CognitoJwtVerifier } from "aws-jwt-verify";
+import jwt from "jsonwebtoken";
 import prisma from "../../../infrastructure/prisma/client";
+
+const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
 
 export interface PlatformUser {
   id: string;
@@ -30,16 +32,12 @@ export const requireSuperAdmin = async (
   const token = authHeader.split(" ")[1];
 
   try {
-    // 1. Verify token with Cognito JWT Verifier
-    let payload;
+    // 1. Verify token with Local JWT
+    let payload: any;
     try {
-      const verifier = CognitoJwtVerifier.create({
-        userPoolId: process.env.COGNITO_USER_POOL_ID!,
-        tokenUse: "id", // Use ID token to read email
-        clientId: process.env.COGNITO_CLIENT_ID!,
-      });
-      payload = await verifier.verify(token);
+      payload = jwt.verify(token, JWT_SECRET);
     } catch (error) {
+      console.error("Auth Error (JWT):", error);
       return res.status(401).json({ error: "Invalid or expired token" });
     }
 
@@ -51,23 +49,30 @@ export const requireSuperAdmin = async (
         .json({ error: "Token valid but no email claim found" });
     }
 
-    // 2. Verify Platform User (Super Admin)
-    const platformRows: any[] = await prisma.$queryRaw`
-       SELECT id, email, role, is_active 
-       FROM platform_users 
-       WHERE email = ${email}
-    `;
+    // 2. Check if user has global PLATFORM_SUPER_ADMIN role from JWT or DB
+    const isSuperAdminFromJwt = payload.global_roles?.includes(
+      "PLATFORM_SUPER_ADMIN",
+    );
 
-    const platformUser =
-      Array.isArray(platformRows) && platformRows.length > 0
-        ? platformRows[0]
-        : null;
+    // Fallback to AuthUserGlobalRole check
+    let isSuperAdminFromDb = false;
+    let authUserId = payload.sub;
 
-    if (
-      !platformUser ||
-      platformUser.role !== "SUPER_ADMIN" ||
-      !platformUser.is_active
-    ) {
+    if (!isSuperAdminFromJwt) {
+      const dbUser = await prisma.authUser.findUnique({
+        where: { email },
+        include: { globalRoles: true },
+      });
+
+      if (dbUser && dbUser.status === "ACTIVE") {
+        isSuperAdminFromDb = dbUser.globalRoles.some(
+          (gr) => gr.role === "PLATFORM_SUPER_ADMIN",
+        );
+        authUserId = dbUser.id;
+      }
+    }
+
+    if (!isSuperAdminFromJwt && !isSuperAdminFromDb) {
       console.warn(`Unauthorized platform access attempt by email: ${email}`);
       return res
         .status(403)
@@ -76,8 +81,8 @@ export const requireSuperAdmin = async (
 
     // 3. Attach to request
     req.platformUser = {
-      id: platformUser.id,
-      email: platformUser.email,
+      id: authUserId,
+      email: email,
       role: "SUPER_ADMIN",
     };
 

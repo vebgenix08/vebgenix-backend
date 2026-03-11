@@ -1,5 +1,5 @@
 export interface EnvConfig {
-  stage: 'dev' | 'prod';
+  stage: "dev" | "prod";
   region: string;
   account: string;
 
@@ -9,6 +9,7 @@ export interface EnvConfig {
   enableNat: boolean;
 
   // Database
+  enableDatabase: boolean;
   dbInstanceClass: string;
   dbMultiAz: boolean;
   dbBackupRetentionDays: number;

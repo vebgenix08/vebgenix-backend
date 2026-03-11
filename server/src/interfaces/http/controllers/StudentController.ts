@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
-import { supabase } from "../../../infrastructure/supabase/client";
 import prisma from "../../../infrastructure/prisma/client";
 import { EmailService } from "../../../infrastructure/services/emailService";
+import { v4 as uuidv4 } from "uuid";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:5173";
 const ADMIN_FALLBACK_EMAIL =
@@ -94,19 +96,23 @@ export class StudentController {
         term: "2024-25", // Dummy/Default for now if not in DB
         program: s.campusType === "SCHOOL" ? "High School" : "PUC",
         stream: s.stream,
-        batch: s.currentGrade + (s.currentSection ? `-${s.currentSection}` : ""),
+        batch:
+          s.currentGrade + (s.currentSection ? `-${s.currentSection}` : ""),
       }));
 
       // Format Counts
       const counts = {
         all: total,
-        live: statusCounts.find((c) => c.status === "ACTIVE")?._count.status || 0,
+        live:
+          statusCounts.find((c) => c.status === "ACTIVE")?._count.status || 0,
         inactive:
-          statusCounts.find((c) => c.status === "SUSPENDED")?._count.status || 0,
+          statusCounts.find((c) => c.status === "SUSPENDED")?._count.status ||
+          0,
         completed:
           statusCounts.find((c) => c.status === "ALUMNI")?._count.status || 0,
         cancelled:
-          statusCounts.find((c) => c.status === "WITHDRAWN")?._count.status || 0,
+          statusCounts.find((c) => c.status === "WITHDRAWN")?._count.status ||
+          0,
         previous: 0, // Not strictly mapped yet
       };
 
@@ -123,13 +129,12 @@ export class StudentController {
       return; // Ensure return
     } catch (error: any) {
       console.error(
-        `StudentController.getAllStudents error: ${error?.message || error}`
+        `StudentController.getAllStudents error: ${error?.message || error}`,
       );
       res.status(500).json({ error: { message: "Failed to fetch students" } });
       return; // Ensure return
     }
   }
-
 
   /**
    * POST /api/admin/students/:studentId/enable-portal
@@ -153,32 +158,25 @@ export class StudentController {
       }
 
       if (student.portalAuthUserId) {
-        res
-          .status(200)
-          .json({
-            message: "Portal access already enabled",
-            userId: student.portalAuthUserId,
-            alreadyEnabled: true,
-          });
+        res.status(200).json({
+          message: "Portal access already enabled",
+          userId: student.portalAuthUserId,
+          alreadyEnabled: true,
+        });
         return;
       }
 
       // 2. Determine Identity & Auth Email
       let authEmail = "";
-      if (
-        student.email &&
-        loginMode === "EMAIL"
-      ) {
+      if (student.email && loginMode === "EMAIL") {
         const normalizedEmail = student.email.toLowerCase().trim();
         if (!isValidEmail(normalizedEmail)) {
-          res
-            .status(400)
-            .json({
-              error: {
-                code: "BAD_REQUEST",
-                message: "Invalid student email format",
-              },
-            });
+          res.status(400).json({
+            error: {
+              code: "BAD_REQUEST",
+              message: "Invalid student email format",
+            },
+          });
           return;
         }
         authEmail = normalizedEmail;
@@ -187,29 +185,18 @@ export class StudentController {
         authEmail = `${student.registrationNumber.toLowerCase()}@students.internal.local`;
       }
 
-      // 3. Create or Fetch Supabase User (Idempotent)
-      let authUser = await findAuthUserByEmail(authEmail);
-      if (!authUser) {
-        const { data, error: createError } =
-          await supabase.auth.admin.createUser({
-            email: authEmail,
-            email_confirm: true,
-            user_metadata: {
-              full_name: student.fullName,
-              role: "STUDENT",
-              campus_scope: student.campusType,
-            },
-          });
-        if (createError || !data.user) {
-          throw createError || new Error("Failed to create portal user");
-        }
-        authUser = data.user;
-      }
+      // 3. Create or Fetch Supabase User (Idempotent) -> NOW MOCKED LOCAL USER
+      // Check if profile exists
+      let existingProfile = await prisma.profile.findFirst({
+        where: { email: authEmail },
+      });
+
+      let userId = existingProfile ? existingProfile.id : uuidv4();
 
       // 4. Update Student Record
       await prisma.student.update({
         where: { id: studentId },
-        data: { portalAuthUserId: authUser.id },
+        data: { portalAuthUserId: userId },
       });
 
       const tenantId = (req as any).tenant?.tenantId;
@@ -220,9 +207,9 @@ export class StudentController {
 
       // 5. Upsert Profile
       await prisma.profile.upsert({
-        where: { id: authUser.id },
+        where: { id: userId },
         create: {
-          id: authUser.id,
+          id: userId,
           email: authEmail,
           fullName: student.fullName,
           role: "STUDENT",
@@ -260,42 +247,34 @@ export class StudentController {
           deliveryDetail = student.parentEmail ? "PARENT" : "ADMIN_FALLBACK";
         }
 
-        const { data: linkData, error: linkError } =
-          await supabase.auth.admin.generateLink({
-            type: "invite", // or recovery, basically same outcome effectively for new users
-            email: authEmail,
-            options: { redirectTo: `${APP_BASE_URL}/auth/callback` },
-          });
+        const loginUrl = `${APP_BASE_URL}/login`;
+        // Mock invite link
+        const inviteLink = `${APP_BASE_URL}/auth/callback?type=invite&token=mock-token-${userId}`;
 
-        if (!linkError && linkData.properties?.action_link) {
-          const loginUrl = `${APP_BASE_URL}/login`;
-          await EmailService.sendMail(
-            recipientEmail,
-            "ERP Access – Set your password",
-            `<p>Activate the student portal account using the link below:</p>
-             <p><a href="${linkData.properties.action_link}">Set Password</a></p>
-             <p>Reg No: ${student.registrationNumber}</p>
-             <p>Login: <a href="${loginUrl}">${loginUrl}</a></p>`,
-          );
-        } else if (linkError) {
-          console.error(
-            `StudentController.enablePortalAccess invite error: ${linkError.message}`,
-          );
-        }
+        await EmailService.sendMail(
+          recipientEmail,
+          "ERP Access – Set your password",
+          `<p>Activate the student portal account using the link below:</p>
+            <p><a href="${inviteLink}">Set Password</a></p>
+            <p>Reg No: ${student.registrationNumber}</p>
+            <p>Login: <a href="${loginUrl}">${loginUrl}</a></p>`,
+        );
       }
 
       res.status(200).json({
         message: "Portal access enabled",
-        portalUserId: authUser.id,
+        portalUserId: userId,
         alreadyEnabled: false,
         delivery: deliveryDetail,
       });
       return; // Ensure return
     } catch (error: any) {
       console.error(
-        `StudentController.enablePortalAccess error: ${error?.message || error}`
+        `StudentController.enablePortalAccess error: ${error?.message || error}`,
       );
-      res.status(500).json({ error: { message: "Failed to enable portal access" } });
+      res
+        .status(500)
+        .json({ error: { message: "Failed to enable portal access" } });
       return; // Ensure return
     }
   }
@@ -322,50 +301,64 @@ export class StudentController {
       }
 
       if (!student.portalAuthUserId) {
-        res
-          .status(403)
-          .json({
-            error: { message: "Portal access not enabled for this student." },
-          });
+        res.status(403).json({
+          error: { message: "Portal access not enabled for this student." },
+        });
         return;
       }
 
       // Determine Auth Email
-      // We try the internal RegNo mapping first as it handles all 'RegNo' based logins
-      // If student has explicit email login set up, maybe they should use main login?
-      // Requirement says "Student logs in using reg_no". So we map RegNo to the internal email.
-      // If EnablePortal used 'EMAIL' mode for PU students, then this Login RegNo flow might fail if we don't know that.
-      // However, usually "RegNo login" implies using the mapped address.
-      // Let's assume we construct the internal email:
       let authEmail = `${normalizedRegNo.toLowerCase()}@students.internal.local`;
-
-      // Check if the portalAuthUserId actually matches this email?
-      // Or we can just try to sign in.
-
-      // Edge Case: If PU student was enabled with REAL email, they should probably login with Email, not RegNo?
-      // OR, does the system support RegNo login even for them?
-      // If they use RegNo login, we need to know their Auth Email.
-      // We can look up the Profile by portalAuthUserId to get the email used.
 
       const profile = await prisma.profile.findUnique({
         where: { id: student.portalAuthUserId },
       });
       if (profile?.email) authEmail = profile.email.toLowerCase();
 
-      // Determine Identity via Supabase SignIn
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: authEmail,
-        password: password,
-      });
+      // Verify Password Hash via AuthUser (linked through UserProfileLink)
+      const profileLink = profile
+        ? await prisma.userProfileLink.findFirst({
+            where: { profileId: profile.id },
+            include: { user: true },
+          })
+        : null;
+      const authUser = profileLink?.user ?? null;
 
-      if (error || !data.session) {
-        res.status(401).json({ error: { message: "Invalid credentials" } });
-        return;
+      if (!authUser || !authUser.passwordHash) {
+        // For now, fail if no password set, forcing them to use Forgot Password
+        return res
+          .status(401)
+          .json({
+            error: { message: "Invalid credentials or password not set." },
+          });
       }
+
+      const isValid = await bcrypt.compare(password, authUser.passwordHash);
+      if (!isValid) {
+        return res
+          .status(401)
+          .json({ error: { message: "Invalid credentials" } });
+      }
+
+      // Generate proper JWT (TODO: Use jsonwebtoken)
+      // For now, continue using dev-token as placeholder if middleware accepts it,
+      // OR implement real JWT signing here.
+      // Since AuthController uses jwt.verify, we should sign it.
+      const jwt = require("jsonwebtoken");
+      const token = jwt.sign(
+        {
+          sub: student.portalAuthUserId,
+          email: authEmail,
+          role: "STUDENT",
+          name: student.fullName,
+        },
+        process.env.JWT_SECRET || "super-secret-key",
+        { expiresIn: "7d" },
+      );
 
       // Return Session
       res.status(200).json({
-        token: data.session.access_token,
+        token: token,
         user: {
           id: student.portalAuthUserId,
           email: authEmail,
@@ -412,12 +405,39 @@ export class StudentController {
       if (!verified) return res.status(200).json(genericResponse);
 
       // Determine Auth Email
-      const profile = await prisma.profile.findUnique({
-        where: { id: student.portalAuthUserId },
+      const profile = await prisma.profile.findFirst({
+        where: {
+          email:
+            student.registrationNumber.toLowerCase() +
+            "@students.internal.local",
+        }, // Assuming this logic or just find by ID
       });
       const authEmail =
         profile?.email ||
         `${normalizedRegNo.toLowerCase()}@students.internal.local`;
+
+      // Generate Token
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetTokenHash = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
+      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+
+      // Get AuthUser for this profile via UserProfileLink
+      const profileLinkFp = await prisma.userProfileLink.findFirst({
+        where: { profileId: student.portalAuthUserId },
+      });
+      if (profileLinkFp) {
+        await prisma.passwordResetToken.create({
+          data: {
+            userId: profileLinkFp.userId,
+            tokenHash: resetTokenHash,
+            purpose: "FORGOT_PASSWORD",
+            expiresAt: resetTokenExpiry,
+          },
+        });
+      }
 
       // Determine Delivery Email
       // Priority: Parent Email -> Admin Fallback
@@ -431,33 +451,25 @@ export class StudentController {
       }
 
       // Generate Link
-      const { data, error } = await supabase.auth.admin.generateLink({
-        type: "recovery",
-        email: authEmail,
-        options: { redirectTo: `${APP_BASE_URL}/auth/callback` },
-      });
+      const loginUrl = `${APP_BASE_URL}/login`;
+      const resetLink = `${APP_BASE_URL}/auth/reset-password?token=${resetToken}&email=${encodeURIComponent(authEmail)}`;
 
-      if (!error && data.properties?.action_link) {
-        const loginUrl = `${APP_BASE_URL}/login`;
-        await EmailService.sendMail(
-          deliveryEmail,
-          "Reset your ERP password",
-          `<p>A password reset was requested for Student Reg No: ${normalizedRegNo}</p>
-           <p><a href="${data.properties.action_link}">Reset Password</a></p>
-           <p>Login: <a href="${loginUrl}">${loginUrl}</a></p>`,
-        );
-      } else if (error) {
-        console.error(
-          `StudentController.studentForgotPassword link error: ${error.message}`,
-        );
-      }
+      await EmailService.sendMail(
+        deliveryEmail,
+        "Reset your ERP password",
+        `<p>A password reset was requested for Student Reg No: ${normalizedRegNo}</p>
+          <p><a href="${resetLink}">Reset Password</a></p>
+          <p>Login: <a href="${loginUrl}">${loginUrl}</a></p>`,
+      );
 
       return res.status(200).json(genericResponse);
     } catch (error: any) {
       console.error(
         `StudentController.studentForgotPassword error: ${error?.message || error}`,
       );
-      return res.status(200).json({ message: "If valid, reset instructions sent." });
+      return res
+        .status(200)
+        .json({ message: "If valid, reset instructions sent." });
     }
   }
 
@@ -476,12 +488,36 @@ export class StudentController {
         return;
       }
 
+      // Determine Auth Email
       const profile = await prisma.profile.findUnique({
         where: { id: student.portalAuthUserId },
       });
       const authEmail =
         profile?.email ||
         `${student.registrationNumber.toLowerCase()}@students.internal.local`;
+
+      // Generate Token
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetTokenHash = crypto
+        .createHash("sha256")
+        .update(resetToken)
+        .digest("hex");
+      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+
+      // Get AuthUser for this profile via UserProfileLink
+      const profileLinkRp = await prisma.userProfileLink.findFirst({
+        where: { profileId: student.portalAuthUserId },
+      });
+      if (profileLinkRp) {
+        await prisma.passwordResetToken.create({
+          data: {
+            userId: profileLinkRp.userId,
+            tokenHash: resetTokenHash,
+            purpose: "FORGOT_PASSWORD",
+            expiresAt: resetTokenExpiry,
+          },
+        });
+      }
 
       // Validate and use parent email or fallback to admin email
       let deliveryEmail = ADMIN_FALLBACK_EMAIL;
@@ -492,24 +528,16 @@ export class StudentController {
         }
       }
 
-      const { data, error } = await supabase.auth.admin.generateLink({
-        type: "recovery",
-        email: authEmail,
-        options: { redirectTo: `${APP_BASE_URL}/auth/callback` },
-      });
+      const loginUrl = `${APP_BASE_URL}/login`;
+      const resetLink = `${APP_BASE_URL}/auth/reset-password?token=${resetToken}&email=${encodeURIComponent(authEmail)}`;
 
-      if (error) throw error;
-
-      if (data.properties?.action_link) {
-        const loginUrl = `${APP_BASE_URL}/login`;
-        await EmailService.sendMail(
-          deliveryEmail,
-          "Reset your ERP password",
-          `<p>Administrator requested password reset for ${student.fullName} (${student.registrationNumber}).</p>
-           <p><a href="${data.properties.action_link}">Reset Password</a></p>
-           <p>Login: <a href="${loginUrl}">${loginUrl}</a></p>`,
-        );
-      }
+      await EmailService.sendMail(
+        deliveryEmail,
+        "Reset your ERP password",
+        `<p>Administrator requested password reset for ${student.fullName} (${student.registrationNumber}).</p>
+          <p><a href="${resetLink}">Reset Password</a></p>
+          <p>Login: <a href="${loginUrl}">${loginUrl}</a></p>`,
+      );
 
       res.status(200).json({ resetSent: true });
       return; // Ensure return
@@ -523,24 +551,4 @@ export class StudentController {
       return; // Ensure return
     }
   }
-}
-
-async function findAuthUserByEmail(email: string) {
-  const normalizedEmail = email.toLowerCase();
-  const perPage = 200;
-  let page = 1;
-  const maxPages = 50;
-  while (page <= maxPages) {
-    const { data, error } = await supabase.auth.admin.listUsers({
-      page,
-      perPage,
-    });
-    if (error) throw error;
-    const users = data?.users || [];
-    const found = users.find((u) => u.email?.toLowerCase() === normalizedEmail);
-    if (found) return found;
-    if (users.length < perPage) return null;
-    page += 1;
-  }
-  return null;
 }

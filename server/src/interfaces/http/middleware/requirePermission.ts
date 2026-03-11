@@ -33,6 +33,12 @@ export function requirePermission(permissionKey: string) {
       return;
     }
 
+    // ORG_OWNER and ORG_ADMIN are tenant super-users — implicitly hold ALL permissions
+    const tenantRole: string = auth.tenant_role ?? '';
+    if (tenantRole === 'ORG_OWNER' || tenantRole === 'ORG_ADMIN') {
+      return next();
+    }
+
     const tenantWideKeys: Set<string> = auth.tenantWideKeys ?? new Set();
     const campusKeys: Map<string, Set<string>> = auth.campusKeys ?? new Map();
     const campusId: string | undefined = (req as any).campus?.campusId;
@@ -46,8 +52,6 @@ export function requirePermission(permissionKey: string) {
     if (campusId && campusKeys.has(campusId)) {
       const campusSet = campusKeys.get(campusId)!;
       if (campusSet.has(permissionKey)) {
-        // Campus membership already verified by requireCampusContext middleware.
-        // req.campus is set only after that verification passes.
         return next();
       }
     }

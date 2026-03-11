@@ -9,25 +9,81 @@ type Query {
   _empty: String
   dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
   superAdminOverview(input: SuperAdminOverviewInput): SuperAdminOverview!
+  
+  # Admissions
   listAdmissions(
     filter: AdmissionFilter
     limit: Int = 25
     cursor: String
   ): AdmissionsConnection!
   getAdmission(id: ID!): Admission
+  
+  # Users (Staff & Access)
+  me: User!
+  listUsers(limit: Int, nextToken: String, filter: UserFilter): UserConnection!
+  getUser(id: ID!): User
+  
+  # Tenants
+  listTenants(limit: Int, nextToken: String): TenantConnection!
+  getTenant(id: ID!): Tenant
+  
   _studentsEmpty: String
-  _usersEmpty: String
   _feesEmpty: String
   _templatesEmpty: String
+  
+  # Audit
   listPlatformAuditLogs(
     input: ListPlatformAuditLogsInput!
   ): PlatformAuditLogsConnection!
   getPlatformAuditLog(id: ID!): PlatformAuditLogDetail!
+  
+  # Admin
+  platformStats: PlatformStats!
+  
+  # Settings
+  listAcademicYears: [AcademicYear!]!
+  listTemplates(type: String): [Template!]!
+  
+  # Students
+  listStudents(filter: StudentFilter, limit: Int, nextToken: String): StudentConnection!
 }
 
 type Mutation {
   _empty: String
   updateAdmissionStatus(id: ID!, status: String!): Admission!
+  
+  # Users
+  createUser(input: CreateUserInput!): User! # Legacy/Dev
+  updateUser(input: UpdateUserInput!): User!
+  deactivateUser(id: ID!): Boolean
+  inviteStaff(input: InviteStaffInput!): InviteStaffPayload!
+  
+  # Tenants
+  createTenant(input: CreateTenantInput!): Tenant!
+  updateTenant(input: UpdateTenantInput!): Tenant!
+  deactivateTenant(id: ID!): Boolean
+  
+  # Admissions
+  createAdmission(input: CreateAdmissionInput!): Admission!
+  updateAdmission(input: UpdateAdmissionInput!): Admission!
+  submitAdmission(id: ID!): Admission!
+  reviewAdmission(id: ID!, input: ReviewAdmissionInput!): Admission!
+  withdrawAdmission(id: ID!): Admission!
+  
+  # Storage
+  generateUploadUrl(contentType: String!, filename: String!): UploadUrlPayload!
+  
+  # Settings
+  createAcademicYear(input: CreateAcademicYearInput!): AcademicYear!
+  createTemplate(input: CreateTemplateInput!): Template!
+  publishTemplateVersion(input: PublishTemplateVersionInput!): TemplateVersion!
+  
+  # Students
+  convertApplicationToStudent(applicationId: ID!): Student!
+  
+  # Finance
+  createFeeHead(input: CreateFeeHeadInput!): FeeHead!
+  createFeeStructure(input: CreateFeeStructureInput!): FeeStructure!
 }
 
 # --- dashboard.graphql ---
@@ -156,25 +212,117 @@ input AdmissionFilter {
   search: String
 }
 
+input CreateAdmissionInput {
+  studentName: String!
+  phone: String!
+}
 
+input UpdateAdmissionInput {
+  id: ID!
+  studentName: String
+  status: String
+}
 
-
-# --- students.graphql ---
-
-# Auto-generated. Represents students module.
-# To be expanded later.
+input ReviewAdmissionInput {
+  decision: String!
+  comments: String
+}
 
 # --- users.graphql ---
 
-# Auto-generated. Represents users module.
+type User {
+  id: ID!
+  email: String!
+  fullName: String
+  permissions: [String!]!
+  roles: [String!]!
+  tenantId: String
+  isPrimaryOwner: Boolean
+  phone: String
+  status: String
+  joinedAt: AWSDateTime
+}
 
-# --- fees.graphql ---
+type UserEdge {
+  cursor: String!
+  node: User!
+}
 
-# Auto-generated. Represents fees module.
+type UserConnection {
+  edges: [UserEdge!]!
+  pageInfo: PageInfo!
+}
 
-# --- templates.graphql ---
+input UserFilter {
+  search: String
+  campusId: ID
+}
 
-# Auto-generated. Represents templates module.
+input InviteStaffInput {
+  email: String!
+  fullName: String!
+  roleIds: [ID!]!
+  campusIds: [ID!]
+  allCampuses: Boolean
+}
+
+type InviteStaffPayload {
+  success: Boolean!
+  membershipId: ID
+}
+
+input CreateUserInput {
+  email: String!
+  fullName: String!
+  role: String
+}
+
+input UpdateUserInput {
+  id: ID!
+  fullName: String
+  role: String
+}
+
+# --- tenants.graphql ---
+
+type Tenant {
+  id: ID!
+  name: String!
+  slug: String
+  isActive: Boolean!
+  createdAt: AWSDateTime!
+}
+
+type TenantConnection {
+  items: [Tenant!]!
+  nextToken: String
+}
+
+input CreateTenantInput {
+  name: String!
+  slug: String
+  email: String! 
+}
+
+input UpdateTenantInput {
+  id: ID!
+  name: String
+  isActive: Boolean
+}
+
+# --- admin.graphql ---
+
+type PlatformStats {
+  totalTenants: Int!
+  activeTenants: Int!
+}
+
+# --- storage.graphql ---
+
+type UploadUrlPayload {
+  uploadUrl: String!
+  key: String!
+}
 
 # --- auditLogs.graphql ---
 
@@ -228,4 +376,86 @@ input ListPlatformAuditLogsInput {
   filter: PlatformAuditLogsFilter
   limit: Int! = 25
   cursor: String
+}
+
+# --- templates.graphql ---
+
+type Template {
+  id: ID!
+  type: String!
+  name: String!
+}
+
+type TemplateVersion {
+  id: ID!
+  version: Int!
+  content: AWSJSON!
+  isPublished: Boolean!
+}
+
+input CreateTemplateInput {
+  type: String!
+  name: String!
+}
+
+input PublishTemplateVersionInput {
+  templateId: ID!
+  content: AWSJSON!
+}
+
+# --- settings.graphql ---
+
+type AcademicYear {
+  id: ID!
+  name: String!
+  startDate: String!
+  endDate: String!
+  isActive: Boolean!
+}
+
+input CreateAcademicYearInput {
+  name: String!
+  startDate: String!
+  endDate: String!
+}
+
+# --- students.graphql ---
+
+type Student {
+  id: ID!
+  fullName: String!
+  registrationNumber: String
+  status: String!
+  currentGrade: String
+}
+
+type StudentConnection {
+  items: [Student!]!
+  nextToken: String
+}
+
+input StudentFilter {
+  search: String
+}
+
+# --- fees.graphql ---
+
+type FeeHead {
+  id: ID!
+  name: String!
+  type: String!
+}
+
+type FeeStructure {
+  id: ID!
+  name: String!
+}
+
+input CreateFeeHeadInput {
+  name: String!
+  type: String!
+}
+
+input CreateFeeStructureInput {
+  name: String!
 }

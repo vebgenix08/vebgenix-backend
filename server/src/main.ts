@@ -1,8 +1,14 @@
 import dotenv from "dotenv";
 // Load environment variables immediately
-dotenv.config();
+const result = dotenv.config();
+if (result.error) {
+  console.error("Failed to load .env file:", result.error);
+} else {
+  console.log("Loaded .env file successfully.");
+}
 
 import express from "express";
+import cookieParser from "cookie-parser";
 // Triggering nodemon restart after fixing port 5000
 import cors from "cors";
 import helmet from "helmet";
@@ -17,6 +23,7 @@ app.use(helmet());
 app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
+app.use(cookieParser());
 
 // Routes
 app.use("/api", router);

@@ -1,0 +1,84 @@
+{
+    "VpcEndpoints": [
+        {
+            "VpcEndpointId": "vpce-0b63dfed5e8339672",
+            "VpcEndpointType": "Interface",
+            "VpcId": "vpc-04f51e876707e3bf4",
+            "ServiceName": "com.amazonaws.ap-south-1.secretsmanager",
+            "State": "available",
+            "PolicyDocument": "{\n  \"Statement\": [\n    {\n      \"Action\": \"*\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Resource\": \"*\"\n    }\n  ]\n}",
+            "RouteTableIds": [],
+            "SubnetIds": [
+                "subnet-0f55db5d2cfe0c863",
+                "subnet-08587354663aefb58"
+            ],
+            "Groups": [
+                {
+                    "GroupId": "sg-09926e3f966c66a68",
+                    "GroupName": "VebgenixNetwork-dev-VpcSecretsManagerEndpointSecurityGroup9A5498C7-Aaz0mcHWxQw2"
+                }
+            ],
+            "IpAddressType": "ipv4",
+            "DnsOptions": {
+                "DnsRecordIpType": "ipv4"
+            },
+            "PrivateDnsEnabled": true,
+            "RequesterManaged": false,
+            "NetworkInterfaceIds": [
+                "eni-0f3868e5fe11dbd18",
+                "eni-05ca710c2211ed46d"
+            ],
+            "DnsEntries": [
+                {
+                    "DnsName": "vpce-0b63dfed5e8339672-w8zslohf.secretsmanager.ap-south-1.vpce.amazonaws.com",
+                    "HostedZoneId": "Z2KVTB3ZLFM7JR"
+                },
+                {
+                    "DnsName": "vpce-0b63dfed5e8339672-w8zslohf-ap-south-1b.secretsmanager.ap-south-1.vpce.amazonaws.com",
+                    "HostedZoneId": "Z2KVTB3ZLFM7JR"
+                },
+                {
+                    "DnsName": "vpce-0b63dfed5e8339672-w8zslohf-ap-south-1a.secretsmanager.ap-south-1.vpce.amazonaws.com",
+                    "HostedZoneId": "Z2KVTB3ZLFM7JR"
+                },
+                {
+                    "DnsName": "secretsmanager.ap-south-1.amazonaws.com",
+                    "HostedZoneId": "Z0284363ZZKUTC74AGDZ"
+                }
+            ],
+            "CreationTimestamp": "2026-02-25T05:30:14.413000+00:00",
+            "Tags": [
+                {
+                    "Key": "owner",
+                    "Value": "platform-team"
+                },
+                {
+                    "Key": "aws:cloudformation:stack-name",
+                    "Value": "VebgenixNetwork-dev"
+                },
+                {
+                    "Key": "aws:cloudformation:stack-id",
+                    "Value": "arn:aws:cloudformation:ap-south-1:998105438053:stack/VebgenixNetwork-dev/fbb0b1b0-120a-11f1-9e2a-0ab928a9e991"
+                },
+                {
+                    "Key": "stage",
+                    "Value": "dev"
+                },
+                {
+                    "Key": "aws:cloudformation:logical-id",
+                    "Value": "VpcSecretsManagerEndpoint93E49F69"
+                },
+                {
+                    "Key": "project",
+                    "Value": "vebgenix"
+                },
+                {
+                    "Key": "Name",
+                    "Value": "VebgenixNetwork-dev/Vpc"
+                }
+            ],
+            "OwnerId": "998105438053",
+            "ServiceRegion": "ap-south-1"
+        }
+    ]
+}

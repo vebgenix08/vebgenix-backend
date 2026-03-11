@@ -1,16 +1,16 @@
-import { Request } from 'express';
+import { Request } from "express";
 
 declare global {
   namespace Express {
     interface Request {
       tenant?: {
         tenantId: string;
-        subdomain: string;
+        slug: string | null;
         name: string;
       };
       campus?: {
         campusId: string;
-        campusType: 'SCHOOL' | 'PU';
+        campusType: "SCHOOL" | "PU";
         name: string;
       };
       // User is already likely extended elsewhere or we can add it here to be safe

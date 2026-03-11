@@ -1,4 +1,4 @@
-import { supabase } from '../infrastructure/supabase/client';
+import prisma from '../infrastructure/prisma/client';
 
 /**
  * Platform Audit Logger
@@ -39,23 +39,20 @@ export class AuditLogger {
     } = params;
 
     try {
-      const { error } = await supabase
-        .from('platform_audit_logs')
-        .insert({
-          actor_id: actorId,
+      await prisma.platformAuditLog.create({
+        data: {
+          actorId,
           action,
-          target_type: targetType,
-          target_id: targetId,
-          tenant_id: tenantId,
-          campus_id: campusId,
-          before,
-          after
-        });
-
-      if (error) {
-        // Log error but don't throw - audit failure should not break the operation
-        console.error('[AuditLogger] Failed to write audit log:', error);
-      }
+          targetType,
+          targetId,
+          meta: {
+            tenantId,
+            campusId,
+            before,
+            after
+          }
+        }
+      });
     } catch (err) {
       console.error('[AuditLogger] Unexpected error:', err);
     }
@@ -66,24 +63,22 @@ export class AuditLogger {
    */
   static async logBatch(logs: AuditLogParams[]): Promise<void> {
     try {
-      const records = logs.map(log => ({
-        actor_id: log.actorId,
+      const data = logs.map(log => ({
+        actorId: log.actorId,
         action: log.action,
-        target_type: log.targetType,
-        target_id: log.targetId || null,
-        tenant_id: log.tenantId || null,
-        campus_id: log.campusId || null,
-        before: log.before || {},
-        after: log.after || {}
+        targetType: log.targetType,
+        targetId: log.targetId || null,
+        meta: {
+          tenantId: log.tenantId || null,
+          campusId: log.campusId || null,
+          before: log.before || {},
+          after: log.after || {}
+        }
       }));
 
-      const { error } = await supabase
-        .from('platform_audit_logs')
-        .insert(records);
-
-      if (error) {
-        console.error('[AuditLogger] Failed to write batch audit logs:', error);
-      }
+      await prisma.platformAuditLog.createMany({
+        data
+      });
     } catch (err) {
       console.error('[AuditLogger] Unexpected batch error:', err);
     }

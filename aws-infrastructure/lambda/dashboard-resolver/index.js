@@ -11,18 +11,34 @@ const { withTenant } = require("../shared/withTenant");
 exports.handler = async (event) => {
   const { info, arguments: args, identity } = event;
   const fieldName = info.fieldName;
-  const claims = identity?.claims || {};
-  const userId = claims.sub;
-  const groups = claims["cognito:groups"] || [];
-  let tenantId = claims["custom:tenant_id"];
 
-  console.log(JSON.stringify({ fieldName, userId, tenantId }));
+  // Support both auth modes:
+  //   USER_POOL  → identity.claims  (Cognito JWT)
+  //   LAMBDA     → identity.resolverContext  (our Express JWT, parsed by appsync-authorizer)
+  const isLambdaAuth = !!identity?.resolverContext;
+  const claims = identity?.claims || {};
+  const rc = identity?.resolverContext || {};
+
+  const userId = isLambdaAuth ? rc.userId : claims.sub;
+  const globalRoles = isLambdaAuth
+    ? JSON.parse(rc.global_roles || "[]") // stored as JSON string
+    : claims["cognito:groups"] || [];
+  let tenantId = isLambdaAuth ? rc.tenant_id : claims["custom:tenant_id"];
+
+  // Super Admin check works for both modes
+  const isSuperAdmin = isLambdaAuth
+    ? globalRoles.includes("PLATFORM_SUPER_ADMIN")
+    : globalRoles.includes("SUPER_ADMIN");
+
+  console.log(
+    JSON.stringify({ fieldName, userId, tenantId, isSuperAdmin, isLambdaAuth }),
+  );
 
   const prisma = await getPrisma();
 
   try {
     if (fieldName === "superAdminOverview") {
-      if (!groups.includes("SUPER_ADMIN")) throw new Error("Unauthorized");
+      if (!isSuperAdmin) throw new Error("Unauthorized");
       return await getSuperAdminOverview(prisma);
     }
 

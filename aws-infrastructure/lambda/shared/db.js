@@ -1,6 +1,6 @@
-'use strict';
+"use strict";
 
-const { PrismaClient } = require('@prisma/client');
+const { PrismaClient } = require("@prisma/client");
 
 /**
  * RDS Proxy-aware Prisma singleton for Lambda.
@@ -22,14 +22,26 @@ async function getDbCredentials() {
     return process.env.DATABASE_URL;
   }
 
-  const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+  if (
+    process.env.DB_SECRET_ARN === "DISABLED" ||
+    process.env.DB_PROXY_ENDPOINT === "DISABLED"
+  ) {
+    throw new Error(
+      "Database is specifically DISABLED in CDK environment config.",
+    );
+  }
+
+  const {
+    SecretsManagerClient,
+    GetSecretValueCommand,
+  } = require("@aws-sdk/client-secrets-manager");
   const sm = new SecretsManagerClient({});
   const { SecretString } = await sm.send(
-    new GetSecretValueCommand({ SecretId: process.env.DB_SECRET_ARN })
+    new GetSecretValueCommand({ SecretId: process.env.DB_SECRET_ARN }),
   );
   const { username, password, dbname } = JSON.parse(SecretString);
   const host = process.env.DB_PROXY_ENDPOINT;
-  const db = dbname ?? process.env.DB_NAME ?? 'vebgenix';
+  const db = dbname ?? process.env.DB_NAME ?? "vebgenix";
   // Use SSL mode=require for RDS Proxy
   return `postgresql://${username}:${encodeURIComponent(password)}@${host}:5432/${db}?sslmode=require`;
 }
@@ -40,13 +52,14 @@ async function getPrisma() {
   const url = await getDbCredentials();
   _prisma = new PrismaClient({
     datasources: { db: { url } },
-    log: process.env.STAGE === 'dev'
-      ? ['query', 'warn', 'error']
-      : ['warn', 'error'],
+    log:
+      process.env.STAGE === "dev"
+        ? ["query", "warn", "error"]
+        : ["warn", "error"],
   });
 
   await _prisma.$connect();
-  console.log('PrismaClient connected via RDS Proxy');
+  console.log("PrismaClient connected via RDS Proxy");
   return _prisma;
 }
 

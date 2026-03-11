@@ -12,6 +12,8 @@ import { MonitoringStack } from "../lib/stacks/monitoring-stack";
 import { AppSyncStack } from "../lib/stacks/appsync-stack";
 import { FrontendStack } from "../lib/stacks/frontend-stack";
 import { GithubOidcStack } from "../lib/stacks/github-oidc-stack";
+import { DatabaseStack } from "../lib/stacks/database-stack";
+import { BastionStack } from "../lib/stacks/bastion-stack";
 
 const app = new cdk.App();
 
@@ -45,17 +47,32 @@ const storageStack = new StorageStack(app, `VebgenixStorage-${config.stage}`, {
   config,
 });
 
+const enableDatabase = config.enableDatabase === true;
+
+let databaseStack: DatabaseStack | undefined;
+
+if (enableDatabase) {
+  databaseStack = new DatabaseStack(app, `VebgenixDatabase-${config.stage}`, {
+    env,
+    config,
+    vpc: networkStack.vpc,
+    sgDb: networkStack.sgDb,
+    sgProxy: networkStack.sgProxy,
+  });
+}
+
 // 4. Async: EventBridge + SQS + Worker Lambdas
 const asyncStack = new AsyncStack(app, `VebgenixAsync-${config.stage}`, {
   env,
   config,
   vpc: networkStack.vpc,
   sgLambda: networkStack.sgLambda,
-  dbProxyEndpoint: `placeholder-proxy-${config.stage}`,
-  dbSecretArn: `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master`,
+  dbProxyEndpoint: databaseStack ? databaseStack.dbProxyEndpoint : "DISABLED",
+  dbSecretArn: databaseStack ? databaseStack.dbSecretArn : "DISABLED",
   emailBucket: storageStack.bucket,
 });
 asyncStack.addDependency(networkStack);
+if (databaseStack) asyncStack.addDependency(databaseStack);
 
 // 5. Monitoring: CloudWatch Alarms + Budget
 new MonitoringStack(app, `VebgenixMonitoring-${config.stage}`, {
@@ -73,12 +90,13 @@ const appSyncStack = new AppSyncStack(app, `VebgenixAppSync-${config.stage}`, {
   sgLambda: networkStack.sgLambda,
   eventBus: asyncStack.eventBus,
   documentsBucket: storageStack.bucket,
-  dbProxyEndpoint: `placeholder-proxy-${config.stage}`,
-  dbSecretArn: `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master`,
+  dbProxyEndpoint: databaseStack ? databaseStack.dbProxyEndpoint : "DISABLED",
+  dbSecretArn: databaseStack ? databaseStack.dbSecretArn : "DISABLED",
 });
 appSyncStack.addDependency(authStack);
 appSyncStack.addDependency(networkStack);
 appSyncStack.addDependency(asyncStack);
+if (databaseStack) appSyncStack.addDependency(databaseStack);
 
 // 7. Frontend: S3 Bucket + CloudFront Distribution (connected via SSM)
 const frontendStack = new FrontendStack(
@@ -101,8 +119,16 @@ new GithubOidcStack(app, `VebgenixOidc-${config.stage}`, {
   config,
 });
 
-// NOTE: DatabaseStack (VebgenixDatabase) omitted until AWS account plan allows RDS.
-// Deploy separately once account upgraded:
-//   npx cdk deploy VebgenixDatabase-dev -c env=dev --require-approval never
+// 9. Bastion (Dev only) for DB migrations via SSM
+if (config.stage === "dev" && databaseStack) {
+  new BastionStack(app, `VebgenixBastion-${config.stage}`, {
+    env,
+    config,
+    vpc: networkStack.vpc,
+    sgDb: networkStack.sgDb,
+  });
+}
+
+// NOTE: prod deployment executes VebgenixDatabase-prod separately.
 
 app.synth();

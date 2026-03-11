@@ -7,7 +7,8 @@ import * as events from "aws-cdk-lib/aws-events";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as logs from "aws-cdk-lib/aws-logs";
-import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as nodejs from "aws-cdk-lib/aws-lambda-nodejs";
+
 import { Construct } from "constructs";
 import { EnvConfig } from "../../config/types";
 import * as path from "path";
@@ -101,25 +102,28 @@ export class AppSyncStack extends cdk.Stack {
     const sharedEnv = {
       STAGE: config.stage,
       DB_PROXY_ENDPOINT: dbProxyEndpoint,
-      DB_SECRET_ARN: dbSecretArn, // plain ARN / name — valid SecretId for GetSecretValue
+      DB_SECRET_ARN: dbSecretArn,
       DB_NAME: "vebgenix",
+      DATABASE_URL: `postgresql://postgres:${dbSecretArn}@${dbProxyEndpoint}:5432/vebgenix`, // RDS Proxy URL
       EVENT_BUS_NAME: eventBus.eventBusName,
       DOCUMENTS_BUCKET: documentsBucket.bucketName,
       USER_POOL_ID: userPool.userPoolId,
       NODE_OPTIONS: "--enable-source-maps",
     };
 
-    // Extract secret name from ARN or use directly
-    // fromSecretNameV2 generates arn:...:secret:name-?????? wildcard IAM resource,
-    // which correctly matches the actual suffixed ARN at authorization time.
-    const secretName = dbSecretArn.startsWith("arn:")
-      ? dbSecretArn.split(":secret:")[1] // "vebgenix/dev/db-master"
-      : dbSecretArn;
-    const dbSecret = secretsmanager.Secret.fromSecretNameV2(
-      this,
-      "DbSecret",
-      secretName,
-    );
+    // PERMANENT: allow resolver lambdas to read DB secret (covers Secrets Manager 6-char suffix)
+    const dbPolicy = new iam.PolicyStatement({
+      actions: [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret",
+      ],
+      resources: [
+        dbSecretArn, // exact ARN (if provided as full ARN)
+        `${dbSecretArn}-*`, // ARN with AWS 6-char suffix (e.g. vebgenix/dev/db-master-abc123)
+        // Fallback: name-based ARN pattern in case dbSecretArn is a secret name not a full ARN
+        `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
+      ],
+    });
 
     // ---------------------------------------------------------------
     // Helper: create domain Lambda + AppSync datasource
@@ -144,9 +148,47 @@ export class AppSyncStack extends cdk.Stack {
             : logs.RetentionDays.ONE_WEEK,
       });
 
-      // ✅ Let CDK generate the correct IAM policy (handles ARN suffix automatically)
-      dbSecret.grantRead(fn);
+      fn.addToRolePolicy(dbPolicy);
+      fn.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret",
+          ],
+          resources: [
+            `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
+          ],
+        }),
+      );
+      return fn;
+    };
 
+    const makeDomainLambda = (logicalId: string, fnName: string, entryPath: string) => {
+      const fn = new nodejs.NodejsFunction(this, logicalId, {
+        functionName: `vebgenix-${fnName}-${config.stage}`,
+        runtime: lambda.Runtime.NODEJS_20_X,
+        entry: path.resolve(__dirname, '../../../server/src/interfaces/graphql', entryPath),
+        handler: 'handler',
+        timeout: cdk.Duration.seconds(30),
+        memorySize: 512,
+        vpc,
+        vpcSubnets: privateSubnets,
+        securityGroups: [sgLambda],
+        environment: sharedEnv,
+        tracing: lambda.Tracing.ACTIVE,
+        bundling: {
+          forceDockerBundling: false,
+          minify: true,
+          externalModules: ['@aws-sdk/*'], 
+          sourceMap: true,
+        },
+        logRetention:
+          config.stage === "prod"
+            ? logs.RetentionDays.THREE_MONTHS
+            : logs.RetentionDays.ONE_WEEK,
+      });
+
+      fn.addToRolePolicy(dbPolicy);
       return fn;
     };
 
@@ -244,6 +286,33 @@ export class AppSyncStack extends cdk.Stack {
     );
 
     // ---------------------------------------------------------------
+    // 8. Settings Lambda (Academic & Templates)
+    // ---------------------------------------------------------------
+    const settingsLambda = makeLambda(
+      "SettingsLambda",
+      "settings-resolver",
+      "settings-resolver/index.handler",
+    );
+
+    // ---------------------------------------------------------------
+    // 9. Students Lambda
+    // ---------------------------------------------------------------
+    const studentsLambda = makeLambda(
+      "StudentsLambda",
+      "students-resolver",
+      "students-resolver/index.handler",
+    );
+
+    // ---------------------------------------------------------------
+    // 10. Finance Lambda
+    // ---------------------------------------------------------------
+    const financeLambda = makeLambda(
+      "FinanceLambda",
+      "finance-resolver",
+      "finance-resolver/index.handler",
+    );
+
+    // ---------------------------------------------------------------
     // AppSync Datasources
     // ---------------------------------------------------------------
     const usersDs = this.api.addLambdaDataSource("UsersDs", usersLambda);
@@ -261,6 +330,18 @@ export class AppSyncStack extends cdk.Stack {
     const auditLogsDs = this.api.addLambdaDataSource(
       "AuditLogsDs",
       auditLogsLambda,
+    );
+    const settingsDs = this.api.addLambdaDataSource(
+      "SettingsDs",
+      settingsLambda,
+    );
+    const studentsDs = this.api.addLambdaDataSource(
+      "StudentsDs",
+      studentsLambda,
+    );
+    const financeDs = this.api.addLambdaDataSource(
+      "FinanceDs",
+      financeLambda,
     );
 
     // ---------------------------------------------------------------
@@ -293,6 +374,22 @@ export class AppSyncStack extends cdk.Stack {
     users("Mutation", "createUser");
     users("Mutation", "updateUser");
     users("Mutation", "deactivateUser");
+    users("Mutation", "inviteStaff");
+
+    const settings = R(settingsDs);
+    settings("Mutation", "createAcademicYear");
+    settings("Query", "listAcademicYears");
+    settings("Mutation", "createTemplate");
+    settings("Mutation", "publishTemplateVersion");
+    settings("Query", "listTemplates");
+
+    const students = R(studentsDs);
+    students("Query", "listStudents");
+    students("Mutation", "convertApplicationToStudent");
+
+    const finance = R(financeDs);
+    finance("Mutation", "createFeeHead");
+    finance("Mutation", "createFeeStructure");
 
     const admissions = R(admissionsDs);
     admissions("Query", "listAdmissions");

@@ -33,7 +33,7 @@ export class NetworkStack extends cdk.Stack {
       { name: 'Isolated', subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 28 },
     ];
     if (config.enableNat) {
-      subnetConfig.unshift({ name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 28 });
+      subnetConfig.push({ name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 28 });
     }
 
     this.vpc = new ec2.Vpc(this, 'Vpc', {
@@ -65,6 +65,21 @@ export class NetworkStack extends cdk.Stack {
       subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       privateDnsEnabled: true,
     });
+    this.vpc.addInterfaceEndpoint('SsmEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.SSM,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      privateDnsEnabled: true,
+    });
+    this.vpc.addInterfaceEndpoint('SsmMessagesEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      privateDnsEnabled: true,
+    });
+    this.vpc.addInterfaceEndpoint('Ec2MessagesEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      privateDnsEnabled: true,
+    });
 
     // ---------------------------------------------------------------
     // Security Groups — least privilege: Lambda -> Proxy -> DB
@@ -90,6 +105,8 @@ export class NetworkStack extends cdk.Stack {
     this.sgDb.addIngressRule(this.sgProxy, ec2.Port.tcp(5432), 'Proxy to DB');
     this.sgLambda.addEgressRule(this.sgProxy, ec2.Port.tcp(5432), 'Lambda egress to Proxy');
     this.sgProxy.addEgressRule(this.sgDb, ec2.Port.tcp(5432), 'Proxy egress to DB');
+    // Proxy needs to reach Secrets Manager (443) to fetch credentials
+    this.sgProxy.addEgressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), 'Proxy HTTPS to Secrets Manager');
     this.sgLambda.addEgressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), 'HTTPS to VPC endpoints');
 
     // ---------------------------------------------------------------

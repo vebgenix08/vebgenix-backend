@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
 import prisma from '../../../infrastructure/prisma/client';
-import { supabase } from '../../../infrastructure/supabase/client';
 
 // ─── Status Model ─────────────────────────────────────────────────────────────
 //
@@ -67,20 +66,13 @@ async function getTenantFeatureMap(tenantId: string): Promise<FeatureCacheEntry>
   if (cached && (now - cached.fetchedAt) < FEATURE_CACHE_TTL_MS) return cached;
 
   try {
-    const { data: featureRows, error } = await supabase
-      .from('tenant_features')
-      .select('feature_key, enabled')
-      .eq('tenant_id', tenantId);
-
-    if (error) {
-      const entry: FeatureCacheEntry = { fetchedAt: now, featureMap: {}, fetchFailed: true };
-      featureCache.set(tenantId, entry);
-      console.error('Feature flag fetch error (cached):', error);
-      return entry;
-    }
+    const featureRows = await prisma.tenantFeature.findMany({
+      where: { tenantId },
+      select: { featureKey: true, enabled: true }
+    });
 
     const featureMap: Record<string, boolean> = {};
-    (featureRows ?? []).forEach((f: any) => { featureMap[f.feature_key] = f.enabled === true; });
+    (featureRows ?? []).forEach((f) => { featureMap[f.featureKey] = f.enabled === true; });
 
     const entry: FeatureCacheEntry = { fetchedAt: now, featureMap, fetchFailed: false };
     featureCache.set(tenantId, entry);
