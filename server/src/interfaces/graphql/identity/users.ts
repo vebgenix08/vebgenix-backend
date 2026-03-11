@@ -6,7 +6,7 @@ export const handler = async (event: any) => {
   const { fieldName, arguments: args, identity } = event;
   
   // 1. Resolve Domain Context (User + Tenant + Permissions)
-  const ctx = await resolveContext(identity);
+  const ctx = await resolveContext(identity, event.request?.headers);
 
   console.log(`[UsersResolver] ${fieldName} for user ${ctx.user.id}`);
 

@@ -18,7 +18,7 @@ export class ConversionService {
       throw new AppError('NOT_FOUND', 'Application not found');
     }
     
-    if (app.status === 'ENROLLED') {
+    if ((app.status as any) === 'ENROLLED') {
       throw new AppError('ALREADY_ENROLLED', 'Student already enrolled');
     }
     

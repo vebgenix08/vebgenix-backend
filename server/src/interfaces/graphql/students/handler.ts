@@ -4,7 +4,7 @@ import { ConversionService } from '../../../application/students/ConversionServi
 
 export const handler = async (event: any) => {
   const { fieldName, arguments: args, identity } = event;
-  const ctx = await resolveContext(identity);
+  const ctx = await resolveContext(identity, event.request?.headers);
 
   console.log(`[StudentResolver] ${fieldName}`);
 
