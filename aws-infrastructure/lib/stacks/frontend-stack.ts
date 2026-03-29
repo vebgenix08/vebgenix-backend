@@ -14,6 +14,8 @@ interface FrontendStackProps extends cdk.StackProps {
 }
 
 export class FrontendStack extends cdk.Stack {
+  public readonly frontendUrl: string;
+
   constructor(scope: Construct, id: string, props: FrontendStackProps) {
     super(scope, id, props);
 
@@ -89,9 +91,11 @@ export class FrontendStack extends cdk.Stack {
       description: 'CloudFront Distribution ID for GitHub Actions cache invalidation',
     });
 
+    this.frontendUrl = `https://${distribution.distributionDomainName}`;
+
     // Outputs
     new cdk.CfnOutput(this, 'FrontendUrl', {
-      value: `https://${distribution.distributionDomainName}`,
+      value: this.frontendUrl,
       description: 'The URL of your deployed Frontend',
     });
   }

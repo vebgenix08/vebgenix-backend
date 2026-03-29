@@ -25,6 +25,8 @@ import { FrontendStack } from "../lib/stacks/frontend-stack";
 import { GithubOidcStack } from "../lib/stacks/github-oidc-stack";
 import { DatabaseStack } from "../lib/stacks/database-stack";
 import { BastionStack } from "../lib/stacks/bastion-stack";
+import { Ec2DatabaseStack } from "../lib/stacks/ec2-database-stack";
+import { RestApiStack } from "../lib/stacks/rest-api-stack";
 
 const app = new cdk.App();
 
@@ -61,6 +63,8 @@ const storageStack = new StorageStack(app, `VebgenixStorage-${config.stage}`, {
 const enableDatabase = config.enableDatabase === true;
 
 let databaseStack: DatabaseStack | undefined;
+let ec2DatabaseStack: Ec2DatabaseStack | undefined;
+let restApiStack: RestApiStack | undefined;
 
 if (enableDatabase) {
   databaseStack = new DatabaseStack(app, `VebgenixDatabase-${config.stage}`, {
@@ -70,6 +74,20 @@ if (enableDatabase) {
     sgDb: networkStack.sgDb,
     sgProxy: networkStack.sgProxy,
   });
+}
+
+if (config.enableEc2Postgres) {
+  ec2DatabaseStack = new Ec2DatabaseStack(
+    app,
+    `VebgenixEc2Database-${config.stage}`,
+    {
+      env,
+      config,
+      vpc: networkStack.vpc,
+      sgDb: networkStack.sgDb,
+    },
+  );
+  ec2DatabaseStack.addDependency(networkStack);
 }
 
 // 4. Async: EventBridge + SQS + Worker Lambdas
@@ -124,6 +142,29 @@ const frontendStack = new FrontendStack(
 );
 frontendStack.addDependency(appSyncStack);
 frontendStack.addDependency(authStack);
+
+if (config.enableEc2RestApi && ec2DatabaseStack) {
+  restApiStack = new RestApiStack(app, `VebgenixRestApi-${config.stage}`, {
+    env,
+    config,
+    vpc: networkStack.vpc,
+    sgApp: networkStack.sgApp,
+    documentsBucket: storageStack.bucket,
+    userPoolId: authStack.userPool.userPoolId,
+    userPoolClientId: authStack.userPoolClientId,
+    dbHost: ec2DatabaseStack.privateIp,
+    dbName: ec2DatabaseStack.dbName,
+    dbSecret: ec2DatabaseStack.dbSecret,
+    eventBusName: asyncStack.eventBus.eventBusName,
+    frontendUrl: frontendStack.frontendUrl,
+  });
+  restApiStack.addDependency(networkStack);
+  restApiStack.addDependency(authStack);
+  restApiStack.addDependency(storageStack);
+  restApiStack.addDependency(asyncStack);
+  restApiStack.addDependency(frontendStack);
+  restApiStack.addDependency(ec2DatabaseStack);
+}
 
 // 8. CI/CD OIDC: Passwordless GitHub Actions integration
 new GithubOidcStack(app, `VebgenixOidc-${config.stage}`, {

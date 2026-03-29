@@ -7,6 +7,8 @@ export interface EnvConfig {
 
   // Network
   enableNat: boolean;
+  enableEc2RestApi: boolean;
+  enableEc2Postgres: boolean;
 
   // Database
   enableDatabase: boolean;
@@ -15,6 +17,10 @@ export interface EnvConfig {
   dbBackupRetentionDays: number;
   dbDeletionProtection: boolean;
   dbStorageEncrypted: boolean;
+  restApiInstanceClass: string;
+  restApiVolumeSizeGb: number;
+  ec2DbInstanceClass: string;
+  ec2DbVolumeSizeGb: number;
 
   // AppSync
   enableWaf: boolean;
