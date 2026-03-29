@@ -157,6 +157,9 @@ FRONTEND_URL=$(aws ssm get-parameter --name "/vebgenix/$STAGE/frontend/APP_URL" 
 DB_SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$DB_SECRET_ARN" --region "$REGION" --query SecretString --output text)
 DB_USER=$(echo "$DB_SECRET_JSON" | jq -r '.username')
 DB_PASS=$(echo "$DB_SECRET_JSON" | jq -r '.password')
+export DB_USER DB_PASS
+DB_USER_ENCODED=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
+DB_PASS_ENCODED=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASS"], safe=""))')
 
 cat >/etc/vebgenix-rest.env <<ENV
 PORT=5000
@@ -167,8 +170,8 @@ USER_POOL_ID=$USER_POOL_ID
 USER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID
 COGNITO_USER_POOL_ID=$USER_POOL_ID
 DB_NAME=$DB_NAME
-DATABASE_URL=postgresql://$DB_USER:$DB_PASS@$DB_HOST:5432/$DB_NAME
-DIRECT_URL=postgresql://$DB_USER:$DB_PASS@$DB_HOST:5432/$DB_NAME
+DATABASE_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME
+DIRECT_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME
 DOCUMENTS_BUCKET=$DOC_BUCKET
 S3_BUCKET_NAME=$DOC_BUCKET
 UPLOADS_BUCKET_NAME=$DOC_BUCKET
