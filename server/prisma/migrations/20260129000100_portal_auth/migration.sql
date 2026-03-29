@@ -43,6 +43,11 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE IF EXISTS public.profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
+
 ALTER TABLE IF EXISTS public.profiles
   ALTER COLUMN role TYPE "UserRole" USING CASE UPPER(role::text)
     WHEN 'ADMIN' THEN 'ADMIN'::"UserRole"
@@ -62,6 +67,18 @@ ALTER TABLE IF EXISTS public.profiles
 
 ALTER TABLE IF EXISTS public.profiles
   ALTER COLUMN campus_scope DROP NOT NULL;
+
+CREATE POLICY "Users can view own profile" ON public.profiles
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Admins can view all profiles" ON public.profiles
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1
+      FROM public.profiles
+      WHERE id = auth.uid() AND role = 'ADMIN'::"UserRole"
+    )
+  );
 
 DO $$
 BEGIN
