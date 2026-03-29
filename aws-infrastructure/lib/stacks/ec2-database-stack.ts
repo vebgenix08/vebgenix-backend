@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
@@ -10,6 +11,7 @@ interface Ec2DatabaseStackProps extends cdk.StackProps {
   config: EnvConfig;
   vpc: ec2.Vpc;
   sgDb: ec2.SecurityGroup;
+  documentsBucket: s3.IBucket;
 }
 
 export class Ec2DatabaseStack extends cdk.Stack {
@@ -20,7 +22,7 @@ export class Ec2DatabaseStack extends cdk.Stack {
 
   constructor(scope: Construct, id: string, props: Ec2DatabaseStackProps) {
     super(scope, id, props);
-    const { config, vpc, sgDb } = props;
+    const { config, vpc, sgDb, documentsBucket } = props;
 
     this.dbSecret = new secretsmanager.Secret(this, "Ec2DbSecret", {
       secretName: `vebgenix/${config.stage}/ec2-postgres`,
@@ -45,6 +47,7 @@ export class Ec2DatabaseStack extends cdk.Stack {
     });
 
     this.dbSecret.grantRead(role);
+    documentsBucket.grantRead(role);
 
     const userData = ec2.UserData.forLinux();
     userData.addCommands(
