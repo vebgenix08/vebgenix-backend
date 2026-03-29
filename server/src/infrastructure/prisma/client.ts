@@ -1,22 +1,25 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
+
+export type TenantDbClient = Prisma.TransactionClient;
+export type TenantTxOptions = {
+  maxWait?: number;
+  timeout?: number;
+  isolationLevel?: Prisma.TransactionIsolationLevel;
+};
 
 let prisma: PrismaClient | undefined;
 
 async function getDatabaseUrl(): Promise<string> {
-  // Local development override
   if (process.env.DATABASE_URL && !process.env.DB_SECRET_ARN) {
     return process.env.DATABASE_URL;
   }
 
-  // AWS Environment: Fetch credentials from Secrets Manager
   const secretArn = process.env.DB_SECRET_ARN;
   if (!secretArn) {
     throw new Error('DB_SECRET_ARN environment variable is missing');
   }
 
   try {
-    // Dynamic require to avoid build-time dependency check failure locally if SDK not installed
-    // Lambda Node.js runtime includes AWS SDK v3
     const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
     
     const client = new SecretsManagerClient({});
@@ -32,7 +35,6 @@ async function getDatabaseUrl(): Promise<string> {
     const host = process.env.DB_PROXY_ENDPOINT || secret.host;
     const db = process.env.DB_NAME || secret.dbname || 'vebgenix';
     
-    // RDS Proxy requires sslmode=require
     return `postgresql://${user}:${encodeURIComponent(password)}@${host}:5432/${db}?sslmode=require`;
   } catch (err) {
     console.error('Failed to fetch DB credentials from Secrets Manager:', err);
@@ -40,29 +42,50 @@ async function getDatabaseUrl(): Promise<string> {
   }
 }
 
-/**
- * Returns a singleton PrismaClient instance.
- * Initializes connection string asynchronously from Secrets Manager if needed.
- */
 export async function getPrisma(): Promise<PrismaClient> {
   if (prisma) return prisma;
 
   const url = await getDatabaseUrl();
-  
-  // Sanitize URL for logging
-  const sanitizedUrl = url.replace(/:([^:@]+)@/, ':****@');
-  console.log(`Initializing PrismaClient with URL: ${sanitizedUrl}`);
 
   prisma = new PrismaClient({
     datasources: { db: { url } },
-    log: process.env.NODE_ENV === 'production' ? ['warn', 'error'] : ['query', 'warn', 'error'],
+    log:
+      process.env.PRISMA_DEBUG_QUERIES === 'true'
+        ? ['query', 'warn', 'error']
+        : ['warn', 'error'],
   });
 
   return prisma;
 }
 
-// Default export is DEPRECATED and should be removed once all consumers migrate to getPrisma()
-// It only works if DATABASE_URL is present in environment variables at startup
+export async function withTenantTx<T>(
+  client: PrismaClient,
+  tenantId: string,
+  userId: string,
+  fn: (tx: TenantDbClient) => Promise<T>,
+  options?: TenantTxOptions
+): Promise<T> {
+  if (!tenantId || !userId) {
+    throw new Error('Tenancy Error: tenantId and userId are required for scoped operations');
+  }
+
+  return client.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
+    await tx.$executeRaw`SELECT set_config('app.user_id', ${userId}, true)`;
+    return await fn(tx);
+  }, options);
+}
+
+export async function runWithTenantContext<T>(
+  tenantId: string,
+  userId: string,
+  fn: (tx: TenantDbClient) => Promise<T>,
+  options: TenantTxOptions = { timeout: 10000 },
+): Promise<T> {
+  const client = await getPrisma();
+  return withTenantTx(client, tenantId, userId, fn, options);
+}
+
 const defaultPrisma = new PrismaClient({
     log: ['warn', 'error'],
 });
