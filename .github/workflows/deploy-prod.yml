@@ -1,0 +1,201 @@
+name: Deploy Backend to prod
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: aws-infrastructure/package-lock.json
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::278035644568:role/GitHubDeployRole-vebgenix-backend-prod
+          aws-region: ap-south-1
+
+      - name: AWS CLI version + caller identity (debug)
+        run: |
+          aws --version
+          aws sts get-caller-identity
+
+      - name: Build GraphQL Schema
+        run: node scripts/build-schema.mjs
+
+      - name: Copy schema to CDK input location
+        run: |
+          mkdir -p aws-infrastructure/lib/schema
+          cp graphql/schema.graphql aws-infrastructure/lib/schema/schema.graphql
+
+      - name: Verify schema fields, ordering guard, and checksum
+        run: |
+          set -euo pipefail
+          SCHEMA=aws-infrastructure/lib/schema/schema.graphql
+
+          echo "=== Local schema checksum ==="
+          sha256sum "$SCHEMA"
+
+          echo "=== First 20 lines of schema ==="
+          head -20 "$SCHEMA"
+
+          echo "=== type Query / extend type Query line numbers ==="
+          grep -n "^type Query\|^extend type Query" "$SCHEMA" || true
+
+          echo "=== Schema ordering guard ==="
+          Q_LINE=$(grep -n "^type Query" "$SCHEMA" | head -n1 | cut -d: -f1 || echo "")
+          E_LINE=$(grep -n "^extend type Query" "$SCHEMA" | head -n1 | cut -d: -f1 || echo "")
+          if [ -n "$E_LINE" ] && [ -n "$Q_LINE" ] && [ "$E_LINE" -lt "$Q_LINE" ]; then
+            echo "FATAL: extend type Query (line $E_LINE) appears BEFORE type Query (line $Q_LINE)"
+            exit 1
+          fi
+          echo "Ordering OK — type Query (line ${Q_LINE:-?}) before extend (line ${E_LINE:-?})"
+
+          echo "=== Required field check ==="
+          for field in dashboardOverview superAdminOverview listPlatformAuditLogs getPlatformAuditLog; do
+            grep -q "$field" "$SCHEMA" \
+              && echo "OK $field" \
+              || (echo "MISSING $field" && exit 1)
+          done
+
+      - name: Install server deps and generate Prisma client
+        working-directory: server
+        run: |
+          npm ci
+          npx prisma generate --schema=prisma/schema.prisma
+
+      - name: Copy Prisma runtime into Lambda asset folder
+        run: |
+          set -euo pipefail
+          mkdir -p aws-infrastructure/lambda/node_modules/@prisma
+          mkdir -p aws-infrastructure/lambda/node_modules/.prisma
+
+          cp -R server/node_modules/@prisma/client \
+            aws-infrastructure/lambda/node_modules/@prisma/
+
+          cp -R server/node_modules/.prisma \
+            aws-infrastructure/lambda/node_modules/
+
+          echo "Prisma runtime copied:"
+          ls aws-infrastructure/lambda/node_modules/@prisma/
+          ls aws-infrastructure/lambda/node_modules/.prisma/
+
+      - name: Install CDK dependencies
+        working-directory: aws-infrastructure
+        run: npm ci
+
+      - name: Resolve AppSync API ID
+        run: |
+          set -euo pipefail
+          API_ID=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixAppSync-prod \
+            --query "Stacks[0].Outputs[?contains(OutputKey,'Api') && contains(OutputKey,'Id')].OutputValue | [0]" \
+            --output text)
+
+          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
+            echo "Could not resolve AppSync API ID"
+            aws cloudformation describe-stacks --stack-name VebgenixAppSync-prod --query "Stacks[0].Outputs" --output table || true
+            exit 1
+          fi
+
+          API_NAME=$(aws appsync get-graphql-api --api-id "$API_ID" --query "graphqlApi.name" --output text)
+          echo "AppSync API ID: $API_ID  (name: $API_NAME)"
+          echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
+
+      - name: Wait for AppSync stack to stabilize
+        run: |
+          set -euo pipefail
+          echo "Checking VebgenixAppSync-prod stack status..."
+          for i in $(seq 1 30); do
+            STATUS=$(aws cloudformation describe-stacks \
+              --stack-name VebgenixAppSync-prod \
+              --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+            echo "  [$i/30] $STATUS"
+            case "$STATUS" in
+              *IN_PROGRESS*)
+                echo "Stack in progress, waiting 20s..."
+                sleep 20
+                ;;
+              *ROLLBACK_COMPLETE*|*FAILED*)
+                echo "Stack in bad state: $STATUS — manual intervention may be needed"
+                exit 1
+                ;;
+              *)
+                echo "Stack stable: $STATUS"
+                break
+                ;;
+            esac
+          done
+
+      - name: Step A - Deploy AppSync stack (schema + lambdas + resolvers)
+        working-directory: aws-infrastructure
+        run: npx cdk deploy VebgenixAppSync-prod -c env=prod --require-approval never
+
+      - name: Step B - Force apply schema and verify fields via introspection
+        run: |
+          set -euo pipefail
+          API_ID="${APPSYNC_API_ID}"
+
+          echo "Schema file being applied:"
+          sha256sum aws-infrastructure/lib/schema/schema.graphql
+          wc -l aws-infrastructure/lib/schema/schema.graphql
+
+          echo "Force-applying schema to API: $API_ID"
+          aws appsync start-schema-creation \
+            --api-id "$API_ID" \
+            --definition fileb://aws-infrastructure/lib/schema/schema.graphql
+
+          STATUS=""
+          for i in $(seq 1 60); do
+            STATUS=$(aws appsync get-schema-creation-status \
+              --api-id "$API_ID" --query "status" --output text)
+            echo "  [$i/60] $STATUS"
+            [ "$STATUS" = "SUCCESS" ] && break
+            if [ "$STATUS" = "FAILED" ]; then
+              aws appsync get-schema-creation-status --api-id "$API_ID"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          [ "$STATUS" = "SUCCESS" ] || { echo "Schema timed out"; exit 1; }
+          echo "Schema SUCCESS. Waiting 15s for AppSync propagation..."
+          sleep 15
+
+          echo "Downloading introspection schema (JSON)..."
+          aws appsync get-introspection-schema \
+            --api-id "$API_ID" \
+            --format JSON \
+            /tmp/introspection.json
+
+          echo "Checking Query fields via python3..."
+          python3 -c "import json,sys; d=json.load(open('/tmp/introspection.json')); qt=next((t for t in d['data']['__schema']['types'] if t['name']=='Query'),None); fields={f['name'] for f in (qt.get('fields') or [])}; print('Query fields:',sorted(fields)); req=['dashboardOverview','superAdminOverview','listPlatformAuditLogs','getPlatformAuditLog']; missing=[f for f in req if f not in fields]; [print('OK',f) for f in req if f in fields]; [print('MISSING',f) for f in missing]; sys.exit(1 if missing else 0)"
+
+      - name: Deploy Remaining Stacks (excluding AppSync)
+        working-directory: aws-infrastructure
+        run: |
+          npx cdk deploy \
+            VebgenixNetwork-prod \
+            VebgenixAuth-prod \
+            VebgenixStorage-prod \
+            VebgenixAsync-prod \
+            VebgenixMonitoring-prod \
+            VebgenixOidc-prod \
+            -c env=prod -c enableNewResolvers=true --require-approval never
