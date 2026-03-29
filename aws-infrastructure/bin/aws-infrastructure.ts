@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Load server/.env to get SMTP credentials for Lambdas
+dotenv.config({ path: path.resolve(__dirname, '../../../server/.env') });
+
 import { devConfig } from "../config/dev";
 import { prodConfig } from "../config/prod";
 import { EnvConfig } from "../config/types";
@@ -70,6 +76,7 @@ const asyncStack = new AsyncStack(app, `VebgenixAsync-${config.stage}`, {
   dbProxyEndpoint: databaseStack ? databaseStack.dbProxyEndpoint : "DISABLED",
   dbSecretArn: databaseStack ? databaseStack.dbSecretArn : "DISABLED",
   emailBucket: storageStack.bucket,
+  userPoolId: authStack.userPool.userPoolId,
 });
 asyncStack.addDependency(networkStack);
 if (databaseStack) asyncStack.addDependency(databaseStack);
