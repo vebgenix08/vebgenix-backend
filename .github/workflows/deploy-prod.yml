@@ -101,23 +101,22 @@ jobs:
         working-directory: aws-infrastructure
         run: npm ci
 
-      - name: Resolve AppSync API ID
+      - name: Resolve AppSync API ID (if exists)
         run: |
           set -euo pipefail
-          API_ID=$(aws cloudformation describe-stacks \
-            --stack-name VebgenixAppSync-prod \
-            --query "Stacks[0].Outputs[?contains(OutputKey,'Api') && contains(OutputKey,'Id')].OutputValue | [0]" \
-            --output text)
-
-          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
-            echo "Could not resolve AppSync API ID"
-            aws cloudformation describe-stacks --stack-name VebgenixAppSync-prod --query "Stacks[0].Outputs" --output table || true
-            exit 1
+          if aws cloudformation describe-stacks --stack-name VebgenixAppSync-prod > /dev/null 2>&1; then
+            API_ID=$(aws cloudformation describe-stacks \
+              --stack-name VebgenixAppSync-prod \
+              --query "Stacks[0].Outputs[?contains(OutputKey,'Api') && contains(OutputKey,'Id')].OutputValue | [0]" \
+              --output text)
+            if [ -n "$API_ID" ] && [ "$API_ID" != "None" ]; then
+              API_NAME=$(aws appsync get-graphql-api --api-id "$API_ID" --query "graphqlApi.name" --output text)
+              echo "AppSync API ID: $API_ID  (name: $API_NAME)"
+              echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
+            fi
+          else
+            echo "AppSync stack not found yet. Will resolve after deploy."
           fi
-
-          API_NAME=$(aws appsync get-graphql-api --api-id "$API_ID" --query "graphqlApi.name" --output text)
-          echo "AppSync API ID: $API_ID  (name: $API_NAME)"
-          echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
 
       - name: Wait for AppSync stack to stabilize
         run: |
@@ -147,6 +146,24 @@ jobs:
       - name: Step A - Deploy AppSync stack (schema + lambdas + resolvers)
         working-directory: aws-infrastructure
         run: npx cdk deploy VebgenixAppSync-prod -c env=prod --require-approval never
+
+      - name: Resolve AppSync API ID (post-deploy)
+        run: |
+          set -euo pipefail
+          API_ID=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixAppSync-prod \
+            --query "Stacks[0].Outputs[?contains(OutputKey,'Api') && contains(OutputKey,'Id')].OutputValue | [0]" \
+            --output text)
+
+          if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
+            echo "Could not resolve AppSync API ID after deploy"
+            aws cloudformation describe-stacks --stack-name VebgenixAppSync-prod --query "Stacks[0].Outputs" --output table || true
+            exit 1
+          fi
+
+          API_NAME=$(aws appsync get-graphql-api --api-id "$API_ID" --query "graphqlApi.name" --output text)
+          echo "AppSync API ID: $API_ID  (name: $API_NAME)"
+          echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
 
       - name: Step B - Force apply schema and verify fields via introspection
         run: |
