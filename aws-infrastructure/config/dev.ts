@@ -13,15 +13,21 @@ export const devConfig: EnvConfig = {
   },
 
   // Network
-  enableNat: true, // No NAT in dev — use VPC Endpoints + stubs for external APIs
+  enableNat: false, // No NAT in dev — use VPC Endpoints + stubs for external APIs
+  enableEc2RestApi: true,
+  enableEc2Postgres: true,
 
   // Database
-  enableDatabase: true,
+  enableDatabase: false,
   dbInstanceClass: "t4g.micro",
   dbMultiAz: false,
   dbBackupRetentionDays: 1,
   dbDeletionProtection: false,
   dbStorageEncrypted: true,
+  restApiInstanceClass: "t4g.small",
+  restApiVolumeSizeGb: 20,
+  ec2DbInstanceClass: "t4g.small",
+  ec2DbVolumeSizeGb: 30,
 
   // AppSync
   enableWaf: false,

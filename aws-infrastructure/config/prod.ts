@@ -16,6 +16,8 @@ export const prodConfig: EnvConfig = {
   // Keep false until Razorpay/Fast2SMS outbound calls go live.
   // When enabling: add 1 NAT Gateway (cost-optimized, single AZ, acceptable HA tradeoff for MVP).
   enableNat: false,
+  enableEc2RestApi: true,
+  enableEc2Postgres: true,
 
   // Database
   enableDatabase: false,
@@ -24,6 +26,10 @@ export const prodConfig: EnvConfig = {
   dbBackupRetentionDays: 30,
   dbDeletionProtection: true,
   dbStorageEncrypted: true,
+  restApiInstanceClass: "t4g.small",
+  restApiVolumeSizeGb: 20,
+  ec2DbInstanceClass: "t4g.medium",
+  ec2DbVolumeSizeGb: 100,
 
   // AppSync
   enableWaf: true,

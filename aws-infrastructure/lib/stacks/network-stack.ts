@@ -17,6 +17,7 @@ interface NetworkStackProps extends cdk.StackProps {
 export class NetworkStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc;
   public readonly sgLambda: ec2.SecurityGroup;
+  public readonly sgApp: ec2.SecurityGroup;
   public readonly sgProxy: ec2.SecurityGroup;
   public readonly sgDb: ec2.SecurityGroup;
 
@@ -29,12 +30,10 @@ export class NetworkStack extends cdk.Stack {
     // Public subnets only when NAT is enabled (Razorpay/Fast2SMS)
     // ---------------------------------------------------------------
     const subnetConfig: ec2.SubnetConfiguration[] = [
-      { name: 'Private', subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, cidrMask: 24 },
+      { name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
+      { name: 'Private', subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
       { name: 'Isolated', subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 28 },
     ];
-    if (config.enableNat) {
-      subnetConfig.push({ name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 28 });
-    }
 
     this.vpc = new ec2.Vpc(this, 'Vpc', {
       ipAddresses: ec2.IpAddresses.cidr('10.0.0.0/16'),
@@ -44,40 +43,35 @@ export class NetworkStack extends cdk.Stack {
     });
 
     // ---------------------------------------------------------------
-    // VPC Endpoints — avoid NAT for AWS service traffic
+    // VPC Endpoints — avoid NAT for proven AWS service traffic
     // ---------------------------------------------------------------
     this.vpc.addGatewayEndpoint('S3Endpoint', {
       service: ec2.GatewayVpcEndpointAwsService.S3,
-      subnets: [{ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }],
+      subnets: [{ subnetType: ec2.SubnetType.PRIVATE_ISOLATED }],
     });
     this.vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      privateDnsEnabled: true,
-    });
-    this.vpc.addInterfaceEndpoint('CloudWatchLogsEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      privateDnsEnabled: true,
-    });
-    this.vpc.addInterfaceEndpoint('StsEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.STS,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       privateDnsEnabled: true,
     });
     this.vpc.addInterfaceEndpoint('SsmEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SSM,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       privateDnsEnabled: true,
     });
     this.vpc.addInterfaceEndpoint('SsmMessagesEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       privateDnsEnabled: true,
     });
-    this.vpc.addInterfaceEndpoint('Ec2MessagesEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+    this.vpc.addInterfaceEndpoint('EventsEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      privateDnsEnabled: true,
+    });
+    this.vpc.addInterfaceEndpoint('CognitoIdpEndpoint', {
+      service: ec2.InterfaceVpcEndpointAwsService.COGNITO_IDP,
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       privateDnsEnabled: true,
     });
 
@@ -88,6 +82,11 @@ export class NetworkStack extends cdk.Stack {
       vpc: this.vpc,
       description: 'RDS PostgreSQL - ingress from RDS Proxy only',
       allowAllOutbound: false,
+    });
+    this.sgApp = new ec2.SecurityGroup(this, 'SgApp', {
+      vpc: this.vpc,
+      description: 'REST API EC2 runtime host',
+      allowAllOutbound: true,
     });
     this.sgProxy = new ec2.SecurityGroup(this, 'SgProxy', {
       vpc: this.vpc,
@@ -101,6 +100,9 @@ export class NetworkStack extends cdk.Stack {
     });
 
     // Ingress/Egress rules
+    this.sgApp.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'Public HTTP to REST origin');
+    this.sgDb.addIngressRule(this.sgApp, ec2.Port.tcp(5432), 'REST app to DB');
+    this.sgApp.addEgressRule(this.sgDb, ec2.Port.tcp(5432), 'REST egress to DB');
     this.sgProxy.addIngressRule(this.sgLambda, ec2.Port.tcp(5432), 'Lambda to Proxy');
     this.sgDb.addIngressRule(this.sgProxy, ec2.Port.tcp(5432), 'Proxy to DB');
     this.sgLambda.addEgressRule(this.sgProxy, ec2.Port.tcp(5432), 'Lambda egress to Proxy');
@@ -120,6 +122,10 @@ export class NetworkStack extends cdk.Stack {
       parameterName: `/vebgenix/${config.stage}/sg-lambda-id`,
       stringValue: this.sgLambda.securityGroupId,
     });
+    new ssm.StringParameter(this, 'SgAppIdParam', {
+      parameterName: `/vebgenix/${config.stage}/sg-app-id`,
+      stringValue: this.sgApp.securityGroupId,
+    });
     new ssm.StringParameter(this, 'SgProxyIdParam', {
       parameterName: `/vebgenix/${config.stage}/sg-proxy-id`,
       stringValue: this.sgProxy.securityGroupId,
@@ -131,6 +137,7 @@ export class NetworkStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'VpcId', { value: this.vpc.vpcId });
     new cdk.CfnOutput(this, 'SgLambdaId', { value: this.sgLambda.securityGroupId });
+    new cdk.CfnOutput(this, 'SgAppId', { value: this.sgApp.securityGroupId });
     new cdk.CfnOutput(this, 'SgProxyId', { value: this.sgProxy.securityGroupId });
     new cdk.CfnOutput(this, 'SgDbId', { value: this.sgDb.securityGroupId });
   }
