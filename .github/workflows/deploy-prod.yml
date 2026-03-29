@@ -226,6 +226,25 @@ jobs:
             VebgenixMonitoring-prod \
             -c env=prod -c enableNewResolvers=true --require-approval never
 
+      - name: Package backend artifact
+        run: |
+          set -euo pipefail
+          ARTIFACT_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixStorage-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue | [0]" \
+            --output text)
+          ARTIFACT_KEY="rest-deployments/backend-${GITHUB_SHA}.tgz"
+
+          tar \
+            --exclude='.git' \
+            --exclude='server/node_modules' \
+            --exclude='aws-infrastructure/node_modules' \
+            --exclude='aws-infrastructure/cdk.out' \
+            -czf /tmp/backend-rest.tgz .
+
+          aws s3 cp /tmp/backend-rest.tgz "s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
+          echo "REST_ARTIFACT_KEY=$ARTIFACT_KEY" >> "$GITHUB_ENV"
+
       - name: Bootstrap DB on EC2 via SSM
         run: |
           set -euo pipefail
@@ -248,31 +267,26 @@ jobs:
             sleep 10
           done
 
+          export REST_ARTIFACT_KEY
           export STAGE=prod
           COMMAND_PARAMS=$(python3 - <<'PY'
           import json
           import os
 
           stage = os.environ["STAGE"]
+          artifact_key = os.environ["REST_ARTIFACT_KEY"]
           commands = [
               "set -euxo pipefail",
+              f"ARTIFACT_KEY='{artifact_key}'",
+              "BOOTSTRAP_DIR=/opt/vebgenix/db-bootstrap",
               f"STAGE={stage}",
               "REGION=ap-south-1",
-              "DB_SECRET_ARN=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/DB_SECRET_ARN\" --region \"$REGION\" --query Parameter.Value --output text)",
-              "DB_SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id \"$DB_SECRET_ARN\" --region \"$REGION\" --query SecretString --output text)",
-              "export DB_SECRET_JSON",
-              "DB_USER=$(python3 -c 'import json, os; print(json.loads(os.environ[\"DB_SECRET_JSON\"])[\"username\"])')",
-              "DB_PASS=$(python3 -c 'import json, os; print(json.loads(os.environ[\"DB_SECRET_JSON\"])[\"password\"])')",
-              "DB_NAME=$(python3 -c 'import json, os; print(json.loads(os.environ[\"DB_SECRET_JSON\"])[\"dbname\"])')",
-              "dnf update -y || true",
-              "if ! command -v docker >/dev/null 2>&1; then dnf install -y docker; fi",
-              "systemctl enable docker",
-              "systemctl start docker",
-              "mkdir -p /var/lib/vebgenix-postgres",
-              "chmod 700 /var/lib/vebgenix-postgres",
-              "if docker ps -a --format '{{.Names}}' | grep -q '^vebgenix-postgres$'; then docker start vebgenix-postgres || true; else docker run -d --name vebgenix-postgres --restart unless-stopped -e POSTGRES_USER=\"$DB_USER\" -e POSTGRES_PASSWORD=\"$DB_PASS\" -e POSTGRES_DB=\"$DB_NAME\" -p 5432:5432 -v /var/lib/vebgenix-postgres:/var/lib/postgresql/data postgres:16; fi",
-              "for i in $(seq 1 30); do if docker exec vebgenix-postgres pg_isready -U \"$DB_USER\" -d \"$DB_NAME\" >/dev/null 2>&1; then break; fi; sleep 5; done",
-              "docker exec vebgenix-postgres pg_isready -U \"$DB_USER\" -d \"$DB_NAME\"",
+              "DOC_BUCKET=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/DOCUMENTS_BUCKET\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "rm -rf \"$BOOTSTRAP_DIR\"",
+              "mkdir -p \"$BOOTSTRAP_DIR\"",
+              "aws s3 cp \"s3://$DOC_BUCKET/$ARTIFACT_KEY\" /tmp/vebgenix-backend-db.tgz --region \"$REGION\"",
+              "tar -xzf /tmp/vebgenix-backend-db.tgz -C \"$BOOTSTRAP_DIR\"",
+              "bash \"$BOOTSTRAP_DIR/scripts/bootstrap-ec2-postgres.sh\" \"$STAGE\" \"$REGION\"",
           ]
           print(json.dumps({"commands": commands}))
           PY
@@ -308,21 +322,6 @@ jobs:
       - name: Deploy REST app to EC2 via SSM
         run: |
           set -euo pipefail
-          ARTIFACT_BUCKET=$(aws cloudformation describe-stacks \
-            --stack-name VebgenixStorage-prod \
-            --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue | [0]" \
-            --output text)
-          ARTIFACT_KEY="rest-deployments/backend-${GITHUB_SHA}.tgz"
-
-          tar \
-            --exclude='.git' \
-            --exclude='server/node_modules' \
-            --exclude='aws-infrastructure/node_modules' \
-            --exclude='aws-infrastructure/cdk.out' \
-            -czf /tmp/backend-rest.tgz .
-
-          aws s3 cp /tmp/backend-rest.tgz "s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
-
           INSTANCE_ID=$(aws cloudformation describe-stacks \
             --stack-name VebgenixRestApi-prod \
             --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
@@ -342,6 +341,7 @@ jobs:
             sleep 10
           done
 
+          ARTIFACT_KEY="${REST_ARTIFACT_KEY}"
           export ARTIFACT_KEY
           COMMAND_PARAMS=$(python3 - <<'PY'
           import json
@@ -377,8 +377,8 @@ jobs:
               "if ! node -v | grep -q '^v20\\.'; then dnf install -y xz && curl -fsSL https://nodejs.org/dist/v20.19.0/node-v20.19.0-linux-arm64.tar.xz -o /tmp/node.tar.xz && mkdir -p /usr/local/lib/nodejs && tar -xJf /tmp/node.tar.xz -C /usr/local/lib/nodejs && ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/node /usr/local/bin/node && ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npm /usr/local/bin/npm && ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npx /usr/local/bin/npx && hash -r; fi",
               "npm ci",
               "set -a && source /etc/vebgenix-rest.env && set +a",
-              "npx prisma generate --schema=prisma/schema.prisma",
               "npx prisma migrate deploy --schema=prisma/schema.prisma",
+              "npx prisma generate --schema=prisma/schema.prisma",
               "npm run build",
               "systemctl daemon-reload",
               "systemctl enable vebgenix-rest",
