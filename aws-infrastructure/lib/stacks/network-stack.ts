@@ -26,13 +26,13 @@ export class NetworkStack extends cdk.Stack {
     const { config } = props;
 
     // ---------------------------------------------------------------
-    // VPC — Private (Lambda) + Isolated (DB) subnets
-    // Public subnets only when NAT is enabled (Razorpay/Fast2SMS)
+    // VPC — preserve existing private/isolated CIDRs and append public subnets
+    // for EC2 hosts. Reordering these groups would force subnet replacement.
     // ---------------------------------------------------------------
     const subnetConfig: ec2.SubnetConfiguration[] = [
-      { name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
-      { name: 'Private', subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 24 },
+      { name: 'Private', subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, cidrMask: 24 },
       { name: 'Isolated', subnetType: ec2.SubnetType.PRIVATE_ISOLATED, cidrMask: 28 },
+      { name: 'Public', subnetType: ec2.SubnetType.PUBLIC, cidrMask: 24 },
     ];
 
     this.vpc = new ec2.Vpc(this, 'Vpc', {
@@ -47,31 +47,34 @@ export class NetworkStack extends cdk.Stack {
     // ---------------------------------------------------------------
     this.vpc.addGatewayEndpoint('S3Endpoint', {
       service: ec2.GatewayVpcEndpointAwsService.S3,
-      subnets: [{ subnetType: ec2.SubnetType.PRIVATE_ISOLATED }],
+      subnets: [
+        { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      ],
     });
     this.vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       privateDnsEnabled: true,
     });
     this.vpc.addInterfaceEndpoint('SsmEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SSM,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       privateDnsEnabled: true,
     });
     this.vpc.addInterfaceEndpoint('SsmMessagesEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       privateDnsEnabled: true,
     });
     this.vpc.addInterfaceEndpoint('EventsEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       privateDnsEnabled: true,
     });
     this.vpc.addInterfaceEndpoint('CognitoIdpEndpoint', {
       service: ec2.InterfaceVpcEndpointAwsService.COGNITO_IDP,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       privateDnsEnabled: true,
     });
 
