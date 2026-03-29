@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 import "source-map-support/register";
 import * as cdk from "aws-cdk-lib";
-import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Load server/.env to get SMTP credentials for Lambdas
-dotenv.config({ path: path.resolve(__dirname, '../../../server/.env') });
+// Load server/.env to get SMTP credentials for Lambdas (optional in CI)
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const dotenv = require("dotenv");
+  dotenv.config({ path: path.resolve(__dirname, "../../../server/.env") });
+} catch {
+  // No-op if dotenv is unavailable in CI
+}
 
 import { devConfig } from "../config/dev";
 import { prodConfig } from "../config/prod";
