@@ -2,96 +2,33 @@
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'UserRole') THEN
-    IF EXISTS (
-      SELECT 1
-      FROM pg_enum e
-      JOIN pg_type t ON t.oid = e.enumtypid
-      WHERE t.typname = 'UserRole'
-        AND e.enumlabel NOT IN ('ADMIN', 'ACCOUNTANT', 'STAFF', 'TEACHER', 'STUDENT')
-    ) THEN
-      CREATE TYPE "UserRole_new" AS ENUM ('ADMIN', 'ACCOUNTANT', 'STAFF', 'TEACHER', 'STUDENT');
-      IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'profiles'
-      ) THEN
-        UPDATE public.profiles
-        SET role = 'STAFF'
-        WHERE role IS NOT NULL
-          AND role NOT IN ('ADMIN', 'ACCOUNTANT', 'STAFF', 'TEACHER', 'STUDENT');
-        ALTER TABLE public.profiles
-          ALTER COLUMN role TYPE "UserRole_new" USING role::text::"UserRole_new";
-      END IF;
-      DROP TYPE "UserRole";
-      ALTER TYPE "UserRole_new" RENAME TO "UserRole";
-    END IF;
-  ELSE
-    CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'ACCOUNTANT', 'STAFF', 'TEACHER', 'STUDENT');
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'UserRole') THEN
+    CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'ACCOUNTANT', 'STAFF', 'TEACHER', 'STUDENT', 'PARENT');
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'UserRole' AND e.enumlabel = 'PARENT'
+  ) THEN
+    ALTER TYPE "UserRole" ADD VALUE 'PARENT';
   END IF;
 END $$;
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'CampusScope') THEN
-    IF EXISTS (
-      SELECT 1
-      FROM pg_enum e
-      JOIN pg_type t ON t.oid = e.enumtypid
-      WHERE t.typname = 'CampusScope'
-        AND e.enumlabel = 'ALL'
-    ) THEN
-      CREATE TYPE "CampusScope_new" AS ENUM ('SCHOOL', 'PU');
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'CampusScope') THEN
+    CREATE TYPE "CampusScope" AS ENUM ('SCHOOL', 'PU', 'ALL');
+  END IF;
 
-      IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'profiles'
-      ) THEN
-        UPDATE public.profiles
-        SET campus_scope = NULL
-        WHERE campus_scope = 'ALL';
-      END IF;
-
-      IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'enquiries'
-      ) THEN
-        UPDATE public.enquiries
-        SET campus_scope = 'SCHOOL'
-        WHERE campus_scope = 'ALL';
-      END IF;
-
-      IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'applications'
-      ) THEN
-        UPDATE public.applications
-        SET campus_scope = 'SCHOOL'
-        WHERE campus_scope = 'ALL';
-      END IF;
-
-      IF EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = 'students'
-      ) THEN
-        UPDATE public.students
-        SET campus_type = 'SCHOOL'
-        WHERE campus_type = 'ALL';
-      END IF;
-
-      ALTER TABLE IF EXISTS public.profiles
-        ALTER COLUMN campus_scope TYPE "CampusScope_new" USING NULLIF(campus_scope, '')::"CampusScope_new";
-      ALTER TABLE IF EXISTS public.enquiries
-        ALTER COLUMN campus_scope TYPE "CampusScope_new" USING campus_scope::text::"CampusScope_new";
-      ALTER TABLE IF EXISTS public.applications
-        ALTER COLUMN campus_scope TYPE "CampusScope_new" USING campus_scope::text::"CampusScope_new";
-      ALTER TABLE IF EXISTS public.students
-        ALTER COLUMN campus_type TYPE "CampusScope_new" USING campus_type::text::"CampusScope_new";
-
-      DROP TYPE "CampusScope";
-      ALTER TYPE "CampusScope_new" RENAME TO "CampusScope";
-    END IF;
-  ELSE
-    CREATE TYPE "CampusScope" AS ENUM ('SCHOOL', 'PU');
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON t.oid = e.enumtypid
+    WHERE t.typname = 'CampusScope' AND e.enumlabel = 'ALL'
+  ) THEN
+    ALTER TYPE "CampusScope" ADD VALUE 'ALL';
   END IF;
 END $$;
 
@@ -107,8 +44,21 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 ALTER TABLE IF EXISTS public.profiles
-  ALTER COLUMN role TYPE "UserRole" USING role::text::"UserRole",
-  ALTER COLUMN campus_scope TYPE "CampusScope" USING NULLIF(campus_scope, '')::"CampusScope";
+  ALTER COLUMN role TYPE "UserRole" USING CASE UPPER(role::text)
+    WHEN 'ADMIN' THEN 'ADMIN'::"UserRole"
+    WHEN 'ACCOUNTANT' THEN 'ACCOUNTANT'::"UserRole"
+    WHEN 'STAFF' THEN 'STAFF'::"UserRole"
+    WHEN 'TEACHER' THEN 'TEACHER'::"UserRole"
+    WHEN 'STUDENT' THEN 'STUDENT'::"UserRole"
+    WHEN 'PARENT' THEN 'PARENT'::"UserRole"
+    ELSE 'STAFF'::"UserRole"
+  END,
+  ALTER COLUMN campus_scope TYPE "CampusScope" USING CASE UPPER(NULLIF(campus_scope::text, ''))
+    WHEN 'SCHOOL' THEN 'SCHOOL'::"CampusScope"
+    WHEN 'PU' THEN 'PU'::"CampusScope"
+    WHEN 'ALL' THEN 'ALL'::"CampusScope"
+    ELSE NULL
+  END;
 
 ALTER TABLE IF EXISTS public.profiles
   ALTER COLUMN campus_scope DROP NOT NULL;
@@ -159,9 +109,6 @@ ALTER TABLE IF EXISTS public.students
 
 ALTER TABLE IF EXISTS public.students
   ADD COLUMN IF NOT EXISTS portal_auth_user_id UUID;
-
-ALTER TABLE IF EXISTS public.students
-  ALTER COLUMN campus_type TYPE "CampusScope" USING campus_type::text::"CampusScope";
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_students_reg_no_unique ON public.students(reg_no);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_students_portal_auth_user_id_unique ON public.students(portal_auth_user_id);
