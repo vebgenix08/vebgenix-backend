@@ -96,9 +96,13 @@ export class RestApiStack extends cdk.Stack {
     userData.addCommands(
       "set -euxo pipefail",
       "dnf update -y",
-      "dnf install -y git jq nginx",
-      "curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -",
-      "dnf install -y nodejs",
+      "dnf install -y git jq nginx xz",
+      "curl -fsSL https://nodejs.org/dist/v20.19.0/node-v20.19.0-linux-arm64.tar.xz -o /tmp/node.tar.xz",
+      "mkdir -p /usr/local/lib/nodejs",
+      "tar -xJf /tmp/node.tar.xz -C /usr/local/lib/nodejs",
+      "ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/node /usr/local/bin/node",
+      "ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npm /usr/local/bin/npm",
+      "ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npx /usr/local/bin/npx",
       "systemctl enable nginx",
       "cat >/etc/nginx/conf.d/vebgenix-rest.conf <<'EOF'",
       "server {",
@@ -191,6 +195,9 @@ PRISMA_DEBUG_QUERIES=false
 ENV
 
 cd "$APP_DIR/server"
+set -a
+source /etc/vebgenix-rest.env
+set +a
 npm ci
 npx prisma generate --schema=prisma/schema.prisma
 npx prisma migrate deploy --schema=prisma/schema.prisma
