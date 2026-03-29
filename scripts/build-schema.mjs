@@ -30,17 +30,23 @@ const ORDER = [
 ];
 
 // ---------------------------------------------------------------------------
-// Concatenate modules
+// Prefer the checked-in root schema as the source of truth.
+// The old graphql/modules/* fragments are incomplete and only kept as fallback.
 // ---------------------------------------------------------------------------
 let rawSchema = "";
-for (const file of ORDER) {
-  const filePath = path.join(MODULES_DIR, file);
-  if (fs.existsSync(filePath)) {
-    const content = fs.readFileSync(filePath, "utf-8");
-    rawSchema += `\n# --- ${file} ---\n\n`;
-    rawSchema += content.trim() + "\n";
-  } else {
-    console.warn(`Warning: ${file} not found in ${MODULES_DIR}`);
+if (fs.existsSync(OUTPUT_SCHEMA)) {
+  rawSchema = fs.readFileSync(OUTPUT_SCHEMA, "utf-8");
+  console.log(`Using checked-in schema source from ${OUTPUT_SCHEMA}`);
+} else {
+  for (const file of ORDER) {
+    const filePath = path.join(MODULES_DIR, file);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, "utf-8");
+      rawSchema += `\n# --- ${file} ---\n\n`;
+      rawSchema += content.trim() + "\n";
+    } else {
+      console.warn(`Warning: ${file} not found in ${MODULES_DIR}`);
+    }
   }
 }
 
