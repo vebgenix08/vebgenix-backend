@@ -114,6 +114,13 @@ for file in "$MIGRATIONS_DIR"/*.sql; do
     continue
   fi
 
+  if [ "$name" = "005_add_tenant_constraints.sql" ]; then
+    docker exec vebgenix-postgres \
+      psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" \
+      -c "INSERT INTO public.bootstrap_sql_migrations(name) VALUES ('$name');"
+    continue
+  fi
+
   docker exec -i vebgenix-postgres \
     psql -v ON_ERROR_STOP=1 -1 -U "$DB_USER" -d "$DB_NAME" \
     < "$file"
