@@ -84,7 +84,7 @@ export class NetworkStack extends cdk.Stack {
     this.sgDb = new ec2.SecurityGroup(this, 'SgDb', {
       vpc: this.vpc,
       description: 'RDS PostgreSQL - ingress from RDS Proxy only',
-      allowAllOutbound: false,
+      allowAllOutbound: true,
     });
     this.sgApp = new ec2.SecurityGroup(this, 'SgApp', {
       vpc: this.vpc,

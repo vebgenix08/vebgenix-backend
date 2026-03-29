@@ -50,13 +50,14 @@ export class Ec2DatabaseStack extends cdk.Stack {
     userData.addCommands(
       "set -euxo pipefail",
       "dnf update -y",
-      "dnf install -y docker jq",
+      "dnf install -y docker",
       "systemctl enable docker",
       "systemctl start docker",
       `SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${this.dbSecret.secretArn} --region ${config.region} --query SecretString --output text)`,
-      "DB_USER=$(echo \"$SECRET_JSON\" | jq -r '.username')",
-      "DB_PASS=$(echo \"$SECRET_JSON\" | jq -r '.password')",
-      "DB_NAME=$(echo \"$SECRET_JSON\" | jq -r '.dbname')",
+      "export SECRET_JSON",
+      "DB_USER=$(python3 -c 'import json, os; print(json.loads(os.environ[\"SECRET_JSON\"])[\"username\"])')",
+      "DB_PASS=$(python3 -c 'import json, os; print(json.loads(os.environ[\"SECRET_JSON\"])[\"password\"])')",
+      "DB_NAME=$(python3 -c 'import json, os; print(json.loads(os.environ[\"SECRET_JSON\"])[\"dbname\"])')",
       "mkdir -p /var/lib/vebgenix-postgres",
       "chmod 700 /var/lib/vebgenix-postgres",
       "if ! docker ps -a --format '{{.Names}}' | grep -q '^vebgenix-postgres$'; then",
@@ -69,6 +70,8 @@ export class Ec2DatabaseStack extends cdk.Stack {
       "else",
       "  docker start vebgenix-postgres || true",
       "fi",
+      "for i in $(seq 1 30); do if docker exec vebgenix-postgres pg_isready -U \"$DB_USER\" -d \"$DB_NAME\" >/dev/null 2>&1; then break; fi; sleep 5; done",
+      "docker exec vebgenix-postgres pg_isready -U \"$DB_USER\" -d \"$DB_NAME\"",
     );
 
     this.instance = new ec2.Instance(this, "DbInstance", {
