@@ -47,6 +47,8 @@ ALTER TABLE IF EXISTS public.profiles ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
+ALTER TABLE IF EXISTS public.profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
+ALTER TABLE IF EXISTS public.profiles DROP CONSTRAINT IF EXISTS profiles_campus_scope_check;
 
 ALTER TABLE IF EXISTS public.profiles
   ALTER COLUMN role TYPE "UserRole" USING CASE UPPER(role::text)
