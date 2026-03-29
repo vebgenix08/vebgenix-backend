@@ -221,6 +221,7 @@ jobs:
             VebgenixAuth-dev \
             VebgenixStorage-dev \
             VebgenixAsync-dev \
+            VebgenixFrontend-dev \
             VebgenixMonitoring-dev \
             VebgenixOidc-dev \
             -c env=dev -c enableNewResolvers=true --require-approval never

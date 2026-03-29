@@ -213,6 +213,6 @@ jobs:
             VebgenixAuth-prod \
             VebgenixStorage-prod \
             VebgenixAsync-prod \
+            VebgenixFrontend-prod \
             VebgenixMonitoring-prod \
-            VebgenixOidc-prod \
             -c env=prod -c enableNewResolvers=true --require-approval never
