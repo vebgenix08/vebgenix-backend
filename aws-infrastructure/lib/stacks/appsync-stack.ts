@@ -49,7 +49,7 @@ export class AppSyncStack extends cdk.Stack {
       dbSecretArn,
     } = props;
 
-    const privateSubnets = { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS };
+    const privateSubnets = { subnetType: ec2.SubnetType.PRIVATE_ISOLATED };
 
     // ---------------------------------------------------------------
     // AppSync GraphQL API
@@ -104,25 +104,52 @@ export class AppSyncStack extends cdk.Stack {
       DB_PROXY_ENDPOINT: dbProxyEndpoint,
       DB_SECRET_ARN: dbSecretArn,
       DB_NAME: "vebgenix",
-      DATABASE_URL: `postgresql://postgres:${dbSecretArn}@${dbProxyEndpoint}:5432/vebgenix`, // RDS Proxy URL
       EVENT_BUS_NAME: eventBus.eventBusName,
       DOCUMENTS_BUCKET: documentsBucket.bucketName,
+      S3_BUCKET_NAME: documentsBucket.bucketName,
+      UPLOADS_BUCKET_NAME: documentsBucket.bucketName,
+      MEDIA_BUCKET_NAME: documentsBucket.bucketName,
+      S3_PUBLIC_BASE_URL:
+        process.env.S3_PUBLIC_BASE_URL ||
+        `https://${documentsBucket.bucketName}.s3.${config.region}.amazonaws.com`,
+      S3_UPLOAD_ROOT: process.env.S3_UPLOAD_ROOT || "tenants",
+      S3_CAMPUS_SEGMENT: process.env.S3_CAMPUS_SEGMENT || "campuses",
+      S3_USER_SEGMENT: process.env.S3_USER_SEGMENT || "users",
+      S3_TENANT_CAMPUS_FALLBACK:
+        process.env.S3_TENANT_CAMPUS_FALLBACK || "tenant",
+      S3_PROFILE_SCOPE_NAME: process.env.S3_PROFILE_SCOPE_NAME || "profile",
+      S3_BRANDING_SCOPE_NAME:
+        process.env.S3_BRANDING_SCOPE_NAME || "branding",
+      S3_AVATAR_UPLOAD_NAME: process.env.S3_AVATAR_UPLOAD_NAME || "avatar",
+      S3_LOGO_UPLOAD_NAME: process.env.S3_LOGO_UPLOAD_NAME || "logo",
       USER_POOL_ID: userPool.userPoolId,
       NODE_OPTIONS: "--enable-source-maps",
+      // Email
+      SMTP_HOST: process.env.SMTP_HOST || 'smtp.gmail.com',
+      SMTP_PORT: process.env.SMTP_PORT || '587',
+      SMTP_USER: process.env.SMTP_USER || '',
+      SMTP_PASS: process.env.SMTP_PASS || '',
+      SMTP_FROM: process.env.SMTP_FROM || '',
+      FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
     };
 
     // PERMANENT: allow resolver lambdas to read DB secret (covers Secrets Manager 6-char suffix)
+    const dbPolicyResources = [
+      ...(dbSecretArn && dbSecretArn.startsWith("arn:")
+        ? [
+            dbSecretArn,
+            `${dbSecretArn}-*`,
+          ]
+        : []),
+      `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
+    ];
+
     const dbPolicy = new iam.PolicyStatement({
       actions: [
         "secretsmanager:GetSecretValue",
         "secretsmanager:DescribeSecret",
       ],
-      resources: [
-        dbSecretArn, // exact ARN (if provided as full ARN)
-        `${dbSecretArn}-*`, // ARN with AWS 6-char suffix (e.g. vebgenix/dev/db-master-abc123)
-        // Fallback: name-based ARN pattern in case dbSecretArn is a secret name not a full ARN
-        `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
-      ],
+      resources: dbPolicyResources,
     });
 
     // ---------------------------------------------------------------
@@ -181,6 +208,27 @@ export class AppSyncStack extends cdk.Stack {
           minify: true,
           externalModules: ['@aws-sdk/*'], 
           sourceMap: true,
+          commandHooks: {
+            beforeBundling(inputDir: string, outputDir: string): string[] { return []; },
+            beforeInstall(inputDir: string, outputDir: string): string[] { return []; },
+            afterBundling(inputDir: string, outputDir: string): string[] {
+              const script = `
+                const fs = require('fs');
+                const path = require('path');
+                const outPrisma = path.join(process.argv[2], 'node_modules', '.prisma', 'client');
+                fs.mkdirSync(outPrisma, { recursive: true });
+                fs.copyFileSync(
+                  path.join(process.argv[1], '..', 'server', 'node_modules', '.prisma', 'client', 'schema.prisma'),
+                  path.join(outPrisma, 'schema.prisma')
+                );
+                fs.copyFileSync(
+                  path.join(process.argv[1], '..', 'server', 'node_modules', '.prisma', 'client', 'libquery_engine-rhel-openssl-3.0.x.so.node'),
+                  path.join(outPrisma, 'libquery_engine-rhel-openssl-3.0.x.so.node')
+                );
+              `.replace(/\s+/g, ' ');
+              return [`node -e "${script}" "${inputDir.replace(/\\/g, '/')}" "${outputDir.replace(/\\/g, '/')}"`];
+            }
+          }
         },
         logRetention:
           config.stage === "prod"
@@ -195,10 +243,10 @@ export class AppSyncStack extends cdk.Stack {
     // ---------------------------------------------------------------
     // 1. Users Lambda
     // ---------------------------------------------------------------
-    const usersLambda = makeLambda(
+    const usersLambda = makeDomainLambda(
       "UsersLambda",
       "users-resolver",
-      "users-resolver/index.handler",
+      "identity/users.ts"
     );
     usersLambda.addToRolePolicy(
       new iam.PolicyStatement({
@@ -248,13 +296,23 @@ export class AppSyncStack extends cdk.Stack {
     );
 
     // ---------------------------------------------------------------
-    // 4. Storage Lambda (presigned upload URLs)
+    // 4. Storage Lambda (presigned upload URLs) — Non-VPC
     // ---------------------------------------------------------------
-    const storageLambda = makeLambda(
-      "StorageLambda",
-      "storage-resolver",
-      "storage-resolver/index.handler",
-    );
+    const storageLambda = new lambda.Function(this, "StorageLambda", {
+      functionName: `vebgenix-storage-resolver-${config.stage}`,
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: "storage-resolver/index.handler",
+      // Entire lambda/ folder packaged so shared/ utilities are always available
+      code: lambda.Code.fromAsset(path.resolve(__dirname, "../../lambda")),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: sharedEnv,
+      tracing: lambda.Tracing.ACTIVE,
+      logRetention:
+        config.stage === "prod"
+          ? logs.RetentionDays.THREE_MONTHS
+          : logs.RetentionDays.ONE_WEEK,
+    });
     documentsBucket.grantPut(storageLambda);
     documentsBucket.grantRead(storageLambda);
 
@@ -288,28 +346,28 @@ export class AppSyncStack extends cdk.Stack {
     // ---------------------------------------------------------------
     // 8. Settings Lambda (Academic & Templates)
     // ---------------------------------------------------------------
-    const settingsLambda = makeLambda(
+    const settingsLambda = makeDomainLambda(
       "SettingsLambda",
-      "settings-resolver",
-      "settings-resolver/index.handler",
+      "settings",
+      "settings/handler.ts",
     );
 
     // ---------------------------------------------------------------
     // 9. Students Lambda
     // ---------------------------------------------------------------
-    const studentsLambda = makeLambda(
+    const studentsLambda = makeDomainLambda(
       "StudentsLambda",
-      "students-resolver",
-      "students-resolver/index.handler",
+      "students",
+      "students/handler.ts",
     );
 
     // ---------------------------------------------------------------
     // 10. Finance Lambda
     // ---------------------------------------------------------------
-    const financeLambda = makeLambda(
+    const financeLambda = makeDomainLambda(
       "FinanceLambda",
-      "finance-resolver",
-      "finance-resolver/index.handler",
+      "finance",
+      "finance/handler.ts",
     );
 
     // ---------------------------------------------------------------
@@ -375,6 +433,7 @@ export class AppSyncStack extends cdk.Stack {
     users("Mutation", "updateUser");
     users("Mutation", "deactivateUser");
     users("Mutation", "inviteStaff");
+    users("Mutation", "acceptInvite");
 
     const settings = R(settingsDs);
     settings("Mutation", "createAcademicYear");
@@ -382,10 +441,16 @@ export class AppSyncStack extends cdk.Stack {
     settings("Mutation", "createTemplate");
     settings("Mutation", "publishTemplateVersion");
     settings("Query", "listTemplates");
+    settings("Query", "listCampuses");
+    settings("Query", "getCampus");
+    settings("Mutation", "createCampus");
+    settings("Mutation", "updateCampus");
 
     const students = R(studentsDs);
     students("Query", "listStudents");
     students("Mutation", "convertApplicationToStudent");
+    students("Mutation", "enableStudentPortal");
+    students("Mutation", "enableGuardianPortal");
 
     const finance = R(financeDs);
     finance("Mutation", "createFeeHead");
