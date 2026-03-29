@@ -96,7 +96,9 @@ export class RestApiStack extends cdk.Stack {
     userData.addCommands(
       "set -euxo pipefail",
       "dnf update -y",
-      "dnf install -y git jq nginx nodejs",
+      "dnf install -y git jq nginx",
+      "curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -",
+      "dnf install -y nodejs",
       "systemctl enable nginx",
       "cat >/etc/nginx/conf.d/vebgenix-rest.conf <<'EOF'",
       "server {",
@@ -162,6 +164,7 @@ USER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID
 COGNITO_USER_POOL_ID=$USER_POOL_ID
 DB_NAME=$DB_NAME
 DATABASE_URL=postgresql://$DB_USER:$DB_PASS@$DB_HOST:5432/$DB_NAME
+DIRECT_URL=postgresql://$DB_USER:$DB_PASS@$DB_HOST:5432/$DB_NAME
 DOCUMENTS_BUCKET=$DOC_BUCKET
 S3_BUCKET_NAME=$DOC_BUCKET
 UPLOADS_BUCKET_NAME=$DOC_BUCKET
