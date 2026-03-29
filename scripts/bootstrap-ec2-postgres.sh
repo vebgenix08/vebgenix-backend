@@ -121,9 +121,16 @@ for file in "$MIGRATIONS_DIR"/*.sql; do
     continue
   fi
 
-  docker exec -i vebgenix-postgres \
-    psql -v ON_ERROR_STOP=1 -1 -U "$DB_USER" -d "$DB_NAME" \
-    < "$file"
+  echo "Applying bootstrap migration: $name"
+  if grep -qi 'CONCURRENTLY' "$file"; then
+    docker exec -i vebgenix-postgres \
+      psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" \
+      < "$file"
+  else
+    docker exec -i vebgenix-postgres \
+      psql -v ON_ERROR_STOP=1 -1 -U "$DB_USER" -d "$DB_NAME" \
+      < "$file"
+  fi
 
   docker exec vebgenix-postgres \
     psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" \
