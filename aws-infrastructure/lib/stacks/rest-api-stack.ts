@@ -278,19 +278,6 @@ EOF`,
       parameterName: `/vebgenix/${config.stage}/rest/EVENT_BUS_NAME`,
       stringValue: eventBusName,
     });
-    new ssm.StringParameter(this, "RestDbHostParam", {
-      parameterName: `/vebgenix/${config.stage}/rest/DB_HOST`,
-      stringValue: dbHost,
-    });
-    new ssm.StringParameter(this, "RestDbNameParam", {
-      parameterName: `/vebgenix/${config.stage}/rest/DB_NAME`,
-      stringValue: dbName,
-    });
-    new ssm.StringParameter(this, "RestDbSecretArnParam", {
-      parameterName: `/vebgenix/${config.stage}/rest/DB_SECRET_ARN`,
-      stringValue: dbSecret.secretArn,
-    });
-
     new cdk.CfnOutput(this, "InstanceId", { value: this.instance.instanceId });
     new cdk.CfnOutput(this, "InstancePublicDns", {
       value: this.instance.instancePublicDnsName,
