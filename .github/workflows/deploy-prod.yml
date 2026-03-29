@@ -229,6 +229,21 @@ jobs:
       - name: Deploy REST app to EC2 via SSM
         run: |
           set -euo pipefail
+          ARTIFACT_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixStorage-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue | [0]" \
+            --output text)
+          ARTIFACT_KEY="rest-deployments/backend-${GITHUB_SHA}.tgz"
+
+          tar \
+            --exclude='.git' \
+            --exclude='server/node_modules' \
+            --exclude='aws-infrastructure/node_modules' \
+            --exclude='aws-infrastructure/cdk.out' \
+            -czf /tmp/backend-rest.tgz .
+
+          aws s3 cp /tmp/backend-rest.tgz "s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
+
           INSTANCE_ID=$(aws cloudformation describe-stacks \
             --stack-name VebgenixRestApi-prod \
             --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
@@ -251,7 +266,7 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands='["sudo /opt/vebgenix/bin/deploy-rest.sh release"]' \
+            --parameters commands="[\"sudo /opt/vebgenix/bin/deploy-rest.sh release ${ARTIFACT_KEY}\"]" \
             --query "Command.CommandId" \
             --output text)
 

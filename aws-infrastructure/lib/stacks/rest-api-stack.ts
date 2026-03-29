@@ -124,19 +124,21 @@ export class RestApiStack extends cdk.Stack {
 #!/bin/bash
 set -euxo pipefail
 BRANCH="\${1:-${config.stage === "prod" ? "release" : "main"}}"
+ARTIFACT_KEY="\${2:-}"
 APP_DIR=/opt/vebgenix/app
 STAGE="${config.stage}"
 REGION="${config.region}"
 REPO_URL="https://github.com/vebgenix08/vebgenix-backend.git"
+DOC_BUCKET=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DOCUMENTS_BUCKET" --region "$REGION" --query Parameter.Value --output text)
 
-if [ ! -d "$APP_DIR/.git" ]; then
-  rm -rf "$APP_DIR"
-  git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
+rm -rf "$APP_DIR"
+mkdir -p "$APP_DIR"
+
+if [ -n "$ARTIFACT_KEY" ]; then
+  aws s3 cp "s3://$DOC_BUCKET/$ARTIFACT_KEY" /tmp/vebgenix-backend.tgz --region "$REGION"
+  tar -xzf /tmp/vebgenix-backend.tgz -C "$APP_DIR"
 else
-  cd "$APP_DIR"
-  git fetch origin "$BRANCH"
-  git checkout "$BRANCH"
-  git reset --hard "origin/$BRANCH"
+  git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
 fi
 
 USER_POOL_ID=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/USER_POOL_ID" --region "$REGION" --query Parameter.Value --output text)
@@ -144,7 +146,6 @@ USER_POOL_CLIENT_ID=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/USER_P
 DB_HOST=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DB_HOST" --region "$REGION" --query Parameter.Value --output text)
 DB_NAME=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DB_NAME" --region "$REGION" --query Parameter.Value --output text)
 DB_SECRET_ARN=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DB_SECRET_ARN" --region "$REGION" --query Parameter.Value --output text)
-DOC_BUCKET=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DOCUMENTS_BUCKET" --region "$REGION" --query Parameter.Value --output text)
 EVENT_BUS_NAME=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/EVENT_BUS_NAME" --region "$REGION" --query Parameter.Value --output text)
 FRONTEND_URL=$(aws ssm get-parameter --name "/vebgenix/$STAGE/frontend/APP_URL" --region "$REGION" --query Parameter.Value --output text)
 DB_SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$DB_SECRET_ARN" --region "$REGION" --query SecretString --output text)
