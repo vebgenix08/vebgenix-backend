@@ -198,10 +198,10 @@ PRISMA_DEBUG_QUERIES=false
 ENV
 
 cd "$APP_DIR/server"
+npm ci
 set -a
 source /etc/vebgenix-rest.env
 set +a
-npm ci
 npx prisma generate --schema=prisma/schema.prisma
 npx prisma migrate deploy --schema=prisma/schema.prisma
 npm run build
