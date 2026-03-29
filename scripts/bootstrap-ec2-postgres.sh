@@ -70,6 +70,24 @@ CREATE TABLE IF NOT EXISTS auth.users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  tenant_id UUID,
+  email TEXT UNIQUE,
+  full_name TEXT,
+  role TEXT NOT NULL CHECK (role IN ('ADMIN', 'ACCOUNTANT', 'STAFF', 'TEACHER', 'STUDENT', 'PARENT')),
+  campus_scope TEXT CHECK (campus_scope IN ('SCHOOL', 'PU', 'ALL')),
+  all_campuses_access BOOLEAN NOT NULL DEFAULT false,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS tenant_id UUID,
+  ADD COLUMN IF NOT EXISTS all_campuses_access BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+
 CREATE OR REPLACE FUNCTION auth.uid()
 RETURNS uuid
 LANGUAGE sql
