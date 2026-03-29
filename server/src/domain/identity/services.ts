@@ -1,20 +1,45 @@
-import { getPrisma } from '../../../infrastructure/prisma/client';
+import { getPrisma, runWithTenantContext } from '../../infrastructure/prisma/client';
 import { User, Membership, Role, MembershipStatus, AuthContext } from './entities';
 import { AuthorizationError, NotFoundError } from '../shared/errors';
+
+async function findAuthUserByEmailInsensitive(prisma: any, email?: string | null) {
+  const normalizedEmail = email ? String(email).trim().toLowerCase() : '';
+  if (!normalizedEmail) return null;
+
+  return prisma.authUser.findFirst({
+    where: {
+      email: {
+        equals: normalizedEmail,
+        mode: 'insensitive',
+      },
+    },
+    include: { globalRoles: true },
+  });
+}
 
 export class IdentityService {
   /**
    * Resolve the full AuthContext for a user within a tenant.
    * This is the "God Function" for authorization used by every Lambda.
    */
-  static async getContext(userId: string, tenantId?: string): Promise<AuthContext> {
+  static async getContext(userId: string, tenantId?: string, email?: string): Promise<AuthContext> {
     const prisma = await getPrisma();
 
     // 1. Fetch User
-    const userRecord = await prisma.authUser.findUnique({
+    let userRecord = await prisma.authUser.findUnique({
       where: { id: userId },
       include: { globalRoles: true }
     });
+
+    // 1b. Fallback: If AppSync sends a Cognito `sub` as userId that doesn't match our Postgres ID,
+    // look up the AuthUser by email and seamlessly translate the userId for subsequent queries.
+    if (!userRecord && email) {
+      userRecord = await findAuthUserByEmailInsensitive(prisma, email);
+
+      if (userRecord) {
+        userId = userRecord.id; // Override userId so subsequent membership/profile queries use the local DB ID
+      }
+    }
 
     if (!userRecord) throw new NotFoundError('User', userId);
 
@@ -36,20 +61,22 @@ export class IdentityService {
     }
 
     // 2. Fetch Membership with Roles and Profile
-    const membershipRecord = await prisma.tenantMembership.findFirst({
-      where: { userId, tenantId },
-      include: {
-        memberRoles: { 
-          include: { 
-            role: { 
-              include: { permissions: true } 
-            } 
-          } 
-        },
-        primaryProfile: { 
-          include: { campusAccess: true } 
-        } 
-      }
+    const membershipRecord = await runWithTenantContext(tenantId, userId, (db) => {
+      return db.tenantMembership.findFirst({
+        where: { userId, tenantId },
+        include: {
+          memberRoles: {
+            include: {
+              role: {
+                include: { permissions: true }
+              }
+            }
+          },
+          primaryProfile: {
+            include: { campusAccess: true }
+          }
+        }
+      });
     });
 
     if (!membershipRecord) {
@@ -71,15 +98,26 @@ export class IdentityService {
     const permissions = new Set<string>();
     roles.forEach(r => r.permissions.forEach(p => permissions.add(p)));
 
-    // 4. Resolve Campus Scope from Profile
-    const profile = membershipRecord.primaryProfile;
+    let profile = membershipRecord.primaryProfile;
+    if (!profile) {
+      const fallback = await runWithTenantContext(tenantId, userId, (db) =>
+        db.profile.findUnique({
+          where: { id: userId },
+          include: { campusAccess: true },
+        }),
+      );
+      if (fallback?.tenantId === tenantId) {
+        profile = fallback as any;
+      }
+    }
+
     if (profile) {
       user.fullName = profile.fullName || user.email;
     }
 
     const isAllCampuses = profile?.allCampusesAccess ?? false;
     const allowedCampusIds = new Set<string>(
-      profile?.campusAccess.map(ca => ca.campusId) ?? []
+      profile?.campusAccess.map((ca: any) => ca.campusId) ?? [],
     );
 
     // 5. Construct Membership Object
