@@ -74,6 +74,7 @@ if (config.enableEc2Postgres) {
       config,
       vpc: networkStack.vpc,
       sgDb: networkStack.sgDb,
+      documentsBucket: storageStack.bucket,
     },
   );
   ec2DatabaseStack.addDependency(networkStack);
