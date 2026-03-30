@@ -219,7 +219,11 @@ jobs:
         # Step C is now merged into Step A — single deploy handles everything
 
         # ─────────────────────────────────────────────────────────────────────
-        # Deploy remaining stacks (NOT AppSync — already deployed in steps A+C)
+        # Deploy the dev REST path only.
+        #
+        # Skip Network because of legacy dev export consumers, and skip
+        # Async/Frontend/Monitoring/OIDC because they are already provisioned
+        # and unnecessarily slow down routine backend dev deploys.
         # ─────────────────────────────────────────────────────────────────────
       - name: Clear stale create-failed EC2 stacks
         run: |
@@ -236,18 +240,12 @@ jobs:
             fi
           done
 
-      - name: Deploy Remaining Stacks (excluding AppSync)
+      - name: Deploy Dev REST Stacks
         working-directory: aws-infrastructure
         run: |
           npx cdk deploy \
-            VebgenixAuth-dev \
-            VebgenixStorage-dev \
-            VebgenixAsync-dev \
-            VebgenixFrontend-dev \
             VebgenixEc2Database-dev \
             VebgenixRestApi-dev \
-            VebgenixMonitoring-dev \
-            VebgenixOidc-dev \
             -c env=dev -c enableNewResolvers=true --require-approval never --exclusively
 
       - name: Package backend artifact
