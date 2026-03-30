@@ -1,4 +1,4 @@
-import { getPrisma } from '../../../infrastructure/prisma/client';
+import { getPrisma } from '../../infrastructure/prisma/client';
 import { AuthContext } from './entities';
 import { IdentityService } from './services';
 
@@ -67,7 +67,7 @@ export class StaffService {
       cursor: cursor ? { id: cursor } : undefined,
       include: {
         user: { select: { email: true, phone: true } },
-        primaryProfile: { select: { fullName: true, avatar: true } }, // Assuming avatar exists or will exist
+        primaryProfile: { select: { fullName: true } },
         memberRoles: { include: { role: true } }
       },
       orderBy: { createdAt: 'desc' }

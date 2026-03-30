@@ -1,4 +1,4 @@
-import { getPrisma } from '../../../infrastructure/prisma/client';
+import { getPrisma } from '../../infrastructure/prisma/client';
 import { User, Membership, Role, MembershipStatus, AuthContext } from './entities';
 import { AuthorizationError, NotFoundError } from '../shared/errors';
 

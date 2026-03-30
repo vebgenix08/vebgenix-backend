@@ -3,9 +3,6 @@ set -euo pipefail
 
 STAGE="${1:?stage is required}"
 REGION="${2:?region is required}"
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MIGRATIONS_DIR="$REPO_ROOT/server/src/migrations"
-
 DB_SECRET_ARN=$(aws ssm get-parameter \
   --name "/vebgenix/$STAGE/rest/DB_SECRET_ARN" \
   --region "$REGION" \
@@ -56,83 +53,28 @@ for _ in $(seq 1 30); do
 done
 docker exec vebgenix-postgres pg_isready -U "$DB_USER" -d "$DB_NAME"
 
-cat >/tmp/vebgenix-ec2-compat.sql <<'SQL'
+cat >/tmp/vebgenix-ec2-init.sql <<'SQL'
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'auth') THEN
+    EXECUTE 'DROP SCHEMA auth CASCADE';
+  END IF;
+END $$;
 
-CREATE SCHEMA IF NOT EXISTS auth;
+ALTER TABLE IF EXISTS public.employees DROP CONSTRAINT IF EXISTS employees_auth_user_id_key;
+ALTER TABLE IF EXISTS public.employees DROP CONSTRAINT IF EXISTS employees_auth_user_id_fkey;
+DROP INDEX IF EXISTS public.employees_auth_user_id_key;
 
-CREATE TABLE IF NOT EXISTS auth.users (
-  id UUID PRIMARY KEY,
-  email TEXT,
-  raw_user_meta_data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+ALTER TABLE IF EXISTS public.user_campus_access DROP CONSTRAINT IF EXISTS user_campus_access_user_id_campus_id_key;
+ALTER TABLE IF EXISTS public.user_campus_access DROP CONSTRAINT IF EXISTS user_campus_access_user_id_fkey;
+DROP INDEX IF EXISTS public.user_campus_access_user_id_campus_id_key;
+DROP INDEX IF EXISTS public.idx_user_campus_access_user_id;
 
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  tenant_id UUID,
-  email TEXT UNIQUE,
-  full_name TEXT,
-  role TEXT NOT NULL CHECK (role IN ('ADMIN', 'ACCOUNTANT', 'STAFF', 'TEACHER', 'STUDENT', 'PARENT')),
-  campus_scope TEXT CHECK (campus_scope IN ('SCHOOL', 'PU', 'ALL')),
-  all_campuses_access BOOLEAN NOT NULL DEFAULT false,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS tenant_id UUID,
-  ADD COLUMN IF NOT EXISTS all_campuses_access BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
-
-CREATE OR REPLACE FUNCTION auth.uid()
-RETURNS uuid
-LANGUAGE sql
-STABLE
-AS $$ SELECT NULL::uuid $$;
-
-CREATE TABLE IF NOT EXISTS public.bootstrap_sql_migrations (
-  name TEXT PRIMARY KEY,
-  applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+DROP TABLE IF EXISTS public.bootstrap_sql_migrations;
 SQL
 
 docker exec -i vebgenix-postgres \
   psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" \
-  < /tmp/vebgenix-ec2-compat.sql
-
-for file in "$MIGRATIONS_DIR"/*.sql; do
-  name="$(basename "$file")"
-  applied=$(docker exec vebgenix-postgres \
-    psql -tA -U "$DB_USER" -d "$DB_NAME" \
-    -c "SELECT 1 FROM public.bootstrap_sql_migrations WHERE name = '$name' LIMIT 1;")
-
-  if [ "$applied" = "1" ]; then
-    continue
-  fi
-
-  if [ "$name" = "005_add_tenant_constraints.sql" ]; then
-    docker exec vebgenix-postgres \
-      psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" \
-      -c "INSERT INTO public.bootstrap_sql_migrations(name) VALUES ('$name');"
-    continue
-  fi
-
-  echo "Applying bootstrap migration: $name"
-  if grep -qi 'CONCURRENTLY' "$file"; then
-    docker exec -i vebgenix-postgres \
-      psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" \
-      < "$file"
-  else
-    docker exec -i vebgenix-postgres \
-      psql -v ON_ERROR_STOP=1 -1 -U "$DB_USER" -d "$DB_NAME" \
-      < "$file"
-  fi
-
-  docker exec vebgenix-postgres \
-    psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" \
-    -c "INSERT INTO public.bootstrap_sql_migrations(name) VALUES ('$name');"
-done
+  < /tmp/vebgenix-ec2-init.sql

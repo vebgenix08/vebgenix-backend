@@ -1,5 +1,4 @@
 import { SQSEvent } from 'aws-lambda';
-import { getPrisma } from '../../infrastructure/prisma/client';
 
 export const handler = async (event: SQSEvent) => {
   console.log(`Processing ${event.Records.length} job records`);
@@ -11,7 +10,6 @@ export const handler = async (event: SQSEvent) => {
       const type = body['detail-type'];
 
       if (type === 'GenerateStudentId') {
-        const prisma = await getPrisma();
         // Logic to generate ID
         console.log('Generating ID for student', detail.studentId);
       }
