@@ -19,7 +19,7 @@ router.post("/switch-tenant", AuthController.switchTenant);
 
 router.post("/forgot-password", AuthController.forgotPassword);
 router.post("/reset-password", AuthController.resetPassword);
-router.post("/confirm-forgot-password", AuthController.resetPassword); // Alias for compatibility if needed
+router.post("/confirm-forgot-password", AuthController.confirmForgotPassword);
 
 // WHOAMI - Deterministic auth routing
 // No resolveTenant middleware here because whoami is global

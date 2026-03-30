@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
+import {
+  extractBearerToken,
+  getClaimString,
+  getClaimStringArray,
+  verifyCognitoIdToken,
+} from "../auth/cognito";
 
 /**
  * verifyJwt — Step 1 of auth chain
@@ -10,37 +13,40 @@ const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
  * Sets req.auth with decoded claims.
  * Does NOT touch req.user or req.tenant.
  */
-export const verifyJwt = (req: Request, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
+export const verifyJwt = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const token = extractBearerToken(req.headers.authorization);
 
-  if (!authHeader) {
+  if (!token) {
     return res.status(401).json({
       error: { code: "UNAUTHORIZED", message: "Missing Authorization header" },
     });
   }
 
-  const token = authHeader.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({
-      error: { code: "UNAUTHORIZED", message: "Missing Bearer token" },
-    });
-  }
-
   try {
-    const payload: any = jwt.verify(token, JWT_SECRET);
-
+    const claims = await verifyCognitoIdToken(token);
     (req as any).auth = {
-      userId: payload.sub,
-      email: payload.email,
-      tenantId: payload.tenant_id || null,
-      tenantRole: payload.tenant_role || null,
-      globalRoles: payload.global_roles || [],
-      primaryProfileId: payload.primary_profile_id || null,
-      campusScope: payload.campus_scope || null,
+      userId: getClaimString(claims, "sub"),
+      email: getClaimString(claims, "email"),
+      tenantId:
+        getClaimString(claims, "custom:tenant_id", "tenant_id") ??
+        ((req.headers["x-tenant-id"] as string) || null),
+      tenantRole: getClaimString(claims, "custom:role", "tenant_role"),
+      globalRoles: getClaimStringArray(claims, "cognito:groups"),
+      primaryProfileId: getClaimString(claims, "sub"),
+      campusScope: getClaimString(
+        claims,
+        "custom:campus_scope",
+        "campus_scope",
+      ),
+      claims,
     };
 
     return next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({
       error: { code: "UNAUTHORIZED", message: "Invalid or expired token" },
     });

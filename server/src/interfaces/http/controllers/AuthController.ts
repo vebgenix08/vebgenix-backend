@@ -1,16 +1,31 @@
 import { Request, Response } from "express";
 import prisma from "../../../infrastructure/prisma/client";
-import { EmailService } from "../../../infrastructure/services/emailService";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { GlobalRole } from "@prisma/client";
+import {
+  CognitoIdentityProviderClient,
+  ForgotPasswordCommand,
+  ConfirmForgotPasswordCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import {
+  extractBearerToken,
+  getClaimString,
+  verifyCognitoIdToken,
+} from "../auth/cognito";
 
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
 const ACCESS_TOKEN_EXPIRY = "8h";
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
 
 export class AuthController {
+  private static getCognitoClient() {
+    return new CognitoIdentityProviderClient({
+      region: process.env.AWS_REGION || "ap-south-1",
+    });
+  }
+
   // Helper: Generate Tokens
   private static generateTokens(user: any, context?: any) {
     const accessToken = jwt.sign(
@@ -326,156 +341,210 @@ export class AuthController {
 
   // POST /api/auth/forgot-password
   static async forgotPassword(req: Request, res: Response) {
+    const genericResponse = {
+      message: "If the email is registered, a reset code will be sent.",
+    };
     try {
       const { email } = req.body;
+      if (!email) {
+        return res.status(200).json(genericResponse);
+      }
+
       const normalizedEmail = String(email).trim().toLowerCase();
-
-      const user = await prisma.authUser.findUnique({
-        where: { email: normalizedEmail },
-      });
-      if (!user) return res.json({ message: "If registered, email sent." });
-
-      // Generate 6-digit code instead of long token to match Frontend UI
-      const token = Math.floor(100000 + Math.random() * 900000).toString();
-      const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-      const tokenId = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 3600000).toISOString();
-
-      // Use raw SQL due to schema mismatch
-      await prisma.$executeRawUnsafe(`
-        INSERT INTO "PasswordResetToken" (
-          "id", "userId", "tokenHash", "purpose", "expiresAt", "createdAt", "attempt_count"
-        ) VALUES (
-          '${tokenId}', '${user.id}', '${tokenHash}', 'FORGOT_PASSWORD', '${expiresAt}', NOW(), 0
-        )
-      `);
-
-      // Send Email with Code
-      await EmailService.sendMail(
-        normalizedEmail,
-        "Reset Your Password",
-        `<div style="font-family: sans-serif; padding: 20px;">
-           <h2>Password Reset Request</h2>
-           <p>Your verification code is:</p>
-           <h1 style="background: #f4f4f4; padding: 10px; display: inline-block; letter-spacing: 5px;">${token}</h1>
-           <p>Enter this code in the application to reset your password.</p>
-           <p>This code is valid for 1 hour.</p>
-         </div>`,
+      await AuthController.getCognitoClient().send(
+        new ForgotPasswordCommand({
+          ClientId: process.env.COGNITO_CLIENT_ID!,
+          Username: normalizedEmail,
+        }),
       );
 
-      return res.json({ message: "If registered, email sent." });
-    } catch (error) {
-      console.error("Forgot Password error:", error);
-      return res.status(500).json({ message: "Error" });
+      return res.status(200).json(genericResponse);
+    } catch (error: any) {
+      console.error(
+        `AuthController.forgotPassword error: ${error?.message || error}`,
+      );
+      return res.status(200).json(genericResponse);
     }
   }
 
   // POST /api/auth/reset-password
   // Alias: /api/auth/confirm-forgot-password
   static async resetPassword(req: Request, res: Response) {
+    return AuthController.confirmForgotPassword(req, res);
+  }
+
+  static async confirmForgotPassword(req: Request, res: Response) {
     try {
       const body = req.body;
 
-      // Flexible field mapping to support Cognito/Frontend variations
       const email = body.email || body.username || body.Username;
-      const token =
-        body.token ||
+      const code =
+        body.code ||
         body.code ||
         body.confirmationCode ||
         body.ConfirmationCode ||
-        body.verificationCode;
+        body.verificationCode ||
+        body.token;
       const newPassword = body.newPassword || body.password || body.Password;
 
-      console.log(`[AuthController] resetPassword attempt for: ${email}`);
-
-      if (!email || !token || !newPassword) {
-        console.warn(`[AuthController] Missing fields. Received:`, {
-          hasEmail: !!email,
-          hasToken: !!token,
-          hasPassword: !!newPassword,
-          bodyKeys: Object.keys(body),
-        });
-        return res.status(400).json({
-          message:
-            "Missing email, code, or password. Please check your request.",
-        });
+      if (!email || !code || !newPassword) {
+        return res
+          .status(400)
+          .json({ message: "email, code, and newPassword are required." });
       }
 
-      // Token is the 6-digit code from frontend
-      const tokenHash = crypto
-        .createHash("sha256")
-        .update(token.toString())
-        .digest("hex");
+      if (newPassword.length < 8) {
+        return res
+          .status(400)
+          .json({ message: "Password must be at least 8 characters." });
+      }
 
       const normalizedEmail = String(email).trim().toLowerCase();
 
-      // Use raw SQL due to schema mismatch
-      const results: any[] = await prisma.$queryRawUnsafe(`
-        SELECT t.id, t."userId", t."tokenHash", t.purpose, t."expiresAt", t."usedAt"
-        FROM "PasswordResetToken" t
-        JOIN "AuthUser" u ON t."userId" = u.id
-        WHERE t."tokenHash" = '${tokenHash}'
-          AND t."usedAt" IS NULL
-          AND t."expiresAt" > NOW()
-          AND u.email = '${normalizedEmail}'
-        LIMIT 1
-      `);
+      await AuthController.getCognitoClient().send(
+        new ConfirmForgotPasswordCommand({
+          ClientId: process.env.COGNITO_CLIENT_ID!,
+          Username: normalizedEmail,
+          ConfirmationCode: String(code).trim(),
+          Password: newPassword,
+        }),
+      );
 
-      const resetRecord = results[0];
-
-      if (!resetRecord) {
-        console.warn(`[AuthController] Invalid or expired token for ${email}`);
+      return res
+        .status(200)
+        .json({ message: "Password reset successful. You can now log in." });
+    } catch (error: any) {
+      console.error(
+        `AuthController.confirmForgotPassword error: ${error?.message || error}`,
+      );
+      const code = error?.name;
+      if (code === "CodeMismatchException") {
         return res
           .status(400)
-          .json({ message: "Invalid or expired verification code." });
+          .json({
+            message: "The verification code is incorrect. Please try again.",
+          });
       }
-
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(newPassword, salt);
-
-      // Update User & Mark Token Used via raw SQL
-      await prisma.$transaction([
-        prisma.$executeRawUnsafe(`
-          UPDATE "AuthUser"
-          SET "passwordHash" = '${passwordHash}', "updatedAt" = NOW()
-          WHERE id = '${resetRecord.userId}'
-        `),
-        prisma.$executeRawUnsafe(`
-          UPDATE "PasswordResetToken"
-          SET "usedAt" = NOW()
-          WHERE id = '${resetRecord.id}'
-        `),
-      ]);
-
-      console.log(`[AuthController] Password reset successful for ${email}`);
-      return res.json({
-        message: "Password updated successfully. You can now log in.",
-      });
-    } catch (error: any) {
-      console.error("Reset Password error:", error);
-      return res.status(500).json({ message: "Failed to reset password." });
+      if (code === "ExpiredCodeException") {
+        return res
+          .status(400)
+          .json({
+            message:
+              "The verification code has expired. Please request a new one.",
+          });
+      }
+      if (code === "InvalidPasswordException") {
+        return res
+          .status(400)
+          .json({
+            message: error.message || "Password does not meet requirements.",
+          });
+      }
+      return res
+        .status(400)
+        .json({ message: error.message || "Failed to reset password." });
     }
   }
 
   // GET /api/auth/whoami
   static async whoami(req: Request, res: Response) {
     try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader) return res.status(401).json({ message: "No token" });
+      const token = extractBearerToken(req.headers.authorization);
+      if (!token) return res.status(401).json({ message: "No token" });
 
-      const token = authHeader.split(" ")[1];
-      const decoded: any = jwt.verify(token, JWT_SECRET);
+      const claims = await verifyCognitoIdToken(token);
+      const email = getClaimString(claims, "email");
+      const sub = getClaimString(claims, "sub");
+      const tenantId = getClaimString(claims, "custom:tenant_id", "tenant_id");
+      const role = getClaimString(claims, "custom:role", "tenant_role");
+      const fullName = getClaimString(claims, "name") ?? email ?? "User";
 
-      // We can return the claims directly or fetch fresh data
-      return res.json({
-        id: decoded.sub,
-        email: decoded.email,
-        global_roles: decoded.global_roles,
-        context: {
-          tenant_id: decoded.tenant_id,
-          role: decoded.tenant_role,
-          campus_scope: decoded.campus_scope,
+      if (!email || !sub) {
+        return res.status(401).json({
+          error: {
+            code: "INVALID_TOKEN",
+            message: "Token valid but required claims are missing",
+          },
+        });
+      }
+
+      const authUser = await prisma.authUser.findUnique({
+        where: { email: email.toLowerCase() },
+        include: {
+          globalRoles: true,
+          memberships: {
+            where: { status: "ACTIVE" },
+            include: { tenant: true, primaryProfile: true },
+          },
         },
+      });
+
+      const isSuperAdmin =
+        authUser?.globalRoles.some(
+          (item) => item.role === GlobalRole.PLATFORM_SUPER_ADMIN,
+        ) ?? false;
+
+      if (isSuperAdmin) {
+        return res.json({
+          kind: "PLATFORM",
+          email,
+          role: "PLATFORM_SUPER_ADMIN",
+          full_name: fullName,
+          global_roles: authUser?.globalRoles.map((item) => item.role) ?? [],
+        });
+      }
+
+      const membership =
+        (tenantId
+          ? authUser?.memberships.find((item) => item.tenantId === tenantId)
+          : authUser?.memberships[0]) ?? null;
+
+      const profile =
+        membership?.primaryProfile ??
+        (await prisma.profile.findFirst({
+          where: {
+            tenantId: membership?.tenantId ?? tenantId ?? undefined,
+            OR: [{ id: sub }, { email: email.toLowerCase() }],
+          },
+        }));
+
+      if (!membership && !profile) {
+        return res.status(401).json({
+          error: {
+            code: "UNAUTHORIZED",
+            message: "User has no tenant profile.",
+            details: { email },
+          },
+        });
+      }
+
+      const resolvedTenantId = membership?.tenantId ?? profile?.tenantId ?? tenantId;
+      const tenant =
+        membership?.tenant ??
+        (resolvedTenantId
+          ? await prisma.tenant.findUnique({
+              where: { id: resolvedTenantId },
+              select: { id: true, name: true, slug: true, isActive: true },
+            })
+          : null);
+
+      if (!resolvedTenantId || !tenant || !tenant.isActive) {
+        return res.status(403).json({
+          error: {
+            code: "TENANT_INACTIVE",
+            message: "Tenant is missing or inactive.",
+          },
+        });
+      }
+
+      return res.json({
+        kind: "TENANT",
+        email,
+        role: membership?.role ?? profile?.role ?? role,
+        full_name: profile?.fullName ?? fullName,
+        tenant_id: resolvedTenantId,
+        tenant_slug: tenant.slug,
+        tenant_name: tenant.name,
       });
     } catch (error) {
       console.error("whoami error:", error);
