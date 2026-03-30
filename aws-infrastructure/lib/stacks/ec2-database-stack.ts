@@ -10,7 +10,6 @@ import { EnvConfig } from "../../config/types";
 interface Ec2DatabaseStackProps extends cdk.StackProps {
   config: EnvConfig;
   vpc: ec2.Vpc;
-  sgDb: ec2.SecurityGroup;
   documentsBucket: s3.IBucket;
 }
 
@@ -19,10 +18,11 @@ export class Ec2DatabaseStack extends cdk.Stack {
   public readonly dbSecret: secretsmanager.Secret;
   public readonly privateIp: string;
   public readonly dbName = "vebgenix";
+  public readonly hostSecurityGroup: ec2.SecurityGroup;
 
   constructor(scope: Construct, id: string, props: Ec2DatabaseStackProps) {
     super(scope, id, props);
-    const { config, vpc, sgDb, documentsBucket } = props;
+    const { config, vpc, documentsBucket } = props;
 
     this.dbSecret = new secretsmanager.Secret(this, "Ec2DbSecret", {
       secretName: `vebgenix/${config.stage}/ec2-postgres`,
@@ -65,12 +65,18 @@ export class Ec2DatabaseStack extends cdk.Stack {
         })
       : undefined;
 
+    this.hostSecurityGroup = new ec2.SecurityGroup(this, "DbHostSecurityGroup", {
+      vpc,
+      description: "EC2 PostgreSQL host",
+      allowAllOutbound: true,
+    });
+
     this.instance = new ec2.Instance(this, "DbInstance", {
       vpc,
       vpcSubnets: dbSubnet
         ? { subnets: [dbSubnet] }
         : { subnetType: ec2.SubnetType.PUBLIC },
-      securityGroup: sgDb,
+      securityGroup: this.hostSecurityGroup,
       instanceType: new ec2.InstanceType(config.ec2DbInstanceClass),
       machineImage: ec2.MachineImage.latestAmazonLinux2023({
         cpuType: ec2.AmazonLinuxCpuType.ARM_64,
@@ -88,6 +94,12 @@ export class Ec2DatabaseStack extends cdk.Stack {
       ],
       requireImdsv2: true,
     });
+
+    this.hostSecurityGroup.addIngressRule(
+      ec2.Peer.ipv4(vpc.vpcCidrBlock),
+      ec2.Port.tcp(5432),
+      "PostgreSQL access from VPC workloads",
+    );
 
     this.privateIp = this.instance.instancePrivateIp;
 

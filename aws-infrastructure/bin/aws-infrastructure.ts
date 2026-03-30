@@ -73,7 +73,6 @@ if (config.enableEc2Postgres) {
       env,
       config,
       vpc: networkStack.vpc,
-      sgDb: networkStack.sgDb,
       documentsBucket: storageStack.bucket,
     },
   );
@@ -138,7 +137,7 @@ if (config.enableEc2RestApi && ec2DatabaseStack) {
     config,
     vpc: networkStack.vpc,
     sgApp: networkStack.sgApp,
-    sgDb: networkStack.sgDb,
+    dbHostSecurityGroup: ec2DatabaseStack.hostSecurityGroup,
     documentsBucket: storageStack.bucket,
     userPoolId: authStack.userPool.userPoolId,
     userPoolClientId: authStack.userPoolClientId,

@@ -13,7 +13,7 @@ interface RestApiStackProps extends cdk.StackProps {
   config: EnvConfig;
   vpc: ec2.Vpc;
   sgApp: ec2.SecurityGroup;
-  sgDb: ec2.SecurityGroup;
+  dbHostSecurityGroup: ec2.SecurityGroup;
   documentsBucket: s3.Bucket;
   userPoolId: string;
   userPoolClientId: string;
@@ -34,7 +34,7 @@ export class RestApiStack extends cdk.Stack {
       config,
       vpc,
       sgApp,
-      sgDb,
+      dbHostSecurityGroup,
       documentsBucket,
       userPoolId,
       userPoolClientId,
@@ -256,7 +256,7 @@ EOF`,
         "Public HTTP to REST origin",
       );
       new ec2.CfnSecurityGroupIngress(this, "RestApiToDbIngress", {
-        groupId: sgDb.securityGroupId,
+        groupId: dbHostSecurityGroup.securityGroupId,
         sourceSecurityGroupId: restSecurityGroup.securityGroupId,
         ipProtocol: "tcp",
         fromPort: 5432,
