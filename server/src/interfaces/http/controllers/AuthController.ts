@@ -663,7 +663,7 @@ export class AuthController {
       // Use raw query due to schema mismatch (camelCase vs snake_case)
       const results: any[] = await prisma.$queryRawUnsafe(`
         SELECT 
-          t.id, t."userId", t."tokenHash", t.purpose, t.tenant_id, t.membership_id, t."expiresAt", t."usedAt",
+          t.id, t."userId", t.token_hash as "tokenHash", t.purpose, t.tenant_id, t.membership_id, t.expires_at as "expiresAt", t.used_at as "usedAt",
           u.email,
           tm.role,
           tn.name as tenant_name
@@ -671,10 +671,10 @@ export class AuthController {
         JOIN "AuthUser" u ON t."userId" = u.id
         LEFT JOIN "TenantMembership" tm ON t.membership_id = tm.id
         LEFT JOIN "tenants" tn ON tm."tenantId" = tn.id
-        WHERE t."tokenHash" = '${tokenHash}'
+        WHERE t.token_hash = '${tokenHash}'
           AND t.purpose = 'INVITE_SET_PASSWORD'
-          AND t."usedAt" IS NULL
-          AND t."expiresAt" > NOW()
+          AND t.used_at IS NULL
+          AND t.expires_at > NOW()
         LIMIT 1
       `);
 
@@ -713,16 +713,16 @@ export class AuthController {
       // Use safe parameterized query (tagged template) — avoids bcrypt $ corruption
       const results: any[] = await prisma.$queryRaw`
         SELECT 
-          t.id, t."userId", t."tokenHash", t.purpose, t.tenant_id, t.membership_id, t."expiresAt", t."usedAt",
+          t.id, t."userId", t.token_hash as "tokenHash", t.purpose, t.tenant_id, t.membership_id, t.expires_at as "expiresAt", t.used_at as "usedAt",
           u."passwordHash",
           tm.status as membership_status
         FROM "PasswordResetToken" t
         JOIN "AuthUser" u ON t."userId" = u.id
         LEFT JOIN "TenantMembership" tm ON t.membership_id = tm.id
-        WHERE t."tokenHash" = ${tokenHash}
+        WHERE t.token_hash = ${tokenHash}
           AND t.purpose = 'INVITE_SET_PASSWORD'
-          AND t."usedAt" IS NULL
-          AND t."expiresAt" > NOW()
+          AND t.used_at IS NULL
+          AND t.expires_at > NOW()
         LIMIT 1
       `;
 
@@ -756,7 +756,7 @@ export class AuthController {
         `),
         prisma.$executeRawUnsafe(`
           UPDATE "PasswordResetToken"
-          SET "usedAt" = NOW()
+          SET used_at = NOW()
           WHERE id = '${resetRecord.id}'
         `),
         ...(resetRecord.membership_id

@@ -322,13 +322,12 @@ export class PlatformService {
           .digest("hex");
 
         // Store token in PasswordResetToken using raw SQL
-        // (Uses actual DB column names confirmed: tokenHash, userId, expiresAt, membership_id, tenant_id)
         const tokenId = crypto.randomUUID();
         const expiresAt = new Date(Date.now() + 7 * 24 * 3600000).toISOString();
         
         await prisma.$executeRawUnsafe(`
           INSERT INTO "PasswordResetToken" (
-            "id", "userId", "tokenHash", "purpose", "tenant_id", "membership_id", "expiresAt", "createdAt", "attempt_count"
+            "id", "userId", token_hash, "purpose", tenant_id, membership_id, expires_at, created_at, attempt_count
           ) VALUES (
             '${tokenId}', '${userId}', '${tokenHash}', 'INVITE_SET_PASSWORD', '${tenantId}', 
             '${membership.id}', '${expiresAt}', NOW(), 0
@@ -712,7 +711,7 @@ export class PlatformService {
 
         await prisma.$executeRawUnsafe(`
           INSERT INTO "PasswordResetToken" (
-            "id", "userId", "tokenHash", "purpose", "tenant_id", "membership_id", "expiresAt", "createdAt", "attempt_count"
+            "id", "userId", token_hash, "purpose", tenant_id, membership_id, expires_at, created_at, attempt_count
           ) VALUES (
             '${tokenId}', '${userId}', '${tokenHash}', 'INVITE_SET_PASSWORD', '${tenantId}', 
             '${membership.id}', '${expiresAt}', NOW(), 0
@@ -787,7 +786,7 @@ export class PlatformService {
 
     await prisma.$executeRawUnsafe(`
        INSERT INTO "PasswordResetToken" (
-         "id", "userId", "tokenHash", "purpose", "tenant_id", "membership_id", "expiresAt", "createdAt", "attempt_count"
+         "id", "userId", token_hash, "purpose", tenant_id, membership_id, expires_at, created_at, attempt_count
        ) VALUES (
          '${tokenId}', '${userId}', '${tokenHash}', 'INVITE_SET_PASSWORD', '${profile.tenantId}', 
          ${membership?.id ? `'${membership.id}'` : "NULL"}, 
