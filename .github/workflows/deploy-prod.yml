@@ -15,6 +15,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: prod
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
@@ -152,7 +154,7 @@ jobs:
 
       - name: Step A - Deploy AppSync stack (schema + lambdas + resolvers)
         working-directory: aws-infrastructure
-        run: npx cdk deploy VebgenixAppSync-prod -c env=prod --require-approval never
+        run: npx cdk deploy VebgenixAppSync-prod -c env=prod --require-approval never --exclusively
 
       - name: Resolve AppSync API ID (post-deploy)
         run: |
@@ -224,7 +226,7 @@ jobs:
             VebgenixEc2Database-prod \
             VebgenixRestApi-prod \
             VebgenixMonitoring-prod \
-            -c env=prod -c enableNewResolvers=true --require-approval never
+            -c env=prod -c enableNewResolvers=true --require-approval never --exclusively
 
       - name: Package backend artifact
         run: |

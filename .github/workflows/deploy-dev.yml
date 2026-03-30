@@ -20,6 +20,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: dev
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
@@ -162,7 +164,7 @@ jobs:
       # ─────────────────────────────────────────────────────────────────────
       - name: Step A - Deploy AppSync stack (schema + lambdas + resolvers)
         working-directory: aws-infrastructure
-        run: npx cdk deploy VebgenixAppSync-dev -c env=dev --require-approval never
+        run: npx cdk deploy VebgenixAppSync-dev -c env=dev --require-approval never --exclusively
 
       # ─────────────────────────────────────────────────────────────────────
       # STEP B — Force-push schema, wait for SUCCESS, verify via
@@ -231,7 +233,7 @@ jobs:
             VebgenixRestApi-dev \
             VebgenixMonitoring-dev \
             VebgenixOidc-dev \
-            -c env=dev -c enableNewResolvers=true --require-approval never
+            -c env=dev -c enableNewResolvers=true --require-approval never --exclusively
 
       - name: Package backend artifact
         run: |
