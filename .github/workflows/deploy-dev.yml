@@ -219,13 +219,13 @@ jobs:
       # Step C is now merged into Step A — single deploy handles everything
 
       # ─────────────────────────────────────────────────────────────────────
-      # Deploy remaining stacks (NOT AppSync — already deployed in steps A+C)
+      # Deploy the dev REST path only.
       #
-      # Intentionally skip VebgenixNetwork-dev here. The dev account still has
-      # a legacy VebgenixDatabase-dev stack importing old network exports,
-      # which makes automatic network mutation roll back. The current dev
-      # rollout only needs the existing VPC to remain stable while the EC2 DB
-      # and REST stacks are created on top of it.
+      # Intentionally skip VebgenixNetwork-dev because the dev account still
+      # has a legacy VebgenixDatabase-dev stack importing old network exports.
+      # Also skip Async/Frontend/Monitoring/OIDC here; those stacks are already
+      # provisioned and make routine backend dev deploys unnecessarily slow.
+      # For the current dev workflow we only need the EC2 DB + REST API path.
       # ─────────────────────────────────────────────────────────────────────
       - name: Clear stale create-failed EC2 stacks
         run: |
@@ -242,18 +242,12 @@ jobs:
             fi
           done
 
-      - name: Deploy Remaining Stacks (excluding AppSync)
+      - name: Deploy Dev REST Stacks
         working-directory: aws-infrastructure
         run: |
           npx cdk deploy \
-            VebgenixAuth-dev \
-            VebgenixStorage-dev \
-            VebgenixAsync-dev \
-            VebgenixFrontend-dev \
             VebgenixEc2Database-dev \
             VebgenixRestApi-dev \
-            VebgenixMonitoring-dev \
-            VebgenixOidc-dev \
             -c env=dev -c enableNewResolvers=true --require-approval never --exclusively
 
       - name: Package backend artifact
