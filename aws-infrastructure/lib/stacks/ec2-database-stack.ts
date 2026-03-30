@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
@@ -9,7 +10,7 @@ import { EnvConfig } from "../../config/types";
 interface Ec2DatabaseStackProps extends cdk.StackProps {
   config: EnvConfig;
   vpc: ec2.Vpc;
-  sgDb: ec2.SecurityGroup;
+  documentsBucket: s3.IBucket;
 }
 
 export class Ec2DatabaseStack extends cdk.Stack {
@@ -17,10 +18,11 @@ export class Ec2DatabaseStack extends cdk.Stack {
   public readonly dbSecret: secretsmanager.Secret;
   public readonly privateIp: string;
   public readonly dbName = "vebgenix";
+  public readonly hostSecurityGroup: ec2.SecurityGroup;
 
   constructor(scope: Construct, id: string, props: Ec2DatabaseStackProps) {
     super(scope, id, props);
-    const { config, vpc, sgDb } = props;
+    const { config, vpc, documentsBucket } = props;
 
     this.dbSecret = new secretsmanager.Secret(this, "Ec2DbSecret", {
       secretName: `vebgenix/${config.stage}/ec2-postgres`,
@@ -45,36 +47,35 @@ export class Ec2DatabaseStack extends cdk.Stack {
     });
 
     this.dbSecret.grantRead(role);
+    documentsBucket.grantRead(role);
 
     const userData = ec2.UserData.forLinux();
     userData.addCommands(
       "set -euxo pipefail",
-      "dnf update -y",
-      "dnf install -y docker jq",
-      "systemctl enable docker",
-      "systemctl start docker",
-      `SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id ${this.dbSecret.secretArn} --region ${config.region} --query SecretString --output text)`,
-      "DB_USER=$(echo \"$SECRET_JSON\" | jq -r '.username')",
-      "DB_PASS=$(echo \"$SECRET_JSON\" | jq -r '.password')",
-      "DB_NAME=$(echo \"$SECRET_JSON\" | jq -r '.dbname')",
       "mkdir -p /var/lib/vebgenix-postgres",
       "chmod 700 /var/lib/vebgenix-postgres",
-      "if ! docker ps -a --format '{{.Names}}' | grep -q '^vebgenix-postgres$'; then",
-      "  docker run -d --name vebgenix-postgres --restart unless-stopped " +
-        "-e POSTGRES_USER=\"$DB_USER\" " +
-        "-e POSTGRES_PASSWORD=\"$DB_PASS\" " +
-        "-e POSTGRES_DB=\"$DB_NAME\" " +
-        "-p 5432:5432 " +
-        "-v /var/lib/vebgenix-postgres:/var/lib/postgresql/data postgres:16",
-      "else",
-      "  docker start vebgenix-postgres || true",
-      "fi",
     );
+
+    const dbSubnet = config.ec2DbSubnetId
+      ? ec2.Subnet.fromSubnetAttributes(this, "DbHostSubnet", {
+          subnetId: config.ec2DbSubnetId,
+          availabilityZone: config.ec2DbSubnetAz ?? cdk.Stack.of(this).availabilityZones[0],
+          routeTableId: config.ec2DbSubnetRouteTableId,
+        })
+      : undefined;
+
+    this.hostSecurityGroup = new ec2.SecurityGroup(this, "DbHostSecurityGroup", {
+      vpc,
+      description: "EC2 PostgreSQL host",
+      allowAllOutbound: true,
+    });
 
     this.instance = new ec2.Instance(this, "DbInstance", {
       vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      securityGroup: sgDb,
+      vpcSubnets: dbSubnet
+        ? { subnets: [dbSubnet] }
+        : { subnetType: ec2.SubnetType.PUBLIC },
+      securityGroup: this.hostSecurityGroup,
       instanceType: new ec2.InstanceType(config.ec2DbInstanceClass),
       machineImage: ec2.MachineImage.latestAmazonLinux2023({
         cpuType: ec2.AmazonLinuxCpuType.ARM_64,

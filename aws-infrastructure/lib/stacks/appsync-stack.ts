@@ -50,6 +50,7 @@ export class AppSyncStack extends cdk.Stack {
     } = props;
 
     const privateSubnets = { subnetType: ec2.SubnetType.PRIVATE_ISOLATED };
+    const dbSecretsEnabled = dbSecretArn.startsWith("arn:");
 
     // ---------------------------------------------------------------
     // AppSync GraphQL API
@@ -134,23 +135,23 @@ export class AppSyncStack extends cdk.Stack {
     };
 
     // PERMANENT: allow resolver lambdas to read DB secret (covers Secrets Manager 6-char suffix)
-    const dbPolicyResources = [
-      ...(dbSecretArn && dbSecretArn.startsWith("arn:")
-        ? [
-            dbSecretArn,
-            `${dbSecretArn}-*`,
-          ]
-        : []),
-      `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
-    ];
+    const dbPolicyResources = dbSecretsEnabled
+      ? [
+          dbSecretArn,
+          `${dbSecretArn}-*`,
+          `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
+        ]
+      : [];
 
-    const dbPolicy = new iam.PolicyStatement({
-      actions: [
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret",
-      ],
-      resources: dbPolicyResources,
-    });
+    const dbPolicy = dbSecretsEnabled
+      ? new iam.PolicyStatement({
+          actions: [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret",
+          ],
+          resources: dbPolicyResources,
+        })
+      : undefined;
 
     // ---------------------------------------------------------------
     // Helper: create domain Lambda + AppSync datasource
@@ -169,24 +170,11 @@ export class AppSyncStack extends cdk.Stack {
         securityGroups: [sgLambda],
         environment: sharedEnv,
         tracing: lambda.Tracing.ACTIVE,
-        logRetention:
-          config.stage === "prod"
-            ? logs.RetentionDays.THREE_MONTHS
-            : logs.RetentionDays.ONE_WEEK,
       });
 
-      fn.addToRolePolicy(dbPolicy);
-      fn.addToRolePolicy(
-        new iam.PolicyStatement({
-          actions: [
-            "secretsmanager:GetSecretValue",
-            "secretsmanager:DescribeSecret",
-          ],
-          resources: [
-            `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
-          ],
-        }),
-      );
+      if (dbPolicy) {
+        fn.addToRolePolicy(dbPolicy);
+      }
       return fn;
     };
 
@@ -230,13 +218,11 @@ export class AppSyncStack extends cdk.Stack {
             }
           }
         },
-        logRetention:
-          config.stage === "prod"
-            ? logs.RetentionDays.THREE_MONTHS
-            : logs.RetentionDays.ONE_WEEK,
       });
 
-      fn.addToRolePolicy(dbPolicy);
+      if (dbPolicy) {
+        fn.addToRolePolicy(dbPolicy);
+      }
       return fn;
     };
 
@@ -308,10 +294,6 @@ export class AppSyncStack extends cdk.Stack {
       memorySize: 256,
       environment: sharedEnv,
       tracing: lambda.Tracing.ACTIVE,
-      logRetention:
-        config.stage === "prod"
-          ? logs.RetentionDays.THREE_MONTHS
-          : logs.RetentionDays.ONE_WEEK,
     });
     documentsBucket.grantPut(storageLambda);
     documentsBucket.grantRead(storageLambda);

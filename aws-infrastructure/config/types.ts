@@ -9,6 +9,12 @@ export interface EnvConfig {
   enableNat: boolean;
   enableEc2RestApi: boolean;
   enableEc2Postgres: boolean;
+  restApiSubnetId?: string;
+  restApiSubnetAz?: string;
+  restApiSubnetRouteTableId?: string;
+  ec2DbSubnetId?: string;
+  ec2DbSubnetAz?: string;
+  ec2DbSubnetRouteTableId?: string;
 
   // Database
   enableDatabase: boolean;

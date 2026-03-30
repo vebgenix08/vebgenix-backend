@@ -1,6 +1,7 @@
 import { resolveContext } from '../context';
 import { StaffService } from '../../../domain/identity/staff-service';
 import { InviteStaff } from '../../../application/identity/InviteStaff';
+import { runWithTenantContext } from '../../../infrastructure/prisma/client';
 
 export const handler = async (event: any) => {
   const { fieldName, arguments: args, identity } = event;
@@ -26,12 +27,16 @@ export const handler = async (event: any) => {
 
     case 'listUsers':
       // Map GraphQL args to Service args
-      const result = await StaffService.listStaff(ctx, {
-        limit: args.limit,
-        cursor: args.cursor, // Changed from nextToken to match new schema style if updated
-        search: args.filter?.search,
-        // TODO: Handle campusId filter if passed
-      });
+      if (!ctx.membership?.tenantId) {
+        throw new Error('Tenant context is required to list users');
+      }
+      const result = await runWithTenantContext(ctx.membership.tenantId, ctx.user.id, (db) =>
+        StaffService.listStaff(db, ctx, {
+          limit: args.limit,
+          cursor: args.cursor,
+          search: args.filter?.search,
+        }),
+      );
       
       return {
         items: result, // We might need to map this to match UserConnection edge/node structure

@@ -10,7 +10,8 @@ export enum ApplicationStatus {
   REJECTED = 'REJECTED',
   OFFER_ISSUED = 'OFFER_ISSUED',
   ENROLLED = 'ENROLLED',
-  WITHDRAWN = 'WITHDRAWN'
+  WITHDRAWN = 'WITHDRAWN',
+  MIGRATED = 'MIGRATED'
 }
 
 export interface Enquiry {

@@ -19,7 +19,7 @@ export class AdmissionsService {
     const prisma = await getPrisma();
     
     // 1. Find/Create Applicant
-    const applicant = await ApplicantService.findOrCreate(ctx, {
+    await ApplicantService.findOrCreate(ctx, {
       fullName: input.fullName,
       phone: input.phone,
       email: input.email,
@@ -65,7 +65,7 @@ export class AdmissionsService {
     });
   }
   
-  static async listAdmissions(ctx: AuthContext, filter?: any) {
+  static async listAdmissions(ctx: AuthContext) {
     IdentityService.authorize(ctx, 'admissions.view');
     const prisma = await getPrisma();
     

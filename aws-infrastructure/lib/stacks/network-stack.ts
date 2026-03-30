@@ -84,7 +84,7 @@ export class NetworkStack extends cdk.Stack {
     this.sgDb = new ec2.SecurityGroup(this, 'SgDb', {
       vpc: this.vpc,
       description: 'RDS PostgreSQL - ingress from RDS Proxy only',
-      allowAllOutbound: false,
+      allowAllOutbound: true,
     });
     this.sgApp = new ec2.SecurityGroup(this, 'SgApp', {
       vpc: this.vpc,
@@ -105,7 +105,6 @@ export class NetworkStack extends cdk.Stack {
     // Ingress/Egress rules
     this.sgApp.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'Public HTTP to REST origin');
     this.sgDb.addIngressRule(this.sgApp, ec2.Port.tcp(5432), 'REST app to DB');
-    this.sgApp.addEgressRule(this.sgDb, ec2.Port.tcp(5432), 'REST egress to DB');
     this.sgProxy.addIngressRule(this.sgLambda, ec2.Port.tcp(5432), 'Lambda to Proxy');
     this.sgDb.addIngressRule(this.sgProxy, ec2.Port.tcp(5432), 'Proxy to DB');
     this.sgLambda.addEgressRule(this.sgProxy, ec2.Port.tcp(5432), 'Lambda egress to Proxy');

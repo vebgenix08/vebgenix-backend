@@ -19,7 +19,7 @@ export const handler = async (event: any) => {
       return SubmitApplication.execute(ctx, args.id);
     case 'listAdmissions':
       return {
-        edges: (await AdmissionsService.listAdmissions(ctx, args.filter)).map(a => ({
+        edges: (await AdmissionsService.listAdmissions(ctx)).map(a => ({
           cursor: a.id,
           node: a
         })),

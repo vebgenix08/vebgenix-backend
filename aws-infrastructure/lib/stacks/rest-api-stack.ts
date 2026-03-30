@@ -13,6 +13,7 @@ interface RestApiStackProps extends cdk.StackProps {
   config: EnvConfig;
   vpc: ec2.Vpc;
   sgApp: ec2.SecurityGroup;
+  dbHostSecurityGroup: ec2.SecurityGroup;
   documentsBucket: s3.Bucket;
   userPoolId: string;
   userPoolClientId: string;
@@ -33,6 +34,7 @@ export class RestApiStack extends cdk.Stack {
       config,
       vpc,
       sgApp,
+      dbHostSecurityGroup,
       documentsBucket,
       userPoolId,
       userPoolClientId,
@@ -96,7 +98,13 @@ export class RestApiStack extends cdk.Stack {
     userData.addCommands(
       "set -euxo pipefail",
       "dnf update -y",
-      "dnf install -y git jq nginx nodejs",
+      "dnf install -y git jq nginx xz",
+      "curl -fsSL https://nodejs.org/dist/v20.19.0/node-v20.19.0-linux-arm64.tar.xz -o /tmp/node.tar.xz",
+      "mkdir -p /usr/local/lib/nodejs",
+      "tar -xJf /tmp/node.tar.xz -C /usr/local/lib/nodejs",
+      "ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/node /usr/local/bin/node",
+      "ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npm /usr/local/bin/npm",
+      "ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npx /usr/local/bin/npx",
       "systemctl enable nginx",
       "cat >/etc/nginx/conf.d/vebgenix-rest.conf <<'EOF'",
       "server {",
@@ -124,19 +132,21 @@ export class RestApiStack extends cdk.Stack {
 #!/bin/bash
 set -euxo pipefail
 BRANCH="\${1:-${config.stage === "prod" ? "release" : "main"}}"
+ARTIFACT_KEY="\${2:-}"
 APP_DIR=/opt/vebgenix/app
 STAGE="${config.stage}"
 REGION="${config.region}"
 REPO_URL="https://github.com/vebgenix08/vebgenix-backend.git"
+DOC_BUCKET=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DOCUMENTS_BUCKET" --region "$REGION" --query Parameter.Value --output text)
 
-if [ ! -d "$APP_DIR/.git" ]; then
-  rm -rf "$APP_DIR"
-  git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
+rm -rf "$APP_DIR"
+mkdir -p "$APP_DIR"
+
+if [ -n "$ARTIFACT_KEY" ]; then
+  aws s3 cp "s3://$DOC_BUCKET/$ARTIFACT_KEY" /tmp/vebgenix-backend.tgz --region "$REGION"
+  tar -xzf /tmp/vebgenix-backend.tgz -C "$APP_DIR"
 else
-  cd "$APP_DIR"
-  git fetch origin "$BRANCH"
-  git checkout "$BRANCH"
-  git reset --hard "origin/$BRANCH"
+  git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
 fi
 
 USER_POOL_ID=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/USER_POOL_ID" --region "$REGION" --query Parameter.Value --output text)
@@ -144,12 +154,14 @@ USER_POOL_CLIENT_ID=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/USER_P
 DB_HOST=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DB_HOST" --region "$REGION" --query Parameter.Value --output text)
 DB_NAME=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DB_NAME" --region "$REGION" --query Parameter.Value --output text)
 DB_SECRET_ARN=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DB_SECRET_ARN" --region "$REGION" --query Parameter.Value --output text)
-DOC_BUCKET=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/DOCUMENTS_BUCKET" --region "$REGION" --query Parameter.Value --output text)
 EVENT_BUS_NAME=$(aws ssm get-parameter --name "/vebgenix/$STAGE/rest/EVENT_BUS_NAME" --region "$REGION" --query Parameter.Value --output text)
 FRONTEND_URL=$(aws ssm get-parameter --name "/vebgenix/$STAGE/frontend/APP_URL" --region "$REGION" --query Parameter.Value --output text)
 DB_SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$DB_SECRET_ARN" --region "$REGION" --query SecretString --output text)
 DB_USER=$(echo "$DB_SECRET_JSON" | jq -r '.username')
 DB_PASS=$(echo "$DB_SECRET_JSON" | jq -r '.password')
+export DB_USER DB_PASS
+DB_USER_ENCODED=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
+DB_PASS_ENCODED=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASS"], safe=""))')
 
 cat >/etc/vebgenix-rest.env <<ENV
 PORT=5000
@@ -159,8 +171,10 @@ AWS_DEFAULT_REGION=$REGION
 USER_POOL_ID=$USER_POOL_ID
 USER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID
 COGNITO_USER_POOL_ID=$USER_POOL_ID
+COGNITO_CLIENT_ID=$USER_POOL_CLIENT_ID
 DB_NAME=$DB_NAME
-DATABASE_URL=postgresql://$DB_USER:$DB_PASS@$DB_HOST:5432/$DB_NAME
+DATABASE_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME
+DIRECT_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME
 DOCUMENTS_BUCKET=$DOC_BUCKET
 S3_BUCKET_NAME=$DOC_BUCKET
 UPLOADS_BUCKET_NAME=$DOC_BUCKET
@@ -188,6 +202,9 @@ ENV
 
 cd "$APP_DIR/server"
 npm ci
+set -a
+source /etc/vebgenix-rest.env
+set +a
 npx prisma generate --schema=prisma/schema.prisma
 npx prisma migrate deploy --schema=prisma/schema.prisma
 npm run build
@@ -207,7 +224,7 @@ EOF`,
       "User=ec2-user",
       "WorkingDirectory=/opt/vebgenix/app/server",
       "EnvironmentFile=/etc/vebgenix-rest.env",
-      "ExecStart=/usr/bin/node /opt/vebgenix/app/server/dist/main.js",
+      "ExecStart=/usr/local/bin/node /opt/vebgenix/app/server/dist/src/main.js",
       "Restart=always",
       "RestartSec=5",
       "",
@@ -217,10 +234,44 @@ EOF`,
       "systemctl daemon-reload",
     );
 
+    const restSubnet = config.restApiSubnetId
+      ? ec2.Subnet.fromSubnetAttributes(this, "RestApiHostSubnet", {
+          subnetId: config.restApiSubnetId,
+          availabilityZone: config.restApiSubnetAz ?? cdk.Stack.of(this).availabilityZones[0],
+          routeTableId: config.restApiSubnetRouteTableId,
+        })
+      : undefined;
+    const restSecurityGroup =
+      config.stage === "dev"
+        ? new ec2.SecurityGroup(this, "RestApiHostSecurityGroup", {
+            vpc,
+            description: "REST API EC2 runtime host",
+            allowAllOutbound: true,
+          })
+        : sgApp;
+
+    if (config.stage === "dev") {
+      restSecurityGroup.addIngressRule(
+        ec2.Peer.anyIpv4(),
+        ec2.Port.tcp(80),
+        "Public HTTP to REST origin",
+      );
+      new ec2.CfnSecurityGroupIngress(this, "RestApiToDbIngress", {
+        groupId: dbHostSecurityGroup.securityGroupId,
+        sourceSecurityGroupId: restSecurityGroup.securityGroupId,
+        ipProtocol: "tcp",
+        fromPort: 5432,
+        toPort: 5432,
+        description: "REST app to DB",
+      });
+    }
+
     this.instance = new ec2.Instance(this, "RestApiInstance", {
       vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      securityGroup: sgApp,
+      vpcSubnets: restSubnet
+        ? { subnets: [restSubnet] }
+        : { subnetType: ec2.SubnetType.PUBLIC },
+      securityGroup: restSecurityGroup,
       instanceType: new ec2.InstanceType(config.restApiInstanceClass),
       machineImage: ec2.MachineImage.latestAmazonLinux2023({
         cpuType: ec2.AmazonLinuxCpuType.ARM_64,
@@ -278,19 +329,6 @@ EOF`,
       parameterName: `/vebgenix/${config.stage}/rest/EVENT_BUS_NAME`,
       stringValue: eventBusName,
     });
-    new ssm.StringParameter(this, "RestDbHostParam", {
-      parameterName: `/vebgenix/${config.stage}/rest/DB_HOST`,
-      stringValue: dbHost,
-    });
-    new ssm.StringParameter(this, "RestDbNameParam", {
-      parameterName: `/vebgenix/${config.stage}/rest/DB_NAME`,
-      stringValue: dbName,
-    });
-    new ssm.StringParameter(this, "RestDbSecretArnParam", {
-      parameterName: `/vebgenix/${config.stage}/rest/DB_SECRET_ARN`,
-      stringValue: dbSecret.secretArn,
-    });
-
     new cdk.CfnOutput(this, "InstanceId", { value: this.instance.instanceId });
     new cdk.CfnOutput(this, "InstancePublicDns", {
       value: this.instance.instancePublicDnsName,

@@ -1,9 +1,12 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
 import prisma from "../../../infrastructure/prisma/client";
 import { resolvePermissions } from "../permissions/resolver";
-
-const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
+import {
+  extractBearerToken,
+  getClaimString,
+  getClaimStringArray,
+  verifyCognitoIdToken,
+} from "../auth/cognito";
 
 export const requireAuth = async (
   req: Request,
@@ -11,9 +14,9 @@ export const requireAuth = async (
   next: NextFunction,
 ) => {
   try {
-    const authHeader = req.headers.authorization;
+    const token = extractBearerToken(req.headers.authorization);
 
-    if (!authHeader) {
+    if (!token) {
       res.status(401).json({
         error: {
           code: "UNAUTHORIZED",
@@ -23,34 +26,52 @@ export const requireAuth = async (
       return;
     }
 
-    const token = authHeader.split(" ")[1];
-
-    if (!token) {
-      res.status(401).json({
-        error: { code: "UNAUTHORIZED", message: "Missing Bearer token" },
-      });
-      return;
-    }
-
-    // 1. Verify token with Local JWT
-    let payload: any;
+    let claims: any;
     try {
-      payload = jwt.verify(token, JWT_SECRET);
+      claims = (req as any).auth?.claims ?? (await verifyCognitoIdToken(token));
     } catch (error) {
-      console.error("Auth Error (JWT):", error);
+      console.error("Auth Error (Cognito):", error);
       res.status(401).json({
         error: { code: "UNAUTHORIZED", message: "Invalid or expired token" },
       });
       return;
     }
 
-    const authUserId = payload.sub;
-    const tenantIdFromToken = payload.tenant_id;
-    const tenantRoleFromToken = payload.tenant_role;
-    const primaryProfileId = payload.primary_profile_id;
+    const authUserId = getClaimString(claims, "sub");
+    const authEmail = getClaimString(claims, "email");
+    const tenantIdFromClaims = getClaimString(
+      claims,
+      "custom:tenant_id",
+      "tenant_id",
+    );
+    const tenantIdFromToken =
+      tenantIdFromClaims ?? ((req.headers["x-tenant-id"] as string) || null);
+    const tenantRoleFromToken =
+      getClaimString(claims, "custom:role", "tenant_role") ?? undefined;
+    const primaryProfileId = getClaimString(claims, "sub");
+    const globalRoles = getClaimStringArray(claims, "cognito:groups");
     
     // Check if we are in a tenant context (URL param)
     const urlTenantId = (req as any).tenant?.tenantId;
+
+    const authUser =
+      authEmail
+        ? await prisma.authUser.findUnique({
+            where: { email: authEmail.toLowerCase() },
+            include: {
+              globalRoles: true,
+              memberships: {
+                where: { status: "ACTIVE" },
+                include: { primaryProfile: true },
+              },
+            },
+          })
+        : null;
+
+    const isSuperAdmin =
+      globalRoles.includes("PLATFORM_SUPER_ADMIN") ||
+      authUser?.globalRoles.some((role) => role.role === "PLATFORM_SUPER_ADMIN") ||
+      false;
 
     if (tenantIdFromToken) {
       // If token has tenant, enforce match with URL tenant if present
@@ -76,22 +97,37 @@ export const requireAuth = async (
         // or just use the AuthUser ID if that was how it was set up.
         // BUT wait, AuthUser ID != Profile ID usually.
         // Let's check TenantMembership.
-        const membership = await prisma.tenantMembership.findFirst({
+        const membership =
+          authUser?.memberships.find(
+            (item) => item.tenantId === tenantIdFromToken,
+          ) ??
+          (await prisma.tenantMembership.findFirst({
             where: {
-                userId: authUserId,
-                tenantId: tenantIdFromToken,
-                role: tenantRoleFromToken
+              userId: authUserId ?? "",
+              tenantId: tenantIdFromToken,
+              status: "ACTIVE",
             },
-            include: { primaryProfile: true }
-        });
+            include: { primaryProfile: true },
+          }));
         
         if (membership?.primaryProfile) {
             profile = membership.primaryProfile;
         } else {
             // Last resort: Check if a Profile exists with ID = AuthUser ID (legacy)
-             profile = await prisma.profile.findUnique({
-                where: { id: authUserId }
-            });
+             profile =
+               (authUserId
+                 ? await prisma.profile.findUnique({
+                     where: { id: authUserId },
+                   })
+                 : null) ??
+               (authEmail
+                 ? await prisma.profile.findFirst({
+                     where: {
+                       email: authEmail.toLowerCase(),
+                       tenantId: tenantIdFromToken,
+                     },
+                   })
+                 : null);
             // Verify it belongs to this tenant
             if (profile && profile.tenantId !== tenantIdFromToken) {
                 profile = null;
@@ -123,9 +159,10 @@ export const requireAuth = async (
         (req as any).auth = {
           profile: (req as any).user,
           tenantId: tenantIdFromToken,
-          tenant_role: tenantRoleFromToken,
+          tenant_role: tenantRoleFromToken ?? profile.role,
           primary_profile_id: profile.id,
           permissions: resolved.allKeys,
+          global_roles: globalRoles,
         };
       } else {
         // AuthUser has membership but NO Profile record found.
@@ -137,8 +174,6 @@ export const requireAuth = async (
       }
     } else {
         // Token has NO tenant context (Platform or initial login)
-        
-        const isSuperAdmin = payload.global_roles?.includes('PLATFORM_SUPER_ADMIN');
 
         if (urlTenantId) {
             // URL requires tenant context
@@ -146,7 +181,7 @@ export const requireAuth = async (
                 // Allow Super Admin to impersonate/manage
                 (req as any).user = {
                     id: authUserId, 
-                    email: payload.email,
+                    email: authEmail,
                     fullName: "Super Admin",
                     role: "ADMIN",
                     campusScope: "ALL",
@@ -157,7 +192,8 @@ export const requireAuth = async (
                 (req as any).auth = {
                     tenantId: urlTenantId,
                     tenant_role: "SUPER_ADMIN",
-                    permissions: ["*"] 
+                    permissions: ["*"],
+                    global_roles: globalRoles,
                 };
             } else {
                 res.status(403).json({ 
@@ -169,11 +205,12 @@ export const requireAuth = async (
             // Platform API or User Profile API (no tenant context)
             (req as any).user = {
                 id: authUserId,
-                email: payload.email,
-                global_roles: payload.global_roles
+                email: authEmail,
+                global_roles: globalRoles
             };
              (req as any).auth = {
-                permissions: []
+                permissions: [],
+                global_roles: globalRoles,
             };
         }
     }

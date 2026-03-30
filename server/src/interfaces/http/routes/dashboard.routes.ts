@@ -31,7 +31,7 @@ const baseMiddleware = [
   requireRole([
     "ADMIN",
     "ACCOUNTANT",
-  ] as import("../../../domain/User").UserRole[]),
+  ]),
 ];
 
 /**

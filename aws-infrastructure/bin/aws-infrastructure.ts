@@ -84,7 +84,7 @@ if (config.enableEc2Postgres) {
       env,
       config,
       vpc: networkStack.vpc,
-      sgDb: networkStack.sgDb,
+      documentsBucket: storageStack.bucket,
     },
   );
   ec2DatabaseStack.addDependency(networkStack);
@@ -149,6 +149,7 @@ if (config.enableEc2RestApi && ec2DatabaseStack) {
     config,
     vpc: networkStack.vpc,
     sgApp: networkStack.sgApp,
+    dbHostSecurityGroup: ec2DatabaseStack.hostSecurityGroup,
     documentsBucket: storageStack.bucket,
     userPoolId: authStack.userPool.userPoolId,
     userPoolClientId: authStack.userPoolClientId,
@@ -158,7 +159,6 @@ if (config.enableEc2RestApi && ec2DatabaseStack) {
     eventBusName: asyncStack.eventBus.eventBusName,
     frontendUrl: frontendStack.frontendUrl,
   });
-  restApiStack.addDependency(networkStack);
   restApiStack.addDependency(authStack);
   restApiStack.addDependency(storageStack);
   restApiStack.addDependency(asyncStack);

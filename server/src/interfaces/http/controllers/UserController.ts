@@ -631,7 +631,7 @@ export class UserController {
       // B4: Campus assignment rules (if updating role OR updating access)
       // We need effective role and effective access state to check.
       // Since partial updates are allowed, we need to merge with existing.
-      const effectiveRole = roleUpper || userProfile.role || '';
+      const effectiveRole = roleUpper || userProfile.role || "";
       const effectiveAllAccess =
         all_campuses_access !== undefined
           ? all_campuses_access

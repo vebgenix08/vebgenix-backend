@@ -15,19 +15,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: prod
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: "npm"
           cache-dependency-path: aws-infrastructure/package-lock.json
 
       - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::278035644568:role/GitHubDeployRole-vebgenix-backend-prod
           aws-region: ap-south-1
@@ -152,7 +154,7 @@ jobs:
 
       - name: Step A - Deploy AppSync stack (schema + lambdas + resolvers)
         working-directory: aws-infrastructure
-        run: npx cdk deploy VebgenixAppSync-prod -c env=prod --require-approval never
+        run: npx cdk deploy VebgenixAppSync-prod -c env=prod --require-approval never --exclusively
 
       - name: Resolve AppSync API ID (post-deploy)
         run: |
@@ -216,15 +218,104 @@ jobs:
         working-directory: aws-infrastructure
         run: |
           npx cdk deploy \
-            VebgenixNetwork-prod \
             VebgenixAuth-prod \
             VebgenixStorage-prod \
             VebgenixAsync-prod \
-            VebgenixFrontend-prod \
-            VebgenixEc2Database-prod \
-            VebgenixRestApi-prod \
             VebgenixMonitoring-prod \
-            -c env=prod -c enableNewResolvers=true --require-approval never
+            -c env=prod -c enableNewResolvers=true --require-approval never --exclusively
+
+      - name: Package backend artifact
+        run: |
+          set -euo pipefail
+          ARTIFACT_BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixStorage-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue | [0]" \
+            --output text)
+          ARTIFACT_KEY="rest-deployments/backend-${GITHUB_SHA}.tgz"
+
+          tar \
+            --exclude='.git' \
+            --exclude='server/node_modules' \
+            --exclude='aws-infrastructure/node_modules' \
+            --exclude='aws-infrastructure/cdk.out' \
+            -czf /tmp/backend-rest.tgz .
+
+          aws s3 cp /tmp/backend-rest.tgz "s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
+          echo "REST_ARTIFACT_KEY=$ARTIFACT_KEY" >> "$GITHUB_ENV"
+
+      - name: Bootstrap DB on EC2 via SSM
+        run: |
+          set -euo pipefail
+          DB_INSTANCE_ID=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixEc2Database-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
+            --output text)
+
+          aws ec2 wait instance-status-ok --instance-ids "$DB_INSTANCE_ID"
+
+          for i in $(seq 1 60); do
+            MANAGED=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$DB_INSTANCE_ID" \
+              --query "InstanceInformationList[0].InstanceId" \
+              --output text 2>/dev/null || echo "None")
+            if [ "$MANAGED" = "$DB_INSTANCE_ID" ]; then
+              break
+            fi
+            echo "Waiting for DB host SSM registration [$i/60]..."
+            sleep 10
+          done
+
+          export REST_ARTIFACT_KEY
+          export STAGE=prod
+          COMMAND_PARAMS=$(python3 - <<'PY'
+          import json
+          import os
+
+          stage = os.environ["STAGE"]
+          artifact_key = os.environ["REST_ARTIFACT_KEY"]
+          commands = [
+              "set -euxo pipefail",
+              f"ARTIFACT_KEY='{artifact_key}'",
+              "BOOTSTRAP_DIR=/opt/vebgenix/db-bootstrap",
+              f"STAGE={stage}",
+              "REGION=ap-south-1",
+              "DOC_BUCKET=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/DOCUMENTS_BUCKET\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "rm -rf \"$BOOTSTRAP_DIR\"",
+              "mkdir -p \"$BOOTSTRAP_DIR\"",
+              "aws s3 cp \"s3://$DOC_BUCKET/$ARTIFACT_KEY\" /tmp/vebgenix-backend-db.tgz --region \"$REGION\"",
+              "tar -xzf /tmp/vebgenix-backend-db.tgz -C \"$BOOTSTRAP_DIR\"",
+              "bash \"$BOOTSTRAP_DIR/scripts/bootstrap-ec2-postgres.sh\" \"$STAGE\" \"$REGION\"",
+          ]
+          print(json.dumps({"commands": commands}))
+          PY
+          )
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$DB_INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "$COMMAND_PARAMS" \
+            --query "Command.CommandId" \
+            --output text)
+
+          sleep 5
+          for i in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$DB_INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || echo "Pending")
+            echo "DB bootstrap status [$i/60]: $STATUS"
+            case "$STATUS" in
+              Success)
+                break
+                ;;
+              Failed|Cancelled|TimedOut)
+                aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$DB_INSTANCE_ID"
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
 
       - name: Deploy REST app to EC2 via SSM
         run: |
@@ -248,10 +339,59 @@ jobs:
             sleep 10
           done
 
+          ARTIFACT_KEY="${REST_ARTIFACT_KEY}"
+          export ARTIFACT_KEY
+          COMMAND_PARAMS=$(python3 - <<'PY'
+          import json
+          import os
+
+          artifact_key = os.environ["ARTIFACT_KEY"]
+          commands = [
+              "set -euxo pipefail",
+              f"ARTIFACT_KEY='{artifact_key}'",
+              "APP_DIR=/opt/vebgenix/app",
+              "STAGE=prod",
+              "REGION=ap-south-1",
+              "rm -rf \"$APP_DIR\"",
+              "mkdir -p \"$APP_DIR\"",
+              "DOC_BUCKET=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/DOCUMENTS_BUCKET\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "aws s3 cp \"s3://$DOC_BUCKET/$ARTIFACT_KEY\" /tmp/vebgenix-backend.tgz --region \"$REGION\"",
+              "tar -xzf /tmp/vebgenix-backend.tgz -C \"$APP_DIR\"",
+              "USER_POOL_ID=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/USER_POOL_ID\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "USER_POOL_CLIENT_ID=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/USER_POOL_CLIENT_ID\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "DB_HOST=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/DB_HOST\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "DB_NAME=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/DB_NAME\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "DB_SECRET_ARN=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/DB_SECRET_ARN\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "EVENT_BUS_NAME=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/EVENT_BUS_NAME\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "FRONTEND_URL=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/frontend/APP_URL\" --region \"$REGION\" --query Parameter.Value --output text)",
+              "DB_SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id \"$DB_SECRET_ARN\" --region \"$REGION\" --query SecretString --output text)",
+              "DB_USER=$(echo \"$DB_SECRET_JSON\" | jq -r '.username')",
+              "DB_PASS=$(echo \"$DB_SECRET_JSON\" | jq -r '.password')",
+              "export DB_USER DB_PASS",
+              "DB_USER_ENCODED=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ[\"DB_USER\"], safe=\"\"))')",
+              "DB_PASS_ENCODED=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ[\"DB_PASS\"], safe=\"\"))')",
+              "cat >/etc/vebgenix-rest.env <<ENV\nPORT=5000\nNODE_ENV=production\nAWS_REGION=$REGION\nAWS_DEFAULT_REGION=$REGION\nUSER_POOL_ID=$USER_POOL_ID\nUSER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID\nCOGNITO_USER_POOL_ID=$USER_POOL_ID\nCOGNITO_CLIENT_ID=$USER_POOL_CLIENT_ID\nDB_NAME=$DB_NAME\nDATABASE_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME\nDIRECT_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME\nDOCUMENTS_BUCKET=$DOC_BUCKET\nS3_BUCKET_NAME=$DOC_BUCKET\nUPLOADS_BUCKET_NAME=$DOC_BUCKET\nMEDIA_BUCKET_NAME=$DOC_BUCKET\nS3_PUBLIC_BASE_URL=https://$DOC_BUCKET.s3.$REGION.amazonaws.com\nS3_UPLOAD_ROOT=tenants\nS3_CAMPUS_SEGMENT=campuses\nS3_USER_SEGMENT=users\nS3_TENANT_CAMPUS_FALLBACK=tenant\nS3_PROFILE_SCOPE_NAME=profile\nS3_BRANDING_SCOPE_NAME=branding\nS3_ADMISSION_SCOPE_NAME=admissions\nS3_APPLICATION_SCOPE_NAME=applications\nS3_ENQUIRY_SCOPE_NAME=enquiries\nS3_DOCUMENT_SCOPE_NAME=documents\nS3_RESULTS_SCOPE_NAME=results\nS3_PUBLISHED_RESULTS_SCOPE_NAME=published\nS3_AVATAR_UPLOAD_NAME=avatar\nS3_LOGO_UPLOAD_NAME=logo\nEVENT_BUS_NAME=$EVENT_BUS_NAME\nFRONTEND_URL=$FRONTEND_URL\nHTTP_ACCESS_LOGS=false\nPRISMA_DEBUG_QUERIES=false\nENV",
+              "cd \"$APP_DIR/server\"",
+              "if ! node -v | grep -q '^v20\\.'; then dnf install -y xz && curl -fsSL https://nodejs.org/dist/v20.19.0/node-v20.19.0-linux-arm64.tar.xz -o /tmp/node.tar.xz && mkdir -p /usr/local/lib/nodejs && tar -xJf /tmp/node.tar.xz -C /usr/local/lib/nodejs && ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/node /usr/local/bin/node && ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npm /usr/local/bin/npm && ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npx /usr/local/bin/npx && hash -r; fi",
+                "npm ci",
+                "set -a && source /etc/vebgenix-rest.env && set +a",
+                "npx prisma db push --accept-data-loss --schema=prisma/schema.prisma",
+                "npx prisma generate --schema=prisma/schema.prisma",
+                "npm run seed:permissions",
+                "npm run build",
+              "cat >/etc/systemd/system/vebgenix-rest.service <<'EOF'\n[Unit]\nDescription=Vebgenix REST API\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nUser=ec2-user\nWorkingDirectory=/opt/vebgenix/app/server\nEnvironmentFile=/etc/vebgenix-rest.env\nExecStart=/usr/local/bin/node /opt/vebgenix/app/server/dist/src/main.js\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOF",
+              "systemctl daemon-reload",
+              "systemctl enable vebgenix-rest",
+              "systemctl restart vebgenix-rest",
+          ]
+          print(json.dumps({"commands": commands}))
+          PY
+          )
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands='["sudo /opt/vebgenix/bin/deploy-rest.sh release"]' \
+            --parameters "$COMMAND_PARAMS" \
             --query "Command.CommandId" \
             --output text)
 
