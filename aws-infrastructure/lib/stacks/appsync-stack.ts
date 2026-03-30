@@ -155,9 +155,21 @@ export class AppSyncStack extends cdk.Stack {
     // ---------------------------------------------------------------
     // Helper: create domain Lambda + AppSync datasource
     // ---------------------------------------------------------------
+    const logRetention =
+      config.stage === "prod"
+        ? logs.RetentionDays.THREE_MONTHS
+        : logs.RetentionDays.ONE_WEEK;
+
+    const makeLogGroup = (logicalId: string, functionName: string) =>
+      new logs.LogGroup(this, `${logicalId}LogGroup`, {
+        logGroupName: `/aws/lambda/${functionName}`,
+        retention: logRetention,
+      });
+
     const makeLambda = (logicalId: string, fnName: string, handler: string) => {
+      const functionName = `vebgenix-${fnName}-${config.stage}`;
       const fn = new lambda.Function(this, logicalId, {
-        functionName: `vebgenix-${fnName}-${config.stage}`,
+        functionName,
         runtime: lambda.Runtime.NODEJS_20_X,
         handler,
         // Entire lambda/ folder packaged so shared/ utilities are always available
@@ -169,10 +181,7 @@ export class AppSyncStack extends cdk.Stack {
         securityGroups: [sgLambda],
         environment: sharedEnv,
         tracing: lambda.Tracing.ACTIVE,
-        logRetention:
-          config.stage === "prod"
-            ? logs.RetentionDays.THREE_MONTHS
-            : logs.RetentionDays.ONE_WEEK,
+        logGroup: makeLogGroup(logicalId, functionName),
       });
 
       fn.addToRolePolicy(dbPolicy);
@@ -191,8 +200,9 @@ export class AppSyncStack extends cdk.Stack {
     };
 
     const makeDomainLambda = (logicalId: string, fnName: string, entryPath: string) => {
+      const functionName = `vebgenix-${fnName}-${config.stage}`;
       const fn = new nodejs.NodejsFunction(this, logicalId, {
-        functionName: `vebgenix-${fnName}-${config.stage}`,
+        functionName,
         runtime: lambda.Runtime.NODEJS_20_X,
         entry: path.resolve(__dirname, '../../../server/src/interfaces/graphql', entryPath),
         handler: 'handler',
@@ -230,10 +240,7 @@ export class AppSyncStack extends cdk.Stack {
             }
           }
         },
-        logRetention:
-          config.stage === "prod"
-            ? logs.RetentionDays.THREE_MONTHS
-            : logs.RetentionDays.ONE_WEEK,
+        logGroup: makeLogGroup(logicalId, functionName),
       });
 
       fn.addToRolePolicy(dbPolicy);
@@ -298,8 +305,9 @@ export class AppSyncStack extends cdk.Stack {
     // ---------------------------------------------------------------
     // 4. Storage Lambda (presigned upload URLs) — Non-VPC
     // ---------------------------------------------------------------
+    const storageFunctionName = `vebgenix-storage-resolver-${config.stage}`;
     const storageLambda = new lambda.Function(this, "StorageLambda", {
-      functionName: `vebgenix-storage-resolver-${config.stage}`,
+      functionName: storageFunctionName,
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: "storage-resolver/index.handler",
       // Entire lambda/ folder packaged so shared/ utilities are always available
@@ -308,10 +316,7 @@ export class AppSyncStack extends cdk.Stack {
       memorySize: 256,
       environment: sharedEnv,
       tracing: lambda.Tracing.ACTIVE,
-      logRetention:
-        config.stage === "prod"
-          ? logs.RetentionDays.THREE_MONTHS
-          : logs.RetentionDays.ONE_WEEK,
+      logGroup: makeLogGroup("StorageLambda", storageFunctionName),
     });
     documentsBucket.grantPut(storageLambda);
     documentsBucket.grantRead(storageLambda);
