@@ -17,6 +17,11 @@ jobs:
     environment: prod
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
@@ -346,6 +351,11 @@ jobs:
           import os
 
           artifact_key = os.environ["ARTIFACT_KEY"]
+          smtp_host = os.environ.get("SMTP_HOST", "")
+          smtp_port = os.environ.get("SMTP_PORT", "")
+          smtp_user = os.environ.get("SMTP_USER", "")
+          smtp_password = os.environ.get("SMTP_PASSWORD", "")
+          smtp_from = os.environ.get("SMTP_FROM", "")
           commands = [
               "set -euxo pipefail",
               f"ARTIFACT_KEY='{artifact_key}'",
@@ -384,6 +394,21 @@ jobs:
               "systemctl enable vebgenix-rest",
               "systemctl restart vebgenix-rest",
           ]
+          env_insert_index = commands.index("cd \"$APP_DIR/server\"")
+          if smtp_host:
+              commands.insert(env_insert_index, f"printf '\\nSMTP_HOST={smtp_host}\\n' >> /etc/vebgenix-rest.env")
+              env_insert_index += 1
+          if smtp_port:
+              commands.insert(env_insert_index, f"printf 'SMTP_PORT={smtp_port}\\n' >> /etc/vebgenix-rest.env")
+              env_insert_index += 1
+          if smtp_user:
+              commands.insert(env_insert_index, f"printf 'SMTP_USER={smtp_user}\\nSMTP_EMAIL={smtp_user}\\n' >> /etc/vebgenix-rest.env")
+              env_insert_index += 1
+          if smtp_password:
+              commands.insert(env_insert_index, f"printf 'SMTP_PASSWORD={smtp_password}\\nSMTP_APP_PASSWORD={smtp_password}\\n' >> /etc/vebgenix-rest.env")
+              env_insert_index += 1
+          if smtp_from:
+              commands.insert(env_insert_index, f"printf 'SMTP_FROM={smtp_from}\\n' >> /etc/vebgenix-rest.env")
           print(json.dumps({"commands": commands}))
           PY
           )
