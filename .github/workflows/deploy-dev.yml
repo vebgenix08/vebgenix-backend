@@ -212,12 +212,17 @@ jobs:
 
       # ─────────────────────────────────────────────────────────────────────
       # Deploy remaining stacks (NOT AppSync — already deployed in steps A+C)
+      #
+      # Intentionally skip VebgenixNetwork-dev here. The dev account still has
+      # a legacy VebgenixDatabase-dev stack importing old network exports,
+      # which makes automatic network mutation roll back. The current dev
+      # rollout only needs the existing VPC to remain stable while the EC2 DB
+      # and REST stacks are created on top of it.
       # ─────────────────────────────────────────────────────────────────────
       - name: Deploy Remaining Stacks (excluding AppSync)
         working-directory: aws-infrastructure
         run: |
           npx cdk deploy \
-            VebgenixNetwork-dev \
             VebgenixAuth-dev \
             VebgenixStorage-dev \
             VebgenixAsync-dev \
