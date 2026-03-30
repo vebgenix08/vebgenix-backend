@@ -218,7 +218,6 @@ jobs:
         working-directory: aws-infrastructure
         run: |
           npx cdk deploy \
-            VebgenixNetwork-prod \
             VebgenixAuth-prod \
             VebgenixStorage-prod \
             VebgenixAsync-prod \
