@@ -51,7 +51,6 @@ export class StaffService {
       cursor: cursor ? { id: cursor } : undefined,
       include: {
         user: { select: { email: true, phone: true } },
-        primaryProfile: { select: { fullName: true } }, 
         primaryProfile: { select: { fullName: true } },
         memberRoles: { include: { role: true } }
       },
