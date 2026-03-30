@@ -216,11 +216,26 @@ jobs:
           echo "Checking Query fields via python3..."
           python3 -c "import json,sys; d=json.load(open('/tmp/introspection.json')); qt=next((t for t in d['data']['__schema']['types'] if t['name']=='Query'),None); fields={f['name'] for f in (qt.get('fields') or [])}; print('Query fields:',sorted(fields)); req=['dashboardOverview','superAdminOverview','listPlatformAuditLogs','getPlatformAuditLog']; missing=[f for f in req if f not in fields]; [print('OK',f) for f in req if f in fields]; [print('MISSING',f) for f in missing]; sys.exit(1 if missing else 0)"
 
-      # Step C is now merged into Step A — single deploy handles everything
+        # Step C is now merged into Step A — single deploy handles everything
 
-      # ─────────────────────────────────────────────────────────────────────
-      # Deploy remaining stacks (NOT AppSync — already deployed in steps A+C)
-      # ─────────────────────────────────────────────────────────────────────
+        # ─────────────────────────────────────────────────────────────────────
+        # Deploy remaining stacks (NOT AppSync — already deployed in steps A+C)
+        # ─────────────────────────────────────────────────────────────────────
+      - name: Clear stale create-failed EC2 stacks
+        run: |
+          set -euo pipefail
+          for STACK in VebgenixEc2Database-dev VebgenixRestApi-dev; do
+            STATUS=$(aws cloudformation describe-stacks \
+              --stack-name "$STACK" \
+              --query "Stacks[0].StackStatus" \
+              --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+            if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
+              echo "Deleting stale stack $STACK in ROLLBACK_COMPLETE..."
+              aws cloudformation delete-stack --stack-name "$STACK"
+              aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+            fi
+          done
+
       - name: Deploy Remaining Stacks (excluding AppSync)
         working-directory: aws-infrastructure
         run: |
