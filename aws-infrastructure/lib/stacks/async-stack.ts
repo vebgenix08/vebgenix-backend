@@ -28,6 +28,7 @@ export class AsyncStack extends cdk.Stack {
     super(scope, id, props);
     const { config, vpc, sgLambda, dbProxyEndpoint, dbSecretArn } = props;
     const privateSubnetSelection = { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS };
+    const dbSecretsEnabled = dbSecretArn.startsWith('arn:');
 
     // ---------------------------------------------------------------
     // EventBridge Custom Bus
@@ -114,6 +115,9 @@ export class AsyncStack extends cdk.Stack {
         STAGE: config.stage,
         DB_PROXY_ENDPOINT: dbProxyEndpoint,
         DB_SECRET_ARN: dbSecretArn,
+        DATABASE_URL: dbSecretsEnabled
+          ? `postgresql://postgres:${dbSecretArn}@${dbProxyEndpoint}:5432/vebgenix`
+          : '',
         FROM_EMAIL: `noreply@${config.stage === 'prod' ? 'vebgenix.com' : 'dev.vebgenix.com'}`,
         DOCUMENTS_BUCKET: props.emailBucket.bucketName,
         NODE_OPTIONS: '--enable-source-maps',
@@ -127,10 +131,12 @@ export class AsyncStack extends cdk.Stack {
     }));
 
     // Grant Secrets Manager read for DB creds
-    emailWorker.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['secretsmanager:GetSecretValue'],
-      resources: [dbSecretArn],
-    }));
+    if (dbSecretsEnabled) {
+      emailWorker.addToRolePolicy(new iam.PolicyStatement({
+        actions: ['secretsmanager:GetSecretValue'],
+        resources: [dbSecretArn],
+      }));
+    }
 
     // Trigger from Email Queue (batch 5)
     emailWorker.addEventSource(new lambdaEventSources.SqsEventSource(this.emailQueue, {
@@ -155,15 +161,20 @@ export class AsyncStack extends cdk.Stack {
         STAGE: config.stage,
         DB_PROXY_ENDPOINT: dbProxyEndpoint,
         DB_SECRET_ARN: dbSecretArn,
+        DATABASE_URL: dbSecretsEnabled
+          ? `postgresql://postgres:${dbSecretArn}@${dbProxyEndpoint}:5432/vebgenix`
+          : '',
         DOCUMENTS_BUCKET: props.emailBucket.bucketName,
         NODE_OPTIONS: '--enable-source-maps',
       },
     });
 
-    jobsWorker.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['secretsmanager:GetSecretValue'],
-      resources: [dbSecretArn],
-    }));
+    if (dbSecretsEnabled) {
+      jobsWorker.addToRolePolicy(new iam.PolicyStatement({
+        actions: ['secretsmanager:GetSecretValue'],
+        resources: [dbSecretArn],
+      }));
+    }
 
     jobsWorker.addEventSource(new lambdaEventSources.SqsEventSource(this.jobsQueue, {
       batchSize: 5,

@@ -227,6 +227,21 @@ jobs:
       # rollout only needs the existing VPC to remain stable while the EC2 DB
       # and REST stacks are created on top of it.
       # ─────────────────────────────────────────────────────────────────────
+      - name: Clear stale create-failed EC2 stacks
+        run: |
+          set -euo pipefail
+          for STACK in VebgenixEc2Database-dev VebgenixRestApi-dev; do
+            STATUS=$(aws cloudformation describe-stacks \
+              --stack-name "$STACK" \
+              --query "Stacks[0].StackStatus" \
+              --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+            if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
+              echo "Deleting stale stack $STACK in ROLLBACK_COMPLETE..."
+              aws cloudformation delete-stack --stack-name "$STACK"
+              aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+            fi
+          done
+
       - name: Deploy Remaining Stacks (excluding AppSync)
         working-directory: aws-infrastructure
         run: |
