@@ -6,6 +6,7 @@ import * as appsync from "aws-cdk-lib/aws-appsync";
 import * as events from "aws-cdk-lib/aws-events";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as nodejs from "aws-cdk-lib/aws-lambda-nodejs";
 
 import { Construct } from "constructs";
