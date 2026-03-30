@@ -6,7 +6,6 @@ import * as appsync from "aws-cdk-lib/aws-appsync";
 import * as events from "aws-cdk-lib/aws-events";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as cognito from "aws-cdk-lib/aws-cognito";
-import * as logs from "aws-cdk-lib/aws-logs";
 import * as nodejs from "aws-cdk-lib/aws-lambda-nodejs";
 
 import { Construct } from "constructs";
@@ -128,21 +127,9 @@ export class AppSyncStack extends cdk.Stack {
     // ---------------------------------------------------------------
     // Helper: create domain Lambda + AppSync datasource
     // ---------------------------------------------------------------
-    const logRetention =
-      config.stage === "prod"
-        ? logs.RetentionDays.THREE_MONTHS
-        : logs.RetentionDays.ONE_WEEK;
-
-    const ensureLogRetention = (logicalId: string, functionName: string) =>
-      new logs.LogRetention(this, `${logicalId}LogRetention`, {
-        logGroupName: `/aws/lambda/${functionName}`,
-        retention: logRetention,
-      });
-
     const makeLambda = (logicalId: string, fnName: string, handler: string) => {
-      const functionName = `vebgenix-${fnName}-${config.stage}`;
       const fn = new lambda.Function(this, logicalId, {
-        functionName,
+        functionName: `vebgenix-${fnName}-${config.stage}`,
         runtime: lambda.Runtime.NODEJS_20_X,
         handler,
         // Entire lambda/ folder packaged so shared/ utilities are always available
@@ -155,7 +142,6 @@ export class AppSyncStack extends cdk.Stack {
         environment: sharedEnv,
         tracing: lambda.Tracing.ACTIVE,
       });
-      ensureLogRetention(logicalId, functionName);
 
       fn.addToRolePolicy(dbPolicy);
       fn.addToRolePolicy(
@@ -173,9 +159,8 @@ export class AppSyncStack extends cdk.Stack {
     };
 
     const makeDomainLambda = (logicalId: string, fnName: string, entryPath: string) => {
-      const functionName = `vebgenix-${fnName}-${config.stage}`;
       const fn = new nodejs.NodejsFunction(this, logicalId, {
-        functionName,
+        functionName: `vebgenix-${fnName}-${config.stage}`,
         runtime: lambda.Runtime.NODEJS_20_X,
         entry: path.resolve(__dirname, '../../../server/src/interfaces/graphql', entryPath),
         handler: 'handler',
@@ -193,7 +178,6 @@ export class AppSyncStack extends cdk.Stack {
           sourceMap: true,
         },
       });
-      ensureLogRetention(logicalId, functionName);
 
       fn.addToRolePolicy(dbPolicy);
       return fn;
