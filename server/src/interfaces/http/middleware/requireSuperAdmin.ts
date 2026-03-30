@@ -1,8 +1,11 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
 import prisma from "../../../infrastructure/prisma/client";
-
-const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
+import {
+  extractBearerToken,
+  getClaimString,
+  getClaimStringArray,
+  verifyCognitoIdToken,
+} from "../auth/cognito";
 
 export interface PlatformUser {
   id: string;
@@ -23,25 +26,15 @@ export const requireSuperAdmin = async (
   res: Response,
   next: NextFunction,
 ) => {
-  const authHeader = req.headers.authorization;
+  const token = extractBearerToken(req.headers.authorization);
 
-  if (!authHeader) {
+  if (!token) {
     return res.status(401).json({ error: "No authorization header" });
   }
 
-  const token = authHeader.split(" ")[1];
-
   try {
-    // 1. Verify token with Local JWT
-    let payload: any;
-    try {
-      payload = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      console.error("Auth Error (JWT):", error);
-      return res.status(401).json({ error: "Invalid or expired token" });
-    }
-
-    const email = payload.email?.toString();
+    const payload = await verifyCognitoIdToken(token);
+    const email = getClaimString(payload, "email");
 
     if (!email) {
       return res
@@ -50,13 +43,14 @@ export const requireSuperAdmin = async (
     }
 
     // 2. Check if user has global PLATFORM_SUPER_ADMIN role from JWT or DB
-    const isSuperAdminFromJwt = payload.global_roles?.includes(
-      "PLATFORM_SUPER_ADMIN",
-    );
+    const isSuperAdminFromJwt = getClaimStringArray(
+      payload,
+      "cognito:groups",
+    ).includes("PLATFORM_SUPER_ADMIN");
 
     // Fallback to AuthUserGlobalRole check
     let isSuperAdminFromDb = false;
-    let authUserId = payload.sub;
+    let authUserId = getClaimString(payload, "sub") ?? "";
 
     if (!isSuperAdminFromJwt) {
       const dbUser = await prisma.authUser.findUnique({
