@@ -16,6 +16,12 @@ export const devConfig: EnvConfig = {
   enableNat: false, // No NAT in dev — use VPC Endpoints + stubs for external APIs
   enableEc2RestApi: true,
   enableEc2Postgres: true,
+  restApiSubnetId: "subnet-0981f0e5c706bd982",
+  restApiSubnetAz: "ap-south-1b",
+  restApiSubnetRouteTableId: "rtb-0f1b4b91acd13b4d4",
+  ec2DbSubnetId: "subnet-0c495732933ca2d9f",
+  ec2DbSubnetAz: "ap-south-1a",
+  ec2DbSubnetRouteTableId: "rtb-08fc96f06f994729d",
 
   // Database
   enableDatabase: false,
