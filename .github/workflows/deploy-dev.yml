@@ -240,6 +240,50 @@ jobs:
             fi
           done
 
+      - name: Replace broken dev EC2 stacks before deploy
+        run: |
+          set -euo pipefail
+          TARGET_DB_SUBNET="subnet-0981f0e5c706bd982"
+          DELETE_STACKS=false
+
+          DB_INSTANCE_ID=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixEc2Database-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue | [0]" \
+            --output text 2>/dev/null || echo "None")
+
+          if [ -n "$DB_INSTANCE_ID" ] && [ "$DB_INSTANCE_ID" != "None" ]; then
+            DB_SUBNET=$(aws ec2 describe-instances \
+              --instance-ids "$DB_INSTANCE_ID" \
+              --query "Reservations[0].Instances[0].SubnetId" \
+              --output text 2>/dev/null || echo "None")
+            DB_MANAGED=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=$DB_INSTANCE_ID" \
+              --query "InstanceInformationList[0].InstanceId" \
+              --output text 2>/dev/null || echo "None")
+
+            echo "Existing DB instance: $DB_INSTANCE_ID"
+            echo "Existing DB subnet: $DB_SUBNET"
+            echo "Existing DB SSM registration: $DB_MANAGED"
+
+            if [ "$DB_SUBNET" != "$TARGET_DB_SUBNET" ] || [ "$DB_MANAGED" != "$DB_INSTANCE_ID" ]; then
+              DELETE_STACKS=true
+            fi
+          fi
+
+          if [ "$DELETE_STACKS" = true ]; then
+            for STACK in VebgenixRestApi-dev VebgenixEc2Database-dev; do
+              STATUS=$(aws cloudformation describe-stacks \
+                --stack-name "$STACK" \
+                --query "Stacks[0].StackStatus" \
+                --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+              if [ "$STATUS" != "DOES_NOT_EXIST" ]; then
+                echo "Deleting broken stack $STACK before redeploy..."
+                aws cloudformation delete-stack --stack-name "$STACK"
+                aws cloudformation wait stack-delete-complete --stack-name "$STACK"
+              fi
+            done
+          fi
+
       - name: Deploy Dev REST Stacks
         working-directory: aws-infrastructure
         run: |
