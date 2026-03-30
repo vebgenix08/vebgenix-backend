@@ -148,10 +148,16 @@ jobs:
                 echo "Stack in progress, waiting 20s..."
                 sleep 20
                 ;;
-              *ROLLBACK_COMPLETE*|*FAILED*)
-                echo "Stack in bad state: $STATUS — manual intervention may be needed"
-                exit 1
-                ;;
+            ROLLBACK_COMPLETE)
+              echo "Stack in ROLLBACK_COMPLETE. Deleting stale stack before redeploy..."
+              aws cloudformation delete-stack --stack-name VebgenixAppSync-dev
+              aws cloudformation wait stack-delete-complete --stack-name VebgenixAppSync-dev
+              break
+              ;;
+            *FAILED*)
+              echo "Stack in bad state: $STATUS — manual intervention may be needed"
+              exit 1
+              ;;
               *)
                 echo "Stack stable: $STATUS"
                 break
