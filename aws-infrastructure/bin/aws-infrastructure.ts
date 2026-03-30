@@ -138,6 +138,7 @@ if (config.enableEc2RestApi && ec2DatabaseStack) {
     config,
     vpc: networkStack.vpc,
     sgApp: networkStack.sgApp,
+    sgDb: networkStack.sgDb,
     documentsBucket: storageStack.bucket,
     userPoolId: authStack.userPool.userPoolId,
     userPoolClientId: authStack.userPoolClientId,
@@ -147,7 +148,6 @@ if (config.enableEc2RestApi && ec2DatabaseStack) {
     eventBusName: asyncStack.eventBus.eventBusName,
     frontendUrl: frontendStack.frontendUrl,
   });
-  restApiStack.addDependency(networkStack);
   restApiStack.addDependency(authStack);
   restApiStack.addDependency(storageStack);
   restApiStack.addDependency(asyncStack);

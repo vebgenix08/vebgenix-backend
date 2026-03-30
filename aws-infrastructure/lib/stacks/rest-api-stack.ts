@@ -13,6 +13,7 @@ interface RestApiStackProps extends cdk.StackProps {
   config: EnvConfig;
   vpc: ec2.Vpc;
   sgApp: ec2.SecurityGroup;
+  sgDb: ec2.SecurityGroup;
   documentsBucket: s3.Bucket;
   userPoolId: string;
   userPoolClientId: string;
@@ -33,6 +34,7 @@ export class RestApiStack extends cdk.Stack {
       config,
       vpc,
       sgApp,
+      sgDb,
       documentsBucket,
       userPoolId,
       userPoolClientId,
@@ -238,13 +240,37 @@ EOF`,
           routeTableId: config.restApiSubnetRouteTableId,
         })
       : undefined;
+    const restSecurityGroup =
+      config.stage === "dev"
+        ? new ec2.SecurityGroup(this, "RestApiHostSecurityGroup", {
+            vpc,
+            description: "REST API EC2 runtime host",
+            allowAllOutbound: true,
+          })
+        : sgApp;
+
+    if (config.stage === "dev") {
+      restSecurityGroup.addIngressRule(
+        ec2.Peer.anyIpv4(),
+        ec2.Port.tcp(80),
+        "Public HTTP to REST origin",
+      );
+      new ec2.CfnSecurityGroupIngress(this, "RestApiToDbIngress", {
+        groupId: sgDb.securityGroupId,
+        sourceSecurityGroupId: restSecurityGroup.securityGroupId,
+        ipProtocol: "tcp",
+        fromPort: 5432,
+        toPort: 5432,
+        description: "REST app to DB",
+      });
+    }
 
     this.instance = new ec2.Instance(this, "RestApiInstance", {
       vpc,
       vpcSubnets: restSubnet
         ? { subnets: [restSubnet] }
         : { subnetType: ec2.SubnetType.PUBLIC },
-      securityGroup: sgApp,
+      securityGroup: restSecurityGroup,
       instanceType: new ec2.InstanceType(config.restApiInstanceClass),
       machineImage: ec2.MachineImage.latestAmazonLinux2023({
         cpuType: ec2.AmazonLinuxCpuType.ARM_64,
