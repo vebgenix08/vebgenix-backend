@@ -3,6 +3,8 @@ import { emailService } from "./EmailService";
 import prisma from "../infrastructure/prisma/client";
 import { grantAdminDashboardPerms } from "../../scripts/grant-admin-dashboard-perms";
 import crypto from "crypto";
+import { generateInviteOtp } from "../domain/identity/invite-otp";
+import { publishEventBridgeEvent } from "../infrastructure/aws/eventbridge";
 
 /**
  * Platform
@@ -42,7 +44,157 @@ interface CreateFirstAdminResult {
   inviteLink?: string; // Only in development
 }
 
+const DEFAULT_SCHOOL_PROGRAMS = [
+  "1st Standard",
+  "2nd Standard",
+  "3rd Standard",
+  "4th Standard",
+  "5th Standard",
+  "6th Standard",
+  "7th Standard",
+  "8th Standard",
+  "9th Standard",
+  "10th Standard",
+];
+
+const DEFAULT_PU_PROGRAMS = ["1st Year PUC", "2nd Year PUC"];
+const REQUIRED_ALWAYS_ON_FEATURES = ["DASHBOARD", "ADMISSIONS"] as const;
+const DEFAULT_TENANT_FEATURES = [
+  ...REQUIRED_ALWAYS_ON_FEATURES,
+  "ACADEMICS",
+  "ATTENDANCE",
+  "FINANCE",
+  "EXAMS",
+  "HOSTEL",
+  "TRANSPORT",
+] as const;
+
 export class PlatformService {
+  static normalizeTenantFeatures(
+    features?: Array<{ feature_key: string; enabled: boolean }>,
+  ): Array<{ feature_key: string; enabled: boolean }> {
+    const featureMap = new Map<string, boolean>();
+
+    for (const featureKey of DEFAULT_TENANT_FEATURES) {
+      featureMap.set(featureKey, true);
+    }
+
+    for (const feature of features ?? []) {
+      if (!feature?.feature_key) continue;
+      featureMap.set(feature.feature_key, feature.enabled);
+    }
+
+    for (const featureKey of REQUIRED_ALWAYS_ON_FEATURES) {
+      featureMap.set(featureKey, true);
+    }
+
+    return Array.from(featureMap.entries()).map(([feature_key, enabled]) => ({
+      feature_key,
+      enabled,
+    }));
+  }
+
+  static async ensureRequiredTenantFeatures(tenantId: string): Promise<void> {
+    await prisma.$transaction(
+      REQUIRED_ALWAYS_ON_FEATURES.map((featureKey) =>
+        prisma.tenantFeature.upsert({
+          where: {
+            tenantId_featureKey: {
+              tenantId,
+              featureKey,
+            },
+          },
+          create: {
+            tenantId,
+            featureKey,
+            enabled: true,
+          },
+          update: {
+            enabled: true,
+          },
+        }),
+      ),
+    );
+  }
+
+  private static getDefaultAcademicYearWindow() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const startYear = month >= 3 ? year : year - 1;
+    const endYear = startYear + 1;
+
+    return {
+      name: `${startYear}-${endYear}`,
+      startDate: new Date(startYear, 3, 1),
+      endDate: new Date(endYear, 2, 31),
+    };
+  }
+
+  static async ensureTenantSetupDefaults(
+    tenantId: string,
+    campusTypes: CampusType[],
+  ): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      const activeCampusTypes = Array.from(new Set(campusTypes));
+
+      const academicYearCount = await tx.academicYear.count({
+        where: { tenantId },
+      });
+
+      if (academicYearCount === 0) {
+        const defaultYear = this.getDefaultAcademicYearWindow();
+        await tx.academicYear.create({
+          data: {
+            tenantId,
+            name: defaultYear.name,
+            startDate: defaultYear.startDate,
+            endDate: defaultYear.endDate,
+            isActive: true,
+            isClosed: false,
+          },
+        });
+      }
+
+      const existingPrograms = await tx.program.findMany({
+        where: { tenantId },
+        select: { name: true },
+      });
+      const existingNames = new Set(
+        existingPrograms.map((program) => program.name.toLowerCase()),
+      );
+
+      const nextPrograms: Array<{ name: string; type: string }> = [];
+
+      if (activeCampusTypes.includes("SCHOOL")) {
+        for (const name of DEFAULT_SCHOOL_PROGRAMS) {
+          if (!existingNames.has(name.toLowerCase())) {
+            nextPrograms.push({ name, type: "SCHOOL" });
+          }
+        }
+      }
+
+      if (activeCampusTypes.includes("PU")) {
+        for (const name of DEFAULT_PU_PROGRAMS) {
+          if (!existingNames.has(name.toLowerCase())) {
+            nextPrograms.push({ name, type: "PU" });
+          }
+        }
+      }
+
+      if (nextPrograms.length > 0) {
+        await tx.program.createMany({
+          data: nextPrograms.map((program) => ({
+            tenantId,
+            name: program.name,
+            type: program.type,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    });
+  }
+
   /**
    * Create a new tenant
    *
@@ -54,6 +206,7 @@ export class PlatformService {
     name: string,
     slug: string | null,
     actorId: string,
+    features?: Array<{ feature_key: string; enabled: boolean }>,
   ): Promise<CreateTenantResult> {
     // Validate slug format if provided
     if (slug) {
@@ -77,41 +230,29 @@ export class PlatformService {
       }
     }
 
-    // Create tenant
-    const tenant = await prisma.tenant.create({
-      data: {
-        name,
-        slug: slug || null,
-        isActive: true,
-        onboardingComplete: false,
-      },
-    });
+    const requestedFeatures = this.normalizeTenantFeatures(features);
 
-    // Auto-enable all features for new tenants
-    const allFeatures = [
-      "DASHBOARD",
-      "ADMISSIONS",
-      "ACADEMICS",
-      "ATTENDANCE",
-      "FINANCE",
-      "HOSTEL",
-      "TRANSPORT",
-    ];
-
-    try {
-      await prisma.tenantFeature.createMany({
-        data: allFeatures.map((featureKey) => ({
-          tenantId: tenant.id,
-          featureKey,
-          enabled: true,
-        })),
+    const tenant = await prisma.$transaction(async (tx) => {
+      const createdTenant = await tx.tenant.create({
+        data: {
+          name,
+          slug: slug || null,
+          isActive: true,
+          onboardingComplete: false,
+        },
       });
-    } catch (featuresError) {
-      console.error(
-        "[PlatformService] Failed to create default features:",
-        featuresError,
-      );
-    }
+
+      await tx.tenantFeature.createMany({
+        data: requestedFeatures.map((feature) => ({
+          tenantId: createdTenant.id,
+          featureKey: feature.feature_key,
+          enabled: feature.enabled,
+        })),
+        skipDuplicates: true,
+      });
+
+      return createdTenant;
+    });
 
     // Log audit
     await AuditLogger.logAction({
@@ -120,7 +261,7 @@ export class PlatformService {
       targetType: "tenant",
       targetId: tenant.id,
       tenantId: tenant.id,
-      after: { name, slug, features: "all_enabled" },
+      after: { name, slug, features: requestedFeatures },
     });
 
     return {
@@ -173,6 +314,8 @@ export class PlatformService {
       after: { name, campus_type: campusType },
     });
 
+    await this.ensureTenantSetupDefaults(tenantId, [campusType]);
+
     return {
       id: campus.id,
       tenant_id: campus.tenantId,
@@ -193,7 +336,8 @@ export class PlatformService {
     actorId: string,
     sendInvite: boolean = true,
   ): Promise<CreateFirstAdminResult> {
-    const emailLower = email.toLowerCase();
+    // Normalize: trim whitespace then lowercase (Rule 3)
+    const emailLower = email.trim().toLowerCase();
 
     // Step 1: Validate email not belonging to a platform super admin
     const globalRole = await prisma.authUserGlobalRole.findFirst({
@@ -212,7 +356,25 @@ export class PlatformService {
       throw error;
     }
 
-    // Step 2: Create or reuse auth user
+    // Step 2: Check if email is already a primary admin for ANY tenant (Rule 5 & 6)
+    // Email is a globally unique login identity — it cannot bootstrap more than one tenant.
+    const existingPrimaryMembership = await prisma.tenantMembership.findFirst({
+      where: {
+        isPrimaryAdmin: true,
+        user: { email: emailLower },
+      },
+    });
+
+    if (existingPrimaryMembership) {
+      const error: any = new Error(
+        "This email is already the primary admin of another tenant and cannot be reused.",
+      );
+      error.code = "PRIMARY_ADMIN_EMAIL_ALREADY_EXISTS";
+      error.statusCode = 409;
+      throw error;
+    }
+
+    // Step 3: Create or reuse auth user
     const authUser = await prisma.authUser.findUnique({
       where: { email: emailLower },
     });
@@ -239,6 +401,7 @@ export class PlatformService {
         email: emailLower,
         fullName,
         role: "ADMIN",
+        campusScope: "ALL",
         allCampusesAccess: true,
         isActive: true,
       },
@@ -246,9 +409,32 @@ export class PlatformService {
         tenantId,
         fullName,
         role: "ADMIN",
+        campusScope: "ALL",
         allCampusesAccess: true,
         isActive: true,
       },
+    });
+
+    await prisma.userProfileLink.upsert({
+      where: {
+        userId_profileId: {
+          userId,
+          profileId: userId,
+        },
+      },
+      create: {
+        userId,
+        profileId: userId,
+        relationship: "SELF",
+        isPrimary: true,
+      },
+      update: {
+        isPrimary: true,
+      },
+    });
+
+    await prisma.userCampusAccess.deleteMany({
+      where: { tenantId, profileId: userId },
     });
 
     const membershipStatus = sendInvite
@@ -263,13 +449,23 @@ export class PlatformService {
         userId,
         tenantId,
         role: "ORG_OWNER",
+        campusScope: "ALL",
         status: membershipStatus,
         isPrimaryAdmin: true,
+        primaryProfileId: userId,
         invitedByUserId: actorId,
         invitedAt: new Date(),
         activatedAt,
       },
-      update: {},
+      update: {
+        campusScope: "ALL",
+        isPrimaryAdmin: true,
+        primaryProfileId: userId,
+        status: membershipStatus,
+        invitedByUserId: actorId,
+        invitedAt: new Date(),
+        activatedAt,
+      },
     });
 
     // Step 3b: Auto-grant dashboard permissions
@@ -314,29 +510,40 @@ export class PlatformService {
 
         if (!tenant) throw new Error("Tenant not found");
 
-        // Generate real invite token
-        const rawToken = crypto.randomBytes(32).toString("hex");
-        const tokenHash = crypto
-          .createHash("sha256")
-          .update(rawToken)
-          .digest("hex");
+        const { code, tokenHash } = generateInviteOtp(6);
 
-        // Store token in PasswordResetToken using raw SQL
-        // (Uses actual DB column names confirmed: tokenHash, userId, expiresAt, membership_id, tenant_id)
         const tokenId = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 7 * 24 * 3600000).toISOString();
-        
-        await prisma.$executeRawUnsafe(`
-          INSERT INTO "PasswordResetToken" (
-            "id", "userId", "tokenHash", "purpose", "tenant_id", "membership_id", "expiresAt", "createdAt", "attempt_count"
-          ) VALUES (
-            '${tokenId}', '${userId}', '${tokenHash}', 'INVITE_SET_PASSWORD', '${tenantId}', 
-            '${membership.id}', '${expiresAt}', NOW(), 0
-          )
-        `);
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-        const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:5173";
-        inviteLink = `${appBaseUrl}/invite/accept?token=${rawToken}`;
+        await prisma.passwordResetToken.updateMany({
+          where: {
+            userId,
+            membershipId: membership.id,
+            purpose: "INVITE_SET_PASSWORD",
+            usedAt: null,
+          },
+          data: { usedAt: new Date() },
+        });
+
+        await prisma.passwordResetToken.create({
+          data: {
+            id: tokenId,
+            userId,
+            tokenHash,
+            purpose: "INVITE_SET_PASSWORD",
+            tenantId,
+            membershipId: membership.id,
+            expiresAt,
+            attemptCount: 0,
+          },
+        });
+
+        const appBaseUrl = process.env.FRONTEND_URL || "https://app.vebgenix.com";
+        inviteLink = `${appBaseUrl}/invite/accept?${new URLSearchParams({
+          token: code,
+          email: emailLower,
+          uid: userId,
+        }).toString()}`;
 
         if (process.env.NODE_ENV === "development") {
           console.log(
@@ -345,6 +552,23 @@ export class PlatformService {
             ":",
             inviteLink,
           );
+        }
+
+        try {
+          await publishEventBridgeEvent({
+            detailType: "CognitoProvisionRequested",
+            source: "vebgenix.platform",
+            detail: {
+              authUserId: userId,
+              membershipId: membership.id,
+              tenantId,
+              email: emailLower,
+              role: membership.role,
+              kind: "TENANT_ADMIN",
+            },
+          });
+        } catch (e) {
+          console.error("[PlatformService] EventBridge publish failed:", e);
         }
 
         inviteSent = await emailService.sendInviteEmail(
@@ -376,6 +600,8 @@ export class PlatformService {
     features: Array<{ feature_key: string; enabled: boolean }>,
     actorId: string,
   ): Promise<void> {
+    const normalizedFeatures = this.normalizeTenantFeatures(features);
+
     // Get current features for audit log
     const currentFeatures = await prisma.tenantFeature.findMany({
       where: { tenantId },
@@ -385,7 +611,7 @@ export class PlatformService {
     // Prisma doesn't support bulk upsert nicely for composite keys without raw SQL or loops
     // We'll use a transaction with upserts
     await prisma.$transaction(
-      features.map((f) =>
+      normalizedFeatures.map((f) =>
         prisma.tenantFeature.upsert({
           where: {
             tenantId_featureKey: {
@@ -413,7 +639,7 @@ export class PlatformService {
       targetId: tenantId,
       tenantId,
       before: { features: currentFeatures || [] },
-      after: { features },
+      after: { features: normalizedFeatures },
     });
   }
 
@@ -475,7 +701,7 @@ export class PlatformService {
     }
 
     // Validate required features
-    const requiredFeatures = ["DASHBOARD", "ADMISSIONS"];
+    const requiredFeatures = [...REQUIRED_ALWAYS_ON_FEATURES];
     const features = await prisma.tenantFeature.findMany({
       where: {
         tenantId,
@@ -497,6 +723,16 @@ export class PlatformService {
       error.statusCode = 400;
       throw error;
     }
+
+    const campusTypes = await prisma.campus.findMany({
+      where: { tenantId },
+      select: { campusType: true },
+    });
+
+    await this.ensureTenantSetupDefaults(
+      tenantId,
+      campusTypes.map((campus) => campus.campusType),
+    );
 
     // Mark onboarding complete
     const updatedTenant = await prisma.tenant.update({
@@ -566,7 +802,8 @@ export class PlatformService {
     actorId: string,
     sendInvite: boolean = true,
   ): Promise<{ userId: string; alreadyExisted: boolean; inviteSent: boolean }> {
-    const emailLower = email.toLowerCase();
+    // Normalize: trim whitespace then lowercase (Rule 3)
+    const emailLower = email.trim().toLowerCase();
 
     // Validate email not belonging to a platform super admin
     const globalRole = await prisma.authUserGlobalRole.findFirst({
@@ -624,6 +861,24 @@ export class PlatformService {
       },
     });
 
+    await prisma.userProfileLink.upsert({
+      where: {
+        userId_profileId: {
+          userId,
+          profileId: userId,
+        },
+      },
+      create: {
+        userId,
+        profileId: userId,
+        relationship: "SELF",
+        isPrimary: true,
+      },
+      update: {
+        isPrimary: true,
+      },
+    });
+
     // Map UserRole to MembershipRole
     const roleMap: Record<string, string> = {
       ADMIN: "ORG_ADMIN",
@@ -653,8 +908,15 @@ export class PlatformService {
         primaryProfileId: userId,
         invitedByUserId: actorId,
         invitedAt: new Date(),
+        activatedAt: sendInvite ? null : new Date(),
       },
-      update: {},
+      update: {
+        status: sendInvite ? ("INVITED" as any) : ("ACTIVE" as any),
+        invitedByUserId: actorId,
+        invitedAt: new Date(),
+        activatedAt: sendInvite ? null : new Date(),
+        primaryProfileId: userId,
+      },
     });
 
     // Auto-grant dashboard permissions if role is ADMIN
@@ -699,28 +961,40 @@ export class PlatformService {
           select: { name: true },
         });
 
-        // Generate real invite token
-        const rawToken = crypto.randomBytes(32).toString("hex");
-        const tokenHash = crypto
-          .createHash("sha256")
-          .update(rawToken)
-          .digest("hex");
+        const { code, tokenHash } = generateInviteOtp(6);
 
-        // Store token in PasswordResetToken using raw SQL
         const tokenId = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 7 * 24 * 3600000).toISOString();
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-        await prisma.$executeRawUnsafe(`
-          INSERT INTO "PasswordResetToken" (
-            "id", "userId", "tokenHash", "purpose", "tenant_id", "membership_id", "expiresAt", "createdAt", "attempt_count"
-          ) VALUES (
-            '${tokenId}', '${userId}', '${tokenHash}', 'INVITE_SET_PASSWORD', '${tenantId}', 
-            '${membership.id}', '${expiresAt}', NOW(), 0
-          )
-        `);
+        await prisma.passwordResetToken.updateMany({
+          where: {
+            userId,
+            membershipId: membership.id,
+            purpose: "INVITE_SET_PASSWORD",
+            usedAt: null,
+          },
+          data: { usedAt: new Date() },
+        });
 
-        const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:5173";
-        inviteLink = `${appBaseUrl}/invite/accept?token=${rawToken}`;
+        await prisma.passwordResetToken.create({
+          data: {
+            id: tokenId,
+            userId,
+            tokenHash,
+            purpose: "INVITE_SET_PASSWORD",
+            tenantId,
+            membershipId: membership.id,
+            expiresAt,
+            attemptCount: 0,
+          },
+        });
+
+        const appBaseUrl = process.env.FRONTEND_URL || "https://app.vebgenix.com";
+        inviteLink = `${appBaseUrl}/invite/accept?${new URLSearchParams({
+          token: code,
+          email: emailLower,
+          uid: userId,
+        }).toString()}`;
 
         if (process.env.NODE_ENV === "development") {
           console.log(
@@ -729,6 +1003,23 @@ export class PlatformService {
             ":",
             inviteLink,
           );
+        }
+
+        try {
+          await publishEventBridgeEvent({
+            detailType: "CognitoProvisionRequested",
+            source: "vebgenix.platform",
+            detail: {
+              authUserId: userId,
+              membershipId: membership.id,
+              tenantId,
+              email: emailLower,
+              role: membership.role,
+              kind: "TENANT_USER",
+            },
+          });
+        } catch (e) {
+          console.error("[PlatformService] EventBridge publish failed:", e);
         }
 
         inviteSent = await emailService.sendInviteEmail(
@@ -769,34 +1060,45 @@ export class PlatformService {
       throw error;
     }
 
-    // Generate real invite token
-    const rawToken = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto
-      .createHash("sha256")
-      .update(rawToken)
-      .digest("hex");
+    const { code, tokenHash } = generateInviteOtp(6);
 
     // Get membership to link
     const membership = await prisma.tenantMembership.findFirst({
       where: { userId, tenantId: profile.tenantId },
     });
 
-    // Store token in PasswordResetToken using raw SQL to bypass schema mismatch
     const tokenId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 3600000).toISOString();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    await prisma.$executeRawUnsafe(`
-       INSERT INTO "PasswordResetToken" (
-         "id", "userId", "tokenHash", "purpose", "tenant_id", "membership_id", "expiresAt", "createdAt", "attempt_count"
-       ) VALUES (
-         '${tokenId}', '${userId}', '${tokenHash}', 'INVITE_SET_PASSWORD', '${profile.tenantId}', 
-         ${membership?.id ? `'${membership.id}'` : "NULL"}, 
-         '${expiresAt}', NOW(), 0
-       )
-     `);
+    const invalidateWhere: any = {
+      userId,
+      purpose: "INVITE_SET_PASSWORD",
+      usedAt: null,
+    };
+    if (membership?.id) invalidateWhere.membershipId = membership.id;
 
-    const appBaseUrl = process.env.APP_BASE_URL || "http://localhost:5173";
-    const inviteLink = `${appBaseUrl}/invite/accept?token=${rawToken}`;
+    await prisma.passwordResetToken.updateMany({
+      where: invalidateWhere,
+      data: { usedAt: new Date() },
+    });
+
+    await prisma.passwordResetToken.create({
+      data: {
+        id: tokenId,
+        userId,
+        tokenHash,
+        purpose: "INVITE_SET_PASSWORD",
+        tenantId: profile.tenantId,
+        membershipId: membership?.id ?? null,
+        expiresAt,
+        attemptCount: 0,
+      },
+    });
+
+    const appBaseUrl = process.env.FRONTEND_URL || "https://app.vebgenix.com";
+    const qs = new URLSearchParams({ token: code, uid: userId });
+    if (profile.email) qs.set("email", profile.email);
+    const inviteLink = `${appBaseUrl}/invite/accept?${qs.toString()}`;
 
     // In development, log the invite link
     if (process.env.NODE_ENV === "development") {
@@ -810,6 +1112,22 @@ export class PlatformService {
 
     // Send email
     const tenantName = profile.tenant?.name;
+    try {
+      await publishEventBridgeEvent({
+        detailType: "CognitoProvisionRequested",
+        source: "vebgenix.platform",
+        detail: {
+          authUserId: userId,
+          membershipId: membership?.id ?? null,
+          tenantId: profile.tenantId,
+          email: profile.email,
+          role: membership?.role ?? null,
+          kind: "RESEND_INVITE",
+        },
+      });
+    } catch (e) {
+      console.error("[PlatformService] EventBridge publish failed:", e);
+    }
     const inviteSent = await emailService.sendInviteEmail(
       profile.email || "",
       inviteLink,
