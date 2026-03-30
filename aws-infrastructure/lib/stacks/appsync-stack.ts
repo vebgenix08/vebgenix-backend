@@ -160,8 +160,8 @@ export class AppSyncStack extends cdk.Stack {
         ? logs.RetentionDays.THREE_MONTHS
         : logs.RetentionDays.ONE_WEEK;
 
-    const makeLogGroup = (logicalId: string, functionName: string) =>
-      new logs.LogGroup(this, `${logicalId}LogGroup`, {
+    const ensureLogRetention = (logicalId: string, functionName: string) =>
+      new logs.LogRetention(this, `${logicalId}LogRetention`, {
         logGroupName: `/aws/lambda/${functionName}`,
         retention: logRetention,
       });
@@ -181,8 +181,8 @@ export class AppSyncStack extends cdk.Stack {
         securityGroups: [sgLambda],
         environment: sharedEnv,
         tracing: lambda.Tracing.ACTIVE,
-        logGroup: makeLogGroup(logicalId, functionName),
       });
+      ensureLogRetention(logicalId, functionName);
 
       fn.addToRolePolicy(dbPolicy);
       fn.addToRolePolicy(
@@ -240,8 +240,8 @@ export class AppSyncStack extends cdk.Stack {
             }
           }
         },
-        logGroup: makeLogGroup(logicalId, functionName),
       });
+      ensureLogRetention(logicalId, functionName);
 
       fn.addToRolePolicy(dbPolicy);
       return fn;
@@ -316,8 +316,8 @@ export class AppSyncStack extends cdk.Stack {
       memorySize: 256,
       environment: sharedEnv,
       tracing: lambda.Tracing.ACTIVE,
-      logGroup: makeLogGroup("StorageLambda", storageFunctionName),
     });
+    ensureLogRetention("StorageLambda", storageFunctionName);
     documentsBucket.grantPut(storageLambda);
     documentsBucket.grantRead(storageLambda);
 
