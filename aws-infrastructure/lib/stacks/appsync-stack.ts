@@ -50,6 +50,7 @@ export class AppSyncStack extends cdk.Stack {
     } = props;
 
     const privateSubnets = { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS };
+    const dbSecretsEnabled = dbSecretArn.startsWith("arn:");
 
     // ---------------------------------------------------------------
     // AppSync GraphQL API
@@ -104,26 +105,28 @@ export class AppSyncStack extends cdk.Stack {
       DB_PROXY_ENDPOINT: dbProxyEndpoint,
       DB_SECRET_ARN: dbSecretArn,
       DB_NAME: "vebgenix",
-      DATABASE_URL: `postgresql://postgres:${dbSecretArn}@${dbProxyEndpoint}:5432/vebgenix`, // RDS Proxy URL
+      DATABASE_URL: dbSecretsEnabled
+        ? `postgresql://postgres:${dbSecretArn}@${dbProxyEndpoint}:5432/vebgenix`
+        : "",
       EVENT_BUS_NAME: eventBus.eventBusName,
       DOCUMENTS_BUCKET: documentsBucket.bucketName,
       USER_POOL_ID: userPool.userPoolId,
       NODE_OPTIONS: "--enable-source-maps",
     };
 
-    // PERMANENT: allow resolver lambdas to read DB secret (covers Secrets Manager 6-char suffix)
-    const dbPolicy = new iam.PolicyStatement({
-      actions: [
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret",
-      ],
-      resources: [
-        dbSecretArn, // exact ARN (if provided as full ARN)
-        `${dbSecretArn}-*`, // ARN with AWS 6-char suffix (e.g. vebgenix/dev/db-master-abc123)
-        // Fallback: name-based ARN pattern in case dbSecretArn is a secret name not a full ARN
-        `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
-      ],
-    });
+    const dbPolicy = dbSecretsEnabled
+      ? new iam.PolicyStatement({
+          actions: [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret",
+          ],
+          resources: [
+            dbSecretArn,
+            `${dbSecretArn}-*`,
+            `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
+          ],
+        })
+      : undefined;
 
     // ---------------------------------------------------------------
     // Helper: create domain Lambda + AppSync datasource
@@ -144,18 +147,9 @@ export class AppSyncStack extends cdk.Stack {
         tracing: lambda.Tracing.ACTIVE,
       });
 
-      fn.addToRolePolicy(dbPolicy);
-      fn.addToRolePolicy(
-        new iam.PolicyStatement({
-          actions: [
-            "secretsmanager:GetSecretValue",
-            "secretsmanager:DescribeSecret",
-          ],
-          resources: [
-            `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
-          ],
-        }),
-      );
+      if (dbPolicy) {
+        fn.addToRolePolicy(dbPolicy);
+      }
       return fn;
     };
 
@@ -180,7 +174,9 @@ export class AppSyncStack extends cdk.Stack {
         },
       });
 
-      fn.addToRolePolicy(dbPolicy);
+      if (dbPolicy) {
+        fn.addToRolePolicy(dbPolicy);
+      }
       return fn;
     };
 
