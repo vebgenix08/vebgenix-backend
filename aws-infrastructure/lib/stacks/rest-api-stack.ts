@@ -231,9 +231,19 @@ EOF`,
       "systemctl daemon-reload",
     );
 
+    const restSubnet = config.restApiSubnetId
+      ? ec2.Subnet.fromSubnetAttributes(this, "RestApiHostSubnet", {
+          subnetId: config.restApiSubnetId,
+          availabilityZone: config.restApiSubnetAz ?? cdk.Stack.of(this).availabilityZones[0],
+          routeTableId: config.restApiSubnetRouteTableId,
+        })
+      : undefined;
+
     this.instance = new ec2.Instance(this, "RestApiInstance", {
       vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      vpcSubnets: restSubnet
+        ? { subnets: [restSubnet] }
+        : { subnetType: ec2.SubnetType.PUBLIC },
       securityGroup: sgApp,
       instanceType: new ec2.InstanceType(config.restApiInstanceClass),
       machineImage: ec2.MachineImage.latestAmazonLinux2023({

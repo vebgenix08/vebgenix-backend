@@ -77,9 +77,19 @@ export class Ec2DatabaseStack extends cdk.Stack {
       "docker exec vebgenix-postgres pg_isready -U \"$DB_USER\" -d \"$DB_NAME\"",
     );
 
+    const dbSubnet = config.ec2DbSubnetId
+      ? ec2.Subnet.fromSubnetAttributes(this, "DbHostSubnet", {
+          subnetId: config.ec2DbSubnetId,
+          availabilityZone: config.ec2DbSubnetAz ?? cdk.Stack.of(this).availabilityZones[0],
+          routeTableId: config.ec2DbSubnetRouteTableId,
+        })
+      : undefined;
+
     this.instance = new ec2.Instance(this, "DbInstance", {
       vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      vpcSubnets: dbSubnet
+        ? { subnets: [dbSubnet] }
+        : { subnetType: ec2.SubnetType.PUBLIC },
       securityGroup: sgDb,
       instanceType: new ec2.InstanceType(config.ec2DbInstanceClass),
       machineImage: ec2.MachineImage.latestAmazonLinux2023({
