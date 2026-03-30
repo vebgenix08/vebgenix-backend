@@ -14,7 +14,7 @@ export const Policies = {
     /**
      * Can the actor remove the target member from the tenant?
      */
-    canRemoveMember(ctx: AuthContext, targetMember: Membership): boolean {
+    canRemoveMember(_ctx: AuthContext, targetMember: Membership): boolean {
       // Primary Owner cannot be removed via normal flows
       if (targetMember.isPrimaryOwner) return false;
       return true;

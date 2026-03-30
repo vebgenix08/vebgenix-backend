@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { UserRole } from '../../../domain/User';
 
-export const requireRole = (allowedRoles: UserRole[]) => {
+export const requireRole = (allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Unauthenticated' } });
