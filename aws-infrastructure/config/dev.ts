@@ -19,9 +19,9 @@ export const devConfig: EnvConfig = {
   restApiSubnetId: "subnet-0981f0e5c706bd982",
   restApiSubnetAz: "ap-south-1b",
   restApiSubnetRouteTableId: "rtb-0f1b4b91acd13b4d4",
-  ec2DbSubnetId: "subnet-0c495732933ca2d9f",
-  ec2DbSubnetAz: "ap-south-1a",
-  ec2DbSubnetRouteTableId: "rtb-08fc96f06f994729d",
+  ec2DbSubnetId: "subnet-0981f0e5c706bd982",
+  ec2DbSubnetAz: "ap-south-1b",
+  ec2DbSubnetRouteTableId: "rtb-0f1b4b91acd13b4d4",
 
   // Database
   enableDatabase: false,
