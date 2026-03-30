@@ -33,6 +33,8 @@ export class EmailService {
     const smtpUser = process.env.SMTP_EMAIL || process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_APP_PASSWORD || process.env.SMTP_PASSWORD;
     const smtpPort = Number(process.env.SMTP_PORT) || 587;
+    const fromAddress = process.env.SMTP_FROM || smtpUser;
+    const fromName = process.env.APP_NAME || "Vebgenix";
 
     if (!smtpHost || !smtpUser || !smtpPass) {
         console.warn("⚠️ SMTP Configuration missing (SMTP_HOST, SMTP_EMAIL/USER, SMTP_APP_PASSWORD/PASSWORD). Email will ONLY be logged to console.");
@@ -53,7 +55,7 @@ export class EmailService {
         });
 
         await transporter.sendMail({
-            from: `"${process.env.APP_NAME || 'Vagentix'}" <${smtpUser}>`,
+            from: `"${fromName}" <${fromAddress}>`,
             to,
             subject,
             html: body,
