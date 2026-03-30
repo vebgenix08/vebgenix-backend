@@ -381,6 +381,7 @@ jobs:
                 "npx prisma generate --schema=prisma/schema.prisma",
                 "npm run seed:permissions",
                 "npm run build",
+              "cat >/etc/systemd/system/vebgenix-rest.service <<'EOF'\n[Unit]\nDescription=Vebgenix REST API\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nUser=ec2-user\nWorkingDirectory=/opt/vebgenix/app/server\nEnvironmentFile=/etc/vebgenix-rest.env\nExecStart=/usr/local/bin/node /opt/vebgenix/app/server/dist/src/main.js\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOF",
               "systemctl daemon-reload",
               "systemctl enable vebgenix-rest",
               "systemctl restart vebgenix-rest",
