@@ -94,12 +94,6 @@ export class Ec2DatabaseStack extends cdk.Stack {
       requireImdsv2: true,
     });
 
-    this.hostSecurityGroup.addIngressRule(
-      ec2.Peer.ipv4(vpc.vpcCidrBlock),
-      ec2.Port.tcp(5432),
-      "PostgreSQL access from VPC workloads",
-    );
-
     this.privateIp = this.instance.instancePrivateIp;
 
     new ssm.StringParameter(this, "DbHostParam", {
