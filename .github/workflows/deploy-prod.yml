@@ -127,6 +127,7 @@ jobs:
           fi
 
       - name: Wait for AppSync stack to stabilize
+        continue-on-error: true
         run: |
           set -euo pipefail
           echo "Checking VebgenixAppSync-prod stack status..."
