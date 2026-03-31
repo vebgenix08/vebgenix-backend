@@ -72,10 +72,13 @@ export class RestApiStack extends cdk.Stack {
         actions: [
           "cognito-idp:AdminCreateUser",
           "cognito-idp:AdminGetUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminConfirmSignUp",
           "cognito-idp:AdminUpdateUserAttributes",
           "cognito-idp:AdminAddUserToGroup",
           "cognito-idp:AdminEnableUser",
           "cognito-idp:AdminDisableUser",
+          "cognito-idp:AdminDeleteUser",
           "cognito-idp:ListUsers",
           "cognito-idp:ListUsersInGroup",
         ],

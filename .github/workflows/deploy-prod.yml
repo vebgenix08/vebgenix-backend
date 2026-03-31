@@ -222,6 +222,7 @@ jobs:
             VebgenixStorage-prod \
             VebgenixAsync-prod \
             VebgenixMonitoring-prod \
+            VebgenixRestApi-prod \
             -c env=prod -c enableNewResolvers=true --require-approval never --exclusively
 
       - name: Bootstrap SMTP SSM parameters in prod account
