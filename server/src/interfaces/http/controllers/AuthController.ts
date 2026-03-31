@@ -14,6 +14,10 @@ import {
   getClaimString,
   verifyCognitoIdToken,
 } from "../auth/cognito";
+import {
+  ensureCognitoUser,
+  setCognitoPasswordAndVerify,
+} from "../../../infrastructure/cognito/admin";
 
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
 const ACCESS_TOKEN_EXPIRY = "8h";
@@ -712,10 +716,10 @@ export class AuthController {
 
       // Use safe parameterized query (tagged template) — avoids bcrypt $ corruption
       const results: any[] = await prisma.$queryRaw`
-        SELECT 
+        SELECT
           t.id, t."userId", t.token_hash as "tokenHash", t.purpose, t.tenant_id, t.membership_id, t.expires_at as "expiresAt", t.used_at as "usedAt",
-          u."passwordHash",
-          tm.status as membership_status
+          u."passwordHash", u.email,
+          tm.status as membership_status, tm.role as membership_role
         FROM "PasswordResetToken" t
         JOIN "AuthUser" u ON t."userId" = u.id
         LEFT JOIN "TenantMembership" tm ON t.membership_id = tm.id
@@ -769,6 +773,32 @@ export class AuthController {
             ]
           : []),
       ]);
+
+      // Sync to Cognito (non-blocking — DB is source of truth, Cognito is auth layer)
+      const userEmail: string = resetRecord.email;
+      const tenantId: string | null = resetRecord.tenant_id ?? null;
+      const membershipRole: string | null = resetRecord.membership_role ?? null;
+
+      // Ensure Cognito user exists with correct tenant_id and role
+      ensureCognitoUser({
+        email: userEmail,
+        tenantId,
+        role: membershipRole,
+      }).then(async (ensureResult) => {
+        if (!ensureResult.ok) {
+          console.warn(`[acceptInvite] Cognito ensureUser failed for ${userEmail}: ${ensureResult.code}`);
+          return;
+        }
+        // Set the chosen password in Cognito
+        const pwResult = await setCognitoPasswordAndVerify({ email: userEmail, newPassword });
+        if (!pwResult.ok) {
+          console.warn(`[acceptInvite] Cognito setPassword failed for ${userEmail}: ${pwResult.code}`);
+        } else {
+          console.log(`[acceptInvite] Cognito user ready for ${userEmail}`);
+        }
+      }).catch((err) => {
+        console.error(`[acceptInvite] Cognito sync error for ${userEmail}:`, err);
+      });
 
       return res.json({
         message: "Password set successfully. You can now log in.",
