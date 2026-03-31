@@ -232,7 +232,7 @@ jobs:
             --stack-name VebgenixAuth-prod \
             --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue | [0]" \
             --output text --region ap-south-1)
-          SUPER_ADMIN_EMAIL="dhanushags08@gmail.com"
+          SUPER_ADMIN_EMAIL="dhanush@vebgenix.com"
 
           # Create or update super admin in Cognito
           if aws cognito-idp admin-get-user --user-pool-id "$USER_POOL_ID" --username "$SUPER_ADMIN_EMAIL" --region ap-south-1 > /dev/null 2>&1; then
@@ -454,7 +454,7 @@ jobs:
                 "npx prisma db push --accept-data-loss --schema=prisma/schema.prisma",
                 "npx prisma generate --schema=prisma/schema.prisma",
                 "npm run seed:permissions",
-                "SUPER_ADMIN_EMAIL=dhanushags08@gmail.com npm run seed:super-admin",
+                "SUPER_ADMIN_EMAIL=dhanush@vebgenix.com npm run seed:super-admin",
                 "npm run build",
               "cat >/etc/systemd/system/vebgenix-rest.service <<'EOF'\n[Unit]\nDescription=Vebgenix REST API\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nUser=ec2-user\nWorkingDirectory=/opt/vebgenix/app/server\nEnvironmentFile=/etc/vebgenix-rest.env\nExecStart=/usr/local/bin/node /opt/vebgenix/app/server/dist/src/main.js\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOF",
               "systemctl daemon-reload",
