@@ -41,6 +41,10 @@ router.get("/tenants/:tenantId/users", PlatformController.listTenantUsers);
 router.post("/tenants/:tenantId/users", PlatformController.provisionTenantUser);
 // TODO: Add PATCH /tenants/:tenantId/users/:userId when updateTenantUser is implemented
 
+// Audit logs
+router.get("/audit-logs", PlatformController.listAuditLogs);
+router.get("/audit-logs/:logId", PlatformController.getAuditLog);
+
 // Impersonate user
 router.post("/impersonate", PlatformController.impersonate);
 
