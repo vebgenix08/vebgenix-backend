@@ -21,8 +21,6 @@ declare global {
   }
 }
 
-const PLATFORM_SUPER_ADMIN_EMAIL = "dhanush@vebgenix.com";
-
 export const requireSuperAdmin = async (
   req: Request,
   res: Response,
@@ -44,18 +42,13 @@ export const requireSuperAdmin = async (
         .json({ error: "Token valid but no email claim found" });
     }
 
-    // Hard gate: only the designated super admin email is allowed
-    if (email.toLowerCase() !== PLATFORM_SUPER_ADMIN_EMAIL) {
-      console.warn(`Blocked platform access attempt by non-super-admin: ${email}`);
-      return res.status(403).json({ error: "Forbidden: Super Admin access required" });
-    }
-
-    // Verify PLATFORM_SUPER_ADMIN role from JWT or DB
+    // 2. Check if user has global PLATFORM_SUPER_ADMIN role from JWT or DB
     const isSuperAdminFromJwt = getClaimStringArray(
       payload,
       "cognito:groups",
     ).includes("PLATFORM_SUPER_ADMIN");
 
+    // Fallback to AuthUserGlobalRole check
     let isSuperAdminFromDb = false;
     let authUserId = getClaimString(payload, "sub") ?? "";
 

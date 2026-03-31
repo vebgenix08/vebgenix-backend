@@ -17,6 +17,12 @@ jobs:
     environment: prod
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      APP_NAME: Vebgenix
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
@@ -222,77 +228,7 @@ jobs:
             VebgenixStorage-prod \
             VebgenixAsync-prod \
             VebgenixMonitoring-prod \
-            VebgenixRestApi-prod \
             -c env=prod -c enableNewResolvers=true --require-approval never --exclusively
-
-      - name: Seed super admin Cognito user in prod
-        run: |
-          set -euo pipefail
-          USER_POOL_ID=$(aws cloudformation describe-stacks \
-            --stack-name VebgenixAuth-prod \
-            --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue | [0]" \
-            --output text --region ap-south-1)
-          SUPER_ADMIN_EMAIL="dhanush@vebgenix.com"
-
-          # Create or update super admin in Cognito
-          if aws cognito-idp admin-get-user --user-pool-id "$USER_POOL_ID" --username "$SUPER_ADMIN_EMAIL" --region ap-south-1 > /dev/null 2>&1; then
-            echo "Super admin Cognito user already exists, updating attributes..."
-            aws cognito-idp admin-update-user-attributes \
-              --user-pool-id "$USER_POOL_ID" \
-              --username "$SUPER_ADMIN_EMAIL" \
-              --user-attributes Name=email_verified,Value=true \
-              --region ap-south-1
-          else
-            echo "Creating super admin Cognito user..."
-            aws cognito-idp admin-create-user \
-              --user-pool-id "$USER_POOL_ID" \
-              --username "$SUPER_ADMIN_EMAIL" \
-              --message-action SUPPRESS \
-              --user-attributes Name=email,Value="$SUPER_ADMIN_EMAIL" Name=email_verified,Value=true \
-              --region ap-south-1
-          fi
-
-          # Add to PLATFORM_SUPER_ADMIN group
-          aws cognito-idp admin-add-user-to-group \
-            --user-pool-id "$USER_POOL_ID" \
-            --username "$SUPER_ADMIN_EMAIL" \
-            --group-name PLATFORM_SUPER_ADMIN \
-            --region ap-south-1 || true
-          echo "Super admin Cognito user seeded."
-
-      - name: Bootstrap Cognito SSM parameters in prod account
-        run: |
-          set -euo pipefail
-          USER_POOL_ID=$(aws cloudformation describe-stacks \
-            --stack-name VebgenixAuth-prod \
-            --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue | [0]" \
-            --output text --region ap-south-1)
-          USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks \
-            --stack-name VebgenixAuth-prod \
-            --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue | [0]" \
-            --output text --region ap-south-1)
-          aws ssm put-parameter --name "/vebgenix/prod/rest/USER_POOL_ID" --value "$USER_POOL_ID" --type String --overwrite --region ap-south-1
-          aws ssm put-parameter --name "/vebgenix/prod/rest/USER_POOL_CLIENT_ID" --value "$USER_POOL_CLIENT_ID" --type String --overwrite --region ap-south-1
-          aws ssm put-parameter --name "/vebgenix/prod/frontend/VITE_USER_POOL_ID" --value "$USER_POOL_ID" --type String --overwrite --region ap-south-1
-          aws ssm put-parameter --name "/vebgenix/prod/frontend/VITE_USER_POOL_CLIENT_ID" --value "$USER_POOL_CLIENT_ID" --type String --overwrite --region ap-south-1
-          echo "Cognito SSM parameters bootstrapped: USER_POOL_ID=$USER_POOL_ID"
-
-      - name: Bootstrap SMTP SSM parameters in prod account
-        env:
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASSWORD }}
-          SMTP_FROM: ${{ secrets.SMTP_FROM }}
-        run: |
-          set -euo pipefail
-          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_HOST" --value "$SMTP_HOST" --type String --overwrite --region ap-south-1
-          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_PORT" --value "$SMTP_PORT" --type String --overwrite --region ap-south-1
-          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_USER" --value "$SMTP_USER" --type String --overwrite --region ap-south-1
-          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_PASS" --value "$SMTP_PASS" --type SecureString --overwrite --region ap-south-1
-          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_FROM" --value "$SMTP_FROM" --type String --overwrite --region ap-south-1
-          aws ssm put-parameter --name "/vebgenix/prod/rest/APP_NAME" --value "Vebgenix" --type String --overwrite --region ap-south-1
-          echo "SMTP SSM parameters bootstrapped in prod account."
 
       - name: Package backend artifact
         run: |
@@ -414,8 +350,15 @@ jobs:
           COMMAND_PARAMS=$(python3 - <<'PY'
           import json
           import os
+          import shlex
 
           artifact_key = os.environ["ARTIFACT_KEY"]
+          smtp_host = os.environ.get("SMTP_HOST", "")
+          smtp_port = os.environ.get("SMTP_PORT", "")
+          smtp_user = os.environ.get("SMTP_USER", "")
+          smtp_password = os.environ.get("SMTP_PASSWORD", "")
+          smtp_from = os.environ.get("SMTP_FROM", "")
+          app_name = os.environ.get("APP_NAME", "Vebgenix")
           commands = [
               "set -euxo pipefail",
               f"ARTIFACT_KEY='{artifact_key}'",
@@ -434,19 +377,13 @@ jobs:
               "DB_SECRET_ARN=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/DB_SECRET_ARN\" --region \"$REGION\" --query Parameter.Value --output text)",
               "EVENT_BUS_NAME=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/EVENT_BUS_NAME\" --region \"$REGION\" --query Parameter.Value --output text)",
               "FRONTEND_URL=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/frontend/APP_URL\" --region \"$REGION\" --query Parameter.Value --output text)",
-              "SMTP_HOST=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/SMTP_HOST\" --region \"$REGION\" --query Parameter.Value --output text)",
-              "SMTP_PORT=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/SMTP_PORT\" --region \"$REGION\" --query Parameter.Value --output text)",
-              "SMTP_USER=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/SMTP_USER\" --region \"$REGION\" --query Parameter.Value --output text)",
-              "SMTP_PASS=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/SMTP_PASS\" --region \"$REGION\" --with-decryption --query Parameter.Value --output text)",
-              "SMTP_FROM=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/SMTP_FROM\" --region \"$REGION\" --query Parameter.Value --output text)",
-              "APP_NAME=$(aws ssm get-parameter --name \"/vebgenix/$STAGE/rest/APP_NAME\" --region \"$REGION\" --query Parameter.Value --output text)",
               "DB_SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id \"$DB_SECRET_ARN\" --region \"$REGION\" --query SecretString --output text)",
               "DB_USER=$(echo \"$DB_SECRET_JSON\" | jq -r '.username')",
               "DB_PASS=$(echo \"$DB_SECRET_JSON\" | jq -r '.password')",
               "export DB_USER DB_PASS",
               "DB_USER_ENCODED=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ[\"DB_USER\"], safe=\"\"))')",
               "DB_PASS_ENCODED=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ[\"DB_PASS\"], safe=\"\"))')",
-              "cat >/etc/vebgenix-rest.env <<ENV\nPORT=5000\nNODE_ENV=production\nAWS_REGION=$REGION\nAWS_DEFAULT_REGION=$REGION\nUSER_POOL_ID=$USER_POOL_ID\nUSER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID\nCOGNITO_USER_POOL_ID=$USER_POOL_ID\nCOGNITO_CLIENT_ID=$USER_POOL_CLIENT_ID\nDB_NAME=$DB_NAME\nDATABASE_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME\nDIRECT_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME\nDOCUMENTS_BUCKET=$DOC_BUCKET\nS3_BUCKET_NAME=$DOC_BUCKET\nUPLOADS_BUCKET_NAME=$DOC_BUCKET\nMEDIA_BUCKET_NAME=$DOC_BUCKET\nS3_PUBLIC_BASE_URL=https://$DOC_BUCKET.s3.$REGION.amazonaws.com\nS3_UPLOAD_ROOT=tenants\nS3_CAMPUS_SEGMENT=campuses\nS3_USER_SEGMENT=users\nS3_TENANT_CAMPUS_FALLBACK=tenant\nS3_PROFILE_SCOPE_NAME=profile\nS3_BRANDING_SCOPE_NAME=branding\nS3_ADMISSION_SCOPE_NAME=admissions\nS3_APPLICATION_SCOPE_NAME=applications\nS3_ENQUIRY_SCOPE_NAME=enquiries\nS3_DOCUMENT_SCOPE_NAME=documents\nS3_RESULTS_SCOPE_NAME=results\nS3_PUBLISHED_RESULTS_SCOPE_NAME=published\nS3_AVATAR_UPLOAD_NAME=avatar\nS3_LOGO_UPLOAD_NAME=logo\nEVENT_BUS_NAME=$EVENT_BUS_NAME\nFRONTEND_URL=$FRONTEND_URL\nSMTP_HOST=$SMTP_HOST\nSMTP_PORT=$SMTP_PORT\nSMTP_USER=$SMTP_USER\nSMTP_PASS=$SMTP_PASS\nSMTP_FROM=$SMTP_FROM\nAPP_NAME=$APP_NAME\nHTTP_ACCESS_LOGS=false\nPRISMA_DEBUG_QUERIES=false\nENV",
+              "cat >/etc/vebgenix-rest.env <<ENV\nPORT=5000\nNODE_ENV=production\nAWS_REGION=$REGION\nAWS_DEFAULT_REGION=$REGION\nUSER_POOL_ID=$USER_POOL_ID\nUSER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID\nCOGNITO_USER_POOL_ID=$USER_POOL_ID\nCOGNITO_CLIENT_ID=$USER_POOL_CLIENT_ID\nDB_NAME=$DB_NAME\nDATABASE_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME\nDIRECT_URL=postgresql://$DB_USER_ENCODED:$DB_PASS_ENCODED@$DB_HOST:5432/$DB_NAME\nDOCUMENTS_BUCKET=$DOC_BUCKET\nS3_BUCKET_NAME=$DOC_BUCKET\nUPLOADS_BUCKET_NAME=$DOC_BUCKET\nMEDIA_BUCKET_NAME=$DOC_BUCKET\nS3_PUBLIC_BASE_URL=https://$DOC_BUCKET.s3.$REGION.amazonaws.com\nS3_UPLOAD_ROOT=tenants\nS3_CAMPUS_SEGMENT=campuses\nS3_USER_SEGMENT=users\nS3_TENANT_CAMPUS_FALLBACK=tenant\nS3_PROFILE_SCOPE_NAME=profile\nS3_BRANDING_SCOPE_NAME=branding\nS3_ADMISSION_SCOPE_NAME=admissions\nS3_APPLICATION_SCOPE_NAME=applications\nS3_ENQUIRY_SCOPE_NAME=enquiries\nS3_DOCUMENT_SCOPE_NAME=documents\nS3_RESULTS_SCOPE_NAME=results\nS3_PUBLISHED_RESULTS_SCOPE_NAME=published\nS3_AVATAR_UPLOAD_NAME=avatar\nS3_LOGO_UPLOAD_NAME=logo\nEVENT_BUS_NAME=$EVENT_BUS_NAME\nFRONTEND_URL=$FRONTEND_URL\nHTTP_ACCESS_LOGS=false\nPRISMA_DEBUG_QUERIES=false\nENV",
               "cd \"$APP_DIR/server\"",
               "if ! node -v | grep -q '^v20\\.'; then dnf install -y xz && curl -fsSL https://nodejs.org/dist/v20.19.0/node-v20.19.0-linux-arm64.tar.xz -o /tmp/node.tar.xz && mkdir -p /usr/local/lib/nodejs && tar -xJf /tmp/node.tar.xz -C /usr/local/lib/nodejs && ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/node /usr/local/bin/node && ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npm /usr/local/bin/npm && ln -sf /usr/local/lib/nodejs/node-v20.19.0-linux-arm64/bin/npx /usr/local/bin/npx && hash -r; fi",
                 "npm ci",
@@ -454,13 +391,29 @@ jobs:
                 "npx prisma db push --accept-data-loss --schema=prisma/schema.prisma",
                 "npx prisma generate --schema=prisma/schema.prisma",
                 "npm run seed:permissions",
-                "SUPER_ADMIN_EMAIL=dhanush@vebgenix.com npm run seed:super-admin",
                 "npm run build",
               "cat >/etc/systemd/system/vebgenix-rest.service <<'EOF'\n[Unit]\nDescription=Vebgenix REST API\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nUser=ec2-user\nWorkingDirectory=/opt/vebgenix/app/server\nEnvironmentFile=/etc/vebgenix-rest.env\nExecStart=/usr/local/bin/node /opt/vebgenix/app/server/dist/src/main.js\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOF",
               "systemctl daemon-reload",
               "systemctl enable vebgenix-rest",
               "systemctl restart vebgenix-rest",
           ]
+          env_insert_index = commands.index("cd \"$APP_DIR/server\"")
+          commands.insert(env_insert_index, f"printf '\\nAPP_NAME=%s\\n' {shlex.quote(app_name)} >> /etc/vebgenix-rest.env")
+          env_insert_index += 1
+          if smtp_host:
+              commands.insert(env_insert_index, f"printf '\\nSMTP_HOST=%s\\n' {shlex.quote(smtp_host)} >> /etc/vebgenix-rest.env")
+              env_insert_index += 1
+          if smtp_port:
+              commands.insert(env_insert_index, f"printf 'SMTP_PORT=%s\\n' {shlex.quote(smtp_port)} >> /etc/vebgenix-rest.env")
+              env_insert_index += 1
+          if smtp_user:
+              commands.insert(env_insert_index, f"printf 'SMTP_USER=%s\\nSMTP_EMAIL=%s\\n' {shlex.quote(smtp_user)} {shlex.quote(smtp_user)} >> /etc/vebgenix-rest.env")
+              env_insert_index += 1
+          if smtp_password:
+              commands.insert(env_insert_index, f"printf 'SMTP_PASSWORD=%s\\nSMTP_APP_PASSWORD=%s\\n' {shlex.quote(smtp_password)} {shlex.quote(smtp_password)} >> /etc/vebgenix-rest.env")
+              env_insert_index += 1
+          if smtp_from:
+              commands.insert(env_insert_index, f"printf 'SMTP_FROM=%s\\n' {shlex.quote(smtp_from)} >> /etc/vebgenix-rest.env")
           print(json.dumps({"commands": commands}))
           PY
           )

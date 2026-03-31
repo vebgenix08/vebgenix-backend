@@ -52,6 +52,7 @@ export class Ec2DatabaseStack extends cdk.Stack {
     const userData = ec2.UserData.forLinux();
     userData.addCommands(
       "set -euxo pipefail",
+      // Keep first boot minimal so the instance registers in SSM quickly.
       "mkdir -p /var/lib/vebgenix-postgres",
       "chmod 700 /var/lib/vebgenix-postgres",
     );

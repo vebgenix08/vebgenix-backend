@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 
 export const emailService = {
-  async sendInviteEmail(to: string, inviteLink: string, tenantName: string = 'Our Organization', loginUrl: string = `${process.env.FRONTEND_URL || 'https://d18w0fdwt58ts4.cloudfront.net'}/login`): Promise<boolean> {
+  async sendInviteEmail(to: string, inviteLink: string, tenantName: string = 'Our Organization', loginUrl: string = 'http://localhost:5173/login'): Promise<boolean> {
       try {
           const subject = `You've been invited to join ${tenantName}`;
           const body = `
@@ -30,12 +30,14 @@ export class EmailService {
     
     // Check if SMTP configuration exists
     const smtpHost = process.env.SMTP_HOST;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const smtpUser = process.env.SMTP_EMAIL || process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_APP_PASSWORD || process.env.SMTP_PASSWORD;
     const smtpPort = Number(process.env.SMTP_PORT) || 587;
+    const fromAddress = process.env.SMTP_FROM || smtpUser;
+    const fromName = process.env.APP_NAME || "Vebgenix";
 
     if (!smtpHost || !smtpUser || !smtpPass) {
-        console.warn("⚠️ SMTP Configuration missing (SMTP_HOST, SMTP_USER, SMTP_PASS). Email will ONLY be logged to console.");
+        console.warn("⚠️ SMTP Configuration missing (SMTP_HOST, SMTP_EMAIL/USER, SMTP_APP_PASSWORD/PASSWORD). Email will ONLY be logged to console.");
         console.log(`Body (Snippet): ${body.substring(0, 500)}...`);
         console.log(`-------------------------\n`);
         return;
@@ -53,7 +55,7 @@ export class EmailService {
         });
 
         await transporter.sendMail({
-            from: `"${process.env.APP_NAME || 'Vagentix'}" <${process.env.SMTP_FROM || smtpUser}>`,
+            from: `"${fromName}" <${fromAddress}>`,
             to,
             subject,
             html: body,

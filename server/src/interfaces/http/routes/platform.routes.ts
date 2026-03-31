@@ -9,6 +9,8 @@ router.use(requireSuperAdmin);
 
 // Platform user info
 router.get("/me", PlatformController.getMe);
+router.get("/audit-logs", PlatformController.listAuditLogs);
+router.get("/audit-logs/:logId", PlatformController.getAuditLog);
 
 // Tenants
 router.get("/tenants", PlatformController.listTenants);

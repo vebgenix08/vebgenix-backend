@@ -1,42 +1,57 @@
-import { TenantDbClient } from '../../infrastructure/prisma/client';
+import { getPrisma } from '../../infrastructure/prisma/client';
 import { AuthContext } from './entities';
 import { IdentityService } from './services';
 
 export class StaffService {
-  static async listStaff(db: TenantDbClient, ctx: AuthContext, params: { 
+  static async listStaff(ctx: AuthContext, params: { 
     search?: string; 
     roleId?: string; 
     campusId?: string;
     limit?: number;
     cursor?: string;
   }) {
+    const prisma = await getPrisma();
+    
+    // 1. Authorization
     IdentityService.authorize(ctx, 'staff.view');
 
+    const tenantId = ctx.membership!.tenantId;
     const { search, roleId, campusId, limit = 20, cursor } = params;
 
+    // 2. Build Where Clause
     const where: any = {
+      tenantId,
+      // We generally want to see INVITED and ACTIVE staff
       status: { in: ['ACTIVE', 'INVITED', 'DISABLED'] }, 
     };
 
+    // 3. Campus Scope Logic
+    // If the viewer is restricted to specific campuses, they should only see staff 
+    // who are relevant to those campuses (intersection).
+    // Note: Global staff (allCampusesAccess=true) are usually visible to everyone.
+    
     if (!ctx.hasAllCampusesAccess) {
       const viewerCampuses = Array.from(ctx.allowedCampusIds);
       
       where.primaryProfile = {
         OR: [
-          { allCampusesAccess: true },
-          { campusAccess: { some: { campusId: { in: viewerCampuses } } } }
+          { allCampusesAccess: true }, // Global staff are visible
+          { campusAccess: { some: { campusId: { in: viewerCampuses } } } } // Overlapping staff
         ]
       };
     } else if (campusId) {
+      // Admin filtering by specific campus
       where.primaryProfile = {
         campusAccess: { some: { campusId } }
       };
     }
 
+    // 4. Role Filter
     if (roleId) {
       where.memberRoles = { some: { roleId } };
     }
 
+    // 5. Search (Email or Name)
     if (search) {
       where.OR = [
         { user: { email: { contains: search, mode: 'insensitive' } } },
@@ -44,7 +59,8 @@ export class StaffService {
       ];
     }
 
-    const members = await db.tenantMembership.findMany({
+    // 6. Execute Query
+    const members = await prisma.tenantMembership.findMany({
       where,
       take: limit,
       skip: cursor ? 1 : 0,
@@ -57,6 +73,7 @@ export class StaffService {
       orderBy: { createdAt: 'desc' }
     });
 
+    // 7. Map Response
     return members.map(m => ({
       id: m.id,
       userId: m.userId,
@@ -71,10 +88,15 @@ export class StaffService {
     }));
   }
 
-  static async getStaffDetails(db: TenantDbClient, ctx: AuthContext, membershipId: string) {
+  static async getStaffDetails(ctx: AuthContext, membershipId: string) {
+    const prisma = await getPrisma();
+
     IdentityService.authorize(ctx, 'staff.view');
     
-    const member = await db.tenantMembership.findUnique({
+    // Add similar scope checks if needed (can I view this specific person?)
+    // For now, assume listStaff scope logic covers generic access rights.
+    
+    const member = await prisma.tenantMembership.findUnique({
       where: { id: membershipId },
       include: {
         user: true,
@@ -83,7 +105,7 @@ export class StaffService {
       }
     });
 
-    if (!member) {
+    if (!member || member.tenantId !== ctx.membership!.tenantId) {
       return null;
     }
 

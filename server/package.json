@@ -6,12 +6,11 @@
   "scripts": {
     "start": "node dist/main.js",
     "dev": "nodemon src/main.ts",
-    "build": "tsc || true",
+    "build": "tsc",
     "clean-slate": "ts-node src/infrastructure/scripts/clean-slate.ts",
     "seed": "ts-node src/infrastructure/scripts/seed.ts",
     "reset-and-seed": "npm run clean-slate && npm run seed",
     "seed:permissions": "ts-node --project tsconfig.json scripts/seed-permissions.ts",
-    "seed:super-admin": "ts-node --project tsconfig.json src/infrastructure/scripts/bootstrap-super-admin.ts",
     "backfill:persona": "ts-node --project tsconfig.json scripts/backfill-personaRole.ts",
     "grant:admin-dashboard-perms": "ts-node --project tsconfig.json scripts/grant-admin-dashboard-perms.ts"
   },
@@ -20,7 +19,6 @@
     "@aws-sdk/client-eventbridge": "^3.400.0",
     "@aws-sdk/client-s3": "^3.400.0",
     "@aws-sdk/client-secrets-manager": "^3.400.0",
-    "@aws-sdk/s3-request-presigner": "^3.1020.0",
     "@supabase/supabase-js": "^2.93.1",
     "aws-jwt-verify": "^5.1.1",
     "axios": "^1.13.6",

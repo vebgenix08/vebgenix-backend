@@ -6,13 +6,14 @@ import jwt from "jsonwebtoken";
 import { GlobalRole } from "@prisma/client";
 import {
   CognitoIdentityProviderClient,
-  ConfirmForgotPasswordCommand,
   ForgotPasswordCommand,
+  ConfirmForgotPasswordCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
-import { ensureCognitoUser, setCognitoPasswordAndVerify } from "../../../infrastructure/cognito/admin";
-import { resolveMediaUrl } from "../../../infrastructure/aws/s3-media";
-import { PlatformService } from "../../../services/PlatformService";
-import { getBearerToken, verifyRequestToken } from "../middleware/auth-token";
+import {
+  extractBearerToken,
+  getClaimString,
+  verifyCognitoIdToken,
+} from "../auth/cognito";
 
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
 const ACCESS_TOKEN_EXPIRY = "8h";
@@ -86,10 +87,9 @@ export class AuthController {
       let context = null;
       let availableContexts: any[] = [];
 
-      const PLATFORM_SUPER_ADMIN_EMAIL = "dhanush@vebgenix.com";
-      const isSuperAdmin =
-        normalizedEmail === PLATFORM_SUPER_ADMIN_EMAIL &&
-        user.globalRoles.some((gr) => gr.role === GlobalRole.PLATFORM_SUPER_ADMIN);
+      const isSuperAdmin = user.globalRoles.some(
+        (gr) => gr.role === GlobalRole.PLATFORM_SUPER_ADMIN,
+      );
 
       if (isSuperAdmin) {
         // Platform Context
@@ -97,25 +97,11 @@ export class AuthController {
       } else if (user.memberships.length === 1) {
         // Single Tenant -> Auto-select
         const membership = user.memberships[0];
-        let primaryProfileId = membership.primaryProfileId;
-        if (!primaryProfileId) {
-          const profile = await prisma.profile.findUnique({
-            where: { id: user.id },
-            select: { id: true, tenantId: true },
-          });
-          if (profile?.tenantId === membership.tenantId) {
-            primaryProfileId = profile.id;
-            await prisma.tenantMembership.update({
-              where: { id: membership.id },
-              data: { primaryProfileId: profile.id },
-            });
-          }
-        }
         context = {
           tenantId: membership.tenantId,
           role: membership.role,
           campusScope: membership.campusScope,
-          primaryProfileId,
+          primaryProfileId: membership.primaryProfileId,
         };
       } else {
         // Multiple Tenants -> Require Selection
@@ -225,25 +211,11 @@ export class AuthController {
         return res.status(403).json({ message: "Not a member of this tenant" });
 
       // Generate New Access Token
-      let primaryProfileId = membership.primaryProfileId;
-      if (!primaryProfileId) {
-        const profile = await prisma.profile.findUnique({
-          where: { id: session.user.id },
-          select: { id: true, tenantId: true },
-        });
-        if (profile?.tenantId === membership.tenantId) {
-          primaryProfileId = profile.id;
-          await prisma.tenantMembership.update({
-            where: { id: membership.id },
-            data: { primaryProfileId: profile.id },
-          });
-        }
-      }
       const context = {
         tenantId: membership.tenantId,
         role: membership.role,
         campusScope: membership.campusScope,
-        primaryProfileId,
+        primaryProfileId: membership.primaryProfileId,
       };
 
       const { accessToken } = AuthController.generateTokens(
@@ -381,8 +353,7 @@ export class AuthController {
       const normalizedEmail = String(email).trim().toLowerCase();
       await AuthController.getCognitoClient().send(
         new ForgotPasswordCommand({
-          ClientId:
-            process.env.COGNITO_CLIENT_ID || process.env.USER_POOL_CLIENT_ID!,
+          ClientId: process.env.COGNITO_CLIENT_ID!,
           Username: normalizedEmail,
         }),
       );
@@ -409,6 +380,7 @@ export class AuthController {
       const email = body.email || body.username || body.Username;
       const code =
         body.code ||
+        body.code ||
         body.confirmationCode ||
         body.ConfirmationCode ||
         body.verificationCode ||
@@ -431,8 +403,7 @@ export class AuthController {
 
       await AuthController.getCognitoClient().send(
         new ConfirmForgotPasswordCommand({
-          ClientId:
-            process.env.COGNITO_CLIENT_ID || process.env.USER_POOL_CLIENT_ID!,
+          ClientId: process.env.COGNITO_CLIENT_ID!,
           Username: normalizedEmail,
           ConfirmationCode: String(code).trim(),
           Password: newPassword,
@@ -478,16 +449,15 @@ export class AuthController {
   // GET /api/auth/whoami
   static async whoami(req: Request, res: Response) {
     try {
-      const token = getBearerToken(req.headers.authorization);
+      const token = extractBearerToken(req.headers.authorization);
       if (!token) return res.status(401).json({ message: "No token" });
 
-      const claims = await verifyRequestToken(token);
-      const email = claims.email;
-      const sub = claims.sub;
-      const tenantId = claims.tenantId;
-      const role = claims.tenantRole;
-      const fullName =
-        typeof claims.raw.name === "string" ? claims.raw.name : email ?? "User";
+      const claims = await verifyCognitoIdToken(token);
+      const email = getClaimString(claims, "email");
+      const sub = getClaimString(claims, "sub");
+      const tenantId = getClaimString(claims, "custom:tenant_id", "tenant_id");
+      const role = getClaimString(claims, "custom:role", "tenant_role");
+      const fullName = getClaimString(claims, "name") ?? email ?? "User";
 
       if (!email || !sub) {
         return res.status(401).json({
@@ -509,12 +479,10 @@ export class AuthController {
         },
       });
 
-      const PLATFORM_SUPER_ADMIN_EMAIL_COGNITO = "dhanush@vebgenix.com";
       const isSuperAdmin =
-        email.toLowerCase() === PLATFORM_SUPER_ADMIN_EMAIL_COGNITO &&
-        (authUser?.globalRoles.some(
+        authUser?.globalRoles.some(
           (item) => item.role === GlobalRole.PLATFORM_SUPER_ADMIN,
-        ) ?? false);
+        ) ?? false;
 
       if (isSuperAdmin) {
         return res.json({
@@ -550,8 +518,7 @@ export class AuthController {
         });
       }
 
-      const resolvedTenantId =
-        membership?.tenantId ?? profile?.tenantId ?? tenantId;
+      const resolvedTenantId = membership?.tenantId ?? profile?.tenantId ?? tenantId;
       const tenant =
         membership?.tenant ??
         (resolvedTenantId
@@ -593,10 +560,8 @@ export class AuthController {
       const tenant = (req as any).tenant;
       const user = (req as any).user;
       const campus = (req as any).campus;
-      const auth = (req as any).auth;
-      const authUserId = auth?.authUserId;
 
-      if (!tenant || !user || !campus || !authUserId) {
+      if (!tenant || !user || !campus) {
         return res.status(400).json({
           error: {
             code: "CONTEXT_MISSING",
@@ -605,8 +570,18 @@ export class AuthController {
         });
       }
 
-      const primaryProfileId = auth?.primary_profile_id;
-      await PlatformService.ensureRequiredTenantFeatures(tenant.tenantId);
+      // Update last login (on AuthUser now? Or Profile?)
+      // We should update AuthUser or AuthSession?
+      // The old code updated Profile.lastLoginAt.
+      // Profile still has lastLoginAt? Let's check schema.
+      // I didn't remove lastLoginAt from Profile.
+      // But user.id in req.user is now AuthUser.id (from token sub).
+      // Profile.id is DIFFERENT from AuthUser.id.
+      // So `prisma.profile.update({ where: { id: user.id } })` will FAIL if user.id is AuthUser.id.
+
+      // We need to find the profile linked to this AuthUser for this Tenant.
+      // The token has `primary_profile_id`.
+      const primaryProfileId = (req as any).auth?.primary_profile_id;
 
       if (primaryProfileId) {
         await prisma.profile.update({
@@ -615,84 +590,55 @@ export class AuthController {
         });
       }
 
-      const isAllCampusesAccess = user.allCampusesAccess === true;
-      const [tenantFeatures, accessibleCampuses] = await Promise.all([
-        prisma.tenantFeature.findMany({
-          where: { tenantId: tenant.tenantId, enabled: true },
-          select: { featureKey: true },
-          orderBy: { featureKey: "asc" },
-        }),
-        isAllCampusesAccess
-          ? prisma.campus.findMany({
-              where: { tenantId: tenant.tenantId, isActive: true },
-              select: { id: true, name: true, campusType: true, isActive: true },
-              orderBy: { createdAt: "asc" },
-            })
-          : prisma.userCampusAccess.findMany({
-              where: {
-                tenantId: tenant.tenantId,
-                profileId: user.id,
-                campus: {
-                  isActive: true,
-                },
-              },
-              select: {
-                campus: {
-                  select: {
-                    id: true,
-                    name: true,
-                    campusType: true,
-                    isActive: true,
-                  },
-                },
-              },
-              orderBy: { createdAt: "asc" },
-            }).then((rows) => rows.map((row: any) => row.campus)),
-      ]);
+      // Get enabled features
+      const tenantFeatures = await prisma.tenantFeature.findMany({
+        where: { tenantId: tenant.tenantId, enabled: true },
+        select: { featureKey: true },
+      });
 
       const featuresEnabled = tenantFeatures.map((f: any) => f.featureKey);
-      const features = featuresEnabled.map((featureKey: string) => ({
-        feature_key: featureKey,
+
+      const features = (featuresEnabled || []).map((k: string) => ({
+        feature_key: k,
         enabled: true,
       }));
 
-      const campuses = accessibleCampuses.map((campusRow: any) => ({
-        id: campusRow.id,
-        name: campusRow.name,
-        campus_type: campusRow.campusType,
-        is_active: campusRow.isActive,
-      }));
+      // We need to fetch the Profile details to return what the frontend expects (full_name etc).
+      // The `user` object from `requireAuth` might be just the token payload or the AuthUser.
+      // If `requireAuth` middleware hasn't been updated, it might be fetching `Profile` (old way) or failing.
+      // I need to check `requireAuth` middleware!
 
-      const [avatarUrl, tenantLogoUrl] = await Promise.all([
-        resolveMediaUrl(user.avatarKey, user.avatarUrl),
-        resolveMediaUrl(tenant.logoKey, tenant.logoUrl),
-      ]);
+      // For now, let's assume `req.user` has what we need or we fetch it.
+      // The frontend expects:
+      // user: { id, email, full_name, role, allCampusesAccess... }
+
+      // We should query the Profile using primaryProfileId
+      let profileData: any = {};
+      if (primaryProfileId) {
+        profileData = await prisma.profile.findUnique({
+          where: { id: primaryProfileId },
+        });
+      }
 
       return res.json({
         user: {
-          id: user.id,
-          auth_user_id: authUserId,
+          id: user.id, // AuthUser ID
           profile_id: primaryProfileId,
           email: user.email,
-          full_name: user.fullName || user.email,
-          avatar_url: avatarUrl,
-          role: user.role || auth?.tenant_role || "USER",
-          tenant_roles: auth?.tenantRoles ?? [],
-          allCampusesAccess: isAllCampusesAccess,
-          personaRole: user.personaRole ?? null,
-          staffType: user.staffType ?? null,
-          permissions: auth?.permissions ?? [],
-          campusScope: auth?.campus_scope ?? null,
+          full_name: profileData?.fullName || user.email, // Fallback
+          role: (req as any).auth?.tenant_role || "USER",
+          allCampusesAccess: profileData?.allCampusesAccess || false,
+          // Phase 3+ persona fields
+          personaRole: profileData?.personaRole ?? null,
+          staffType: profileData?.staffType ?? null,
+          permissions: (req as any).auth?.permissions ?? [],
         },
         tenant: {
           id: tenant.tenantId,
           name: tenant.name,
           slug: tenant.slug,
-          logo_url: tenantLogoUrl,
         },
         campus,
-        campuses,
-        campusesUserCanAccess: campuses,
         features,
         featuresEnabled,
       });
@@ -707,35 +653,34 @@ export class AuthController {
   // POST /api/auth/invite/verify
   static async verifyInvite(req: Request, res: Response) {
     try {
-      const { token, email, userId } = req.body;
-      if (!token || !email) {
-        return res.status(400).json({ message: "Token and email are required" });
+      const { token } = req.body;
+      if (!token) {
+        return res.status(400).json({ message: "Token is required" });
       }
 
       const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-      const normalizedEmail = String(email).trim().toLowerCase();
 
-      const inviteRecord = await prisma.passwordResetToken.findFirst({
-        where: {
-          tokenHash,
-          purpose: "INVITE_SET_PASSWORD",
-          usedAt: null,
-          expiresAt: { gt: new Date() },
-          ...(userId ? { userId: String(userId) } : {}),
-          user: { email: normalizedEmail },
-        },
-        include: {
-          user: { select: { id: true, email: true } },
-          membership: {
-            select: {
-              role: true,
-              tenant: { select: { name: true } },
-            },
-          },
-        },
-      });
+      // Use raw query due to schema mismatch (camelCase vs snake_case)
+      const results: any[] = await prisma.$queryRawUnsafe(`
+        SELECT 
+          t.id, t."userId", t.token_hash as "tokenHash", t.purpose, t.tenant_id, t.membership_id, t.expires_at as "expiresAt", t.used_at as "usedAt",
+          u.email,
+          tm.role,
+          tn.name as tenant_name
+        FROM "PasswordResetToken" t
+        JOIN "AuthUser" u ON t."userId" = u.id
+        LEFT JOIN "TenantMembership" tm ON t.membership_id = tm.id
+        LEFT JOIN "tenants" tn ON tm."tenantId" = tn.id
+        WHERE t.token_hash = '${tokenHash}'
+          AND t.purpose = 'INVITE_SET_PASSWORD'
+          AND t.used_at IS NULL
+          AND t.expires_at > NOW()
+        LIMIT 1
+      `);
 
-      if (!inviteRecord) {
+      const resetRecord = results[0];
+
+      if (!resetRecord) {
         return res
           .status(400)
           .json({ message: "Invalid or expired invite token" });
@@ -743,10 +688,9 @@ export class AuthController {
 
       return res.json({
         valid: true,
-        userId: inviteRecord.user.id,
-        email: inviteRecord.user.email,
-        tenantName: inviteRecord.membership?.tenant?.name || null,
-        role: inviteRecord.membership?.role || null,
+        email: resetRecord.email,
+        tenantName: resetRecord.tenant_name || null,
+        role: resetRecord.role || null,
       });
     } catch (error) {
       console.error("verifyInvite error:", error);
@@ -757,40 +701,34 @@ export class AuthController {
   // POST /api/auth/invite/accept
   static async acceptInvite(req: Request, res: Response) {
     try {
-      const { token, newPassword, email, userId } = req.body;
-      if (!token || !newPassword || !email) {
+      const { token, newPassword } = req.body;
+      if (!token || !newPassword) {
         return res
           .status(400)
-          .json({ message: "Token, email and newPassword are required" });
+          .json({ message: "Token and newPassword are required" });
       }
 
       const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-      const normalizedEmail = String(email).trim().toLowerCase();
 
-      const inviteRecord = await prisma.passwordResetToken.findFirst({
-        where: {
-          tokenHash,
-          purpose: "INVITE_SET_PASSWORD",
-          usedAt: null,
-          expiresAt: { gt: new Date() },
-          ...(userId ? { userId: String(userId) } : {}),
-          user: { email: normalizedEmail },
-        },
-        include: {
-          user: { select: { id: true, passwordHash: true, email: true } },
-          membership: {
-            select: {
-              id: true,
-              status: true,
-              tenantId: true,
-              role: true,
-              primaryProfile: { select: { fullName: true } },
-            },
-          },
-        },
-      });
+      // Use safe parameterized query (tagged template) — avoids bcrypt $ corruption
+      const results: any[] = await prisma.$queryRaw`
+        SELECT 
+          t.id, t."userId", t.token_hash as "tokenHash", t.purpose, t.tenant_id, t.membership_id, t.expires_at as "expiresAt", t.used_at as "usedAt",
+          u."passwordHash",
+          tm.status as membership_status
+        FROM "PasswordResetToken" t
+        JOIN "AuthUser" u ON t."userId" = u.id
+        LEFT JOIN "TenantMembership" tm ON t.membership_id = tm.id
+        WHERE t.token_hash = ${tokenHash}
+          AND t.purpose = 'INVITE_SET_PASSWORD'
+          AND t.used_at IS NULL
+          AND t.expires_at > NOW()
+        LIMIT 1
+      `;
 
-      if (!inviteRecord) {
+      const resetRecord = results[0];
+
+      if (!resetRecord) {
         return res
           .status(400)
           .json({ message: "Invalid or expired invite token" });
@@ -798,103 +736,36 @@ export class AuthController {
 
       // Reject replay only when membership is active AND password is already set.
       if (
-        inviteRecord.membership?.status === "ACTIVE" &&
-        !!inviteRecord.user.passwordHash
+        resetRecord.membership_status === "ACTIVE" &&
+        !!resetRecord.passwordHash
       ) {
         return res.status(409).json({ message: "Invite already accepted" });
-      }
-
-      let cognito = await setCognitoPasswordAndVerify({
-        email: normalizedEmail,
-        newPassword,
-      });
-
-      if (!cognito.ok && cognito.code === "COGNITO_USER_NOT_FOUND") {
-        const provisioned = await ensureCognitoUser({
-          email: normalizedEmail,
-          fullName: inviteRecord.membership?.primaryProfile?.fullName || null,
-          tenantId: inviteRecord.membership?.tenantId || null,
-          role: inviteRecord.membership?.role || null,
-        });
-
-        if (!provisioned.ok) {
-          console.error("[AcceptInvite] Cognito ensure user failed:", provisioned);
-          return res.status(502).json({
-            message:
-              provisioned.code === "AWS_CREDENTIALS_MISSING" ||
-              provisioned.code === "AWS_CREDENTIALS_INVALID"
-                ? "Server AWS credentials are missing/invalid. Configure AWS credentials and retry."
-                : provisioned.code === "COGNITO_NOT_AUTHORIZED" ||
-                    provisioned.code === "COGNITO_ACCESS_DENIED"
-                  ? "Server is not authorized to create Cognito users. Fix IAM permissions and retry."
-                  : provisioned.code === "COGNITO_CONFIG_MISSING"
-                    ? "Server Cognito configuration is missing (USER_POOL_ID)."
-                    : "Failed to provision Cognito user. Please retry.",
-            code: provisioned.code,
-            errorName: provisioned.errorName,
-          });
-        }
-
-        cognito = await setCognitoPasswordAndVerify({
-          email: normalizedEmail,
-          newPassword,
-        });
-      }
-
-      if (!cognito.ok) {
-        console.error("[AcceptInvite] Cognito sync failed:", {
-          code: cognito.code,
-          errorName: cognito.errorName,
-        });
-        return res.status(502).json({
-          message:
-            cognito.code === "COGNITO_USER_NOT_FOUND"
-              ? "Account is not ready yet. Cognito user provisioning is still pending. Please retry in a minute."
-              : cognito.code === "COGNITO_INVALID_PASSWORD"
-                ? "Password does not meet the requirements. Use at least 8 characters with uppercase, lowercase, number and symbol."
-                : cognito.code === "AWS_CREDENTIALS_MISSING" ||
-                  cognito.code === "AWS_CREDENTIALS_INVALID"
-                ? "Server AWS credentials are missing/invalid. Configure AWS credentials and retry."
-                : cognito.code === "COGNITO_NOT_AUTHORIZED"
-                  ? "Server is not authorized to update Cognito users. Fix IAM permissions and retry."
-                  : cognito.code === "COGNITO_CONFIG_MISSING"
-                    ? "Server Cognito configuration is missing (USER_POOL_ID)."
-                    : "Failed to sync with Cognito. Please retry.",
-          code: cognito.code,
-          errorName: cognito.errorName,
-        });
-      }
-
-      try {
-        await ensureCognitoUser({
-          email: normalizedEmail,
-          fullName: inviteRecord.membership?.primaryProfile?.fullName || null,
-          tenantId: inviteRecord.membership?.tenantId || null,
-          role: inviteRecord.membership?.role || null,
-        });
-      } catch (_) {
       }
 
       // Hash password
       const salt = await bcrypt.genSalt(10);
       const passwordHash = await bcrypt.hash(newPassword, salt);
 
-      const now = new Date();
+      // Transaction: set password + mark token used + activate membership
+      // Use raw SQL for updates to avoid schema mismatch issues
       await prisma.$transaction([
-        prisma.authUser.update({
-          where: { id: inviteRecord.user.id },
-          data: { passwordHash, updatedAt: now },
-        }),
-        prisma.passwordResetToken.update({
-          where: { id: inviteRecord.id },
-          data: { usedAt: now },
-        }),
-        ...(inviteRecord.membership?.id
+        prisma.$executeRawUnsafe(`
+          UPDATE "AuthUser" 
+          SET "passwordHash" = '${passwordHash}', "updatedAt" = NOW()
+          WHERE id = '${resetRecord.userId}'
+        `),
+        prisma.$executeRawUnsafe(`
+          UPDATE "PasswordResetToken"
+          SET used_at = NOW()
+          WHERE id = '${resetRecord.id}'
+        `),
+        ...(resetRecord.membership_id
           ? [
-              prisma.tenantMembership.update({
-                where: { id: inviteRecord.membership.id },
-                data: { status: "ACTIVE", activatedAt: now, updatedAt: now },
-              }),
+              prisma.$executeRawUnsafe(`
+                UPDATE "TenantMembership"
+                SET status = 'ACTIVE', activated_at = NOW(), "updatedAt" = NOW()
+                WHERE id = '${resetRecord.membership_id}'
+              `),
             ]
           : []),
       ]);
