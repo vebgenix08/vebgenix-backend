@@ -177,23 +177,41 @@ export async function setCognitoPasswordAndVerify(input: {
     return { ok: false, code: "COGNITO_GET_USER_FAILED", errorName: name };
   }
 
-  await client.send(
-    new AdminSetUserPasswordCommand({
-      UserPoolId: userPoolId,
-      Username: email,
-      Password: input.newPassword,
-      Permanent: true,
-    }),
-  );
+  try {
+    await client.send(
+      new AdminSetUserPasswordCommand({
+        UserPoolId: userPoolId,
+        Username: email,
+        Password: input.newPassword,
+        Permanent: true,
+      }),
+    );
+  } catch (e: any) {
+    const name = e?.name || e?.Code;
+    if (name === "InvalidPasswordException" || name === "InvalidParameterException") {
+      return { ok: false, code: "COGNITO_INVALID_PASSWORD", errorName: name };
+    }
+    if (name === "NotAuthorizedException") {
+      return { ok: false, code: "COGNITO_NOT_AUTHORIZED", errorName: name };
+    }
+    if (name === "UnrecognizedClientException") {
+      return { ok: false, code: "AWS_CREDENTIALS_INVALID", errorName: name };
+    }
+    return { ok: false, code: "COGNITO_SET_PASSWORD_FAILED", errorName: name };
+  }
 
-  const attrs: AttributeType[] = [{ Name: "email_verified", Value: "true" }];
-  await client.send(
-    new AdminUpdateUserAttributesCommand({
-      UserPoolId: userPoolId,
-      Username: email,
-      UserAttributes: attrs,
-    }),
-  );
+  try {
+    const attrs: AttributeType[] = [{ Name: "email_verified", Value: "true" }];
+    await client.send(
+      new AdminUpdateUserAttributesCommand({
+        UserPoolId: userPoolId,
+        Username: email,
+        UserAttributes: attrs,
+      }),
+    );
+  } catch (_) {
+    // Non-fatal: email_verified update failure should not block invite acceptance
+  }
 
   try {
     await client.send(new AdminConfirmSignUpCommand({ UserPoolId: userPoolId, Username: email }));

@@ -847,7 +847,9 @@ export class AuthController {
           message:
             cognito.code === "COGNITO_USER_NOT_FOUND"
               ? "Account is not ready yet. Cognito user provisioning is still pending. Please retry in a minute."
-              : cognito.code === "AWS_CREDENTIALS_MISSING" ||
+              : cognito.code === "COGNITO_INVALID_PASSWORD"
+                ? "Password does not meet the requirements. Use at least 8 characters with uppercase, lowercase, number and symbol."
+                : cognito.code === "AWS_CREDENTIALS_MISSING" ||
                   cognito.code === "AWS_CREDENTIALS_INVALID"
                 ? "Server AWS credentials are missing/invalid. Configure AWS credentials and retry."
                 : cognito.code === "COGNITO_NOT_AUTHORIZED"
