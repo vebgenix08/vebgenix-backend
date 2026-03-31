@@ -37,28 +37,28 @@ class EmailService {
     const {
       SMTP_HOST,
       SMTP_PORT,
-      SMTP_EMAIL,
-      SMTP_APP_PASSWORD,
+      SMTP_USER,
+      SMTP_PASS,
       SMTP_FROM
     } = process.env;
 
-    if (!SMTP_HOST || !SMTP_PORT || !SMTP_EMAIL || !SMTP_APP_PASSWORD) {
+    if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
       console.warn('[EmailService] SMTP credentials not configured. Emails will not be sent.');
-      console.warn('DEBUG: SMTP_HOST:', SMTP_HOST, 'SMTP_PORT:', SMTP_PORT, 'SMTP_EMAIL:', SMTP_EMAIL);
+      console.warn('DEBUG: SMTP_HOST:', SMTP_HOST, 'SMTP_PORT:', SMTP_PORT, 'SMTP_USER:', SMTP_USER);
       return;
     }
 
-    console.log('[EmailService] SMTP initialized with:', SMTP_HOST, SMTP_PORT, SMTP_EMAIL);
+    console.log('[EmailService] SMTP initialized with:', SMTP_HOST, SMTP_PORT, SMTP_USER);
 
     this.config = {
       host: SMTP_HOST,
       port: parseInt(SMTP_PORT, 10),
       secure: parseInt(SMTP_PORT, 10) === 465,
       auth: {
-        user: SMTP_EMAIL,
-        pass: SMTP_APP_PASSWORD
+        user: SMTP_USER,
+        pass: SMTP_PASS
       },
-      from: SMTP_FROM || SMTP_EMAIL
+      from: SMTP_FROM || SMTP_USER
     };
 
     this.transporter = nodemailer.createTransport(this.config);
