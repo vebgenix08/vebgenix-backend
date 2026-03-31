@@ -224,6 +224,23 @@ jobs:
             VebgenixMonitoring-prod \
             -c env=prod -c enableNewResolvers=true --require-approval never --exclusively
 
+      - name: Bootstrap SMTP SSM parameters in prod account
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+        run: |
+          set -euo pipefail
+          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_HOST" --value "$SMTP_HOST" --type String --overwrite --region ap-south-1
+          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_PORT" --value "$SMTP_PORT" --type String --overwrite --region ap-south-1
+          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_USER" --value "$SMTP_USER" --type String --overwrite --region ap-south-1
+          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_PASS" --value "$SMTP_PASS" --type SecureString --overwrite --region ap-south-1
+          aws ssm put-parameter --name "/vebgenix/prod/rest/SMTP_FROM" --value "$SMTP_FROM" --type String --overwrite --region ap-south-1
+          aws ssm put-parameter --name "/vebgenix/prod/rest/APP_NAME" --value "Vebgenix" --type String --overwrite --region ap-south-1
+          echo "SMTP SSM parameters bootstrapped in prod account."
+
       - name: Package backend artifact
         run: |
           set -euo pipefail
