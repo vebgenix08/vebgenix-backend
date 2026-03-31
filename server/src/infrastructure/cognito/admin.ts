@@ -54,6 +54,22 @@ export async function ensureCognitoUser(input: {
     await client.send(
       new AdminGetUserCommand({ UserPoolId: userPoolId, Username: email }),
     );
+    // User exists — update custom attributes and group
+    const updateAttrs: AttributeType[] = [
+      { Name: "email_verified", Value: "true" },
+      ...(input.tenantId ? [{ Name: "custom:tenant_id", Value: input.tenantId }] : []),
+      ...(input.role ? [{ Name: "custom:role", Value: input.role }] : []),
+      ...(input.fullName ? [{ Name: "name", Value: input.fullName }] : []),
+    ];
+    try {
+      await client.send(
+        new AdminUpdateUserAttributesCommand({
+          UserPoolId: userPoolId,
+          Username: email,
+          UserAttributes: updateAttrs,
+        }),
+      );
+    } catch (_) {}
     const groupName = input.role ? String(input.role).toUpperCase() : null;
     if (groupName) {
       try {
@@ -64,8 +80,7 @@ export async function ensureCognitoUser(input: {
             GroupName: groupName,
           }),
         );
-      } catch (_) {
-      }
+      } catch (_) {}
     }
     return { ok: true };
   } catch (e: any) {
