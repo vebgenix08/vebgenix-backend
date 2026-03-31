@@ -85,54 +85,35 @@ export const requireAuth = async (
         return;
       }
 
-      // Fetch Profile
+      // Fetch Profile — use DB-resolved authUser.id, not Cognito sub
       let profile = null;
-      if (primaryProfileId) {
-        profile = await prisma.profile.findUnique({
-          where: { id: primaryProfileId },
+
+      // 1. Try via membership's primaryProfile (already included in authUser query)
+      const membership = authUser?.memberships.find(
+        (m) => m.tenantId === tenantIdFromToken,
+      );
+      if (membership?.primaryProfile) {
+        profile = membership.primaryProfile;
+      }
+
+      // 2. Try profile by DB AuthUser id
+      if (!profile && authUser?.id) {
+        const byDbId = await prisma.profile.findUnique({
+          where: { id: authUser.id },
         });
-      } else {
-        // Fallback: Find profile via TenantMembership
-        // We need to find the membership first to get the primaryProfileId (if it exists)
-        // or just use the AuthUser ID if that was how it was set up.
-        // BUT wait, AuthUser ID != Profile ID usually.
-        // Let's check TenantMembership.
-        const membership =
-          authUser?.memberships.find(
-            (item) => item.tenantId === tenantIdFromToken,
-          ) ??
-          (await prisma.tenantMembership.findFirst({
-            where: {
-              userId: authUserId ?? "",
-              tenantId: tenantIdFromToken,
-              status: "ACTIVE",
-            },
-            include: { primaryProfile: true },
-          }));
-        
-        if (membership?.primaryProfile) {
-            profile = membership.primaryProfile;
-        } else {
-            // Last resort: Check if a Profile exists with ID = AuthUser ID (legacy)
-             profile =
-               (authUserId
-                 ? await prisma.profile.findUnique({
-                     where: { id: authUserId },
-                   })
-                 : null) ??
-               (authEmail
-                 ? await prisma.profile.findFirst({
-                     where: {
-                       email: authEmail.toLowerCase(),
-                       tenantId: tenantIdFromToken,
-                     },
-                   })
-                 : null);
-            // Verify it belongs to this tenant
-            if (profile && profile.tenantId !== tenantIdFromToken) {
-                profile = null;
-            }
+        if (byDbId && byDbId.tenantId === tenantIdFromToken) {
+          profile = byDbId;
         }
+      }
+
+      // 3. Try by email + tenantId
+      if (!profile && authEmail) {
+        profile = await prisma.profile.findFirst({
+          where: {
+            email: authEmail.toLowerCase(),
+            tenantId: tenantIdFromToken,
+          },
+        });
       }
 
       if (profile) {
