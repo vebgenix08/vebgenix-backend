@@ -4,7 +4,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const email = process.env.SUPER_ADMIN_EMAIL || 'admin@vebgenix.com';
-  
+
   console.log(`Bootstrapping Super Admin: ${email}`);
 
   // 1. Create AuthUser
@@ -32,8 +32,26 @@ async function main() {
     }
   });
 
-  console.log(`Super Admin Created: ${user.id}`);
-  console.log('Ensure this email exists in your Cognito User Pool to log in.');
+  // 3. Remove PLATFORM_SUPER_ADMIN from any other users that shouldn't have it
+  const wrongSuperAdmins = await prisma.authUserGlobalRole.findMany({
+    where: {
+      role: 'PLATFORM_SUPER_ADMIN',
+      userId: { not: user.id },
+    },
+    include: { user: { select: { email: true } } },
+  });
+
+  for (const record of wrongSuperAdmins) {
+    console.warn(`Removing PLATFORM_SUPER_ADMIN from wrong user: ${record.user.email}`);
+    await prisma.authUserGlobalRole.delete({
+      where: { userId_role: { userId: record.userId, role: 'PLATFORM_SUPER_ADMIN' } },
+    });
+  }
+
+  console.log(`Super Admin ready: ${email} (${user.id})`);
+  if (wrongSuperAdmins.length > 0) {
+    console.log(`Cleaned up ${wrongSuperAdmins.length} incorrect super admin record(s).`);
+  }
 }
 
 main()
