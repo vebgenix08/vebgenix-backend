@@ -247,6 +247,45 @@ export async function createCampus(req: Request, res: Response): Promise<void> {
 }
 
 /**
+ * PATCH /api/tenant/campuses/:campusId
+ * ADMIN only - Update campus details
+ */
+export async function updateCampus(req: Request, res: Response): Promise<void> {
+  try {
+    const tenant = (req as any).tenant;
+    if (!tenant) {
+      res.status(500).json({ error: { code: "MIDDLEWARE_ERROR", message: "Tenant not resolved" } });
+      return;
+    }
+
+    const { campusId } = req.params;
+    const { name, campus_type, isActive } = req.body;
+
+    // Verify campus belongs to tenant
+    const existing = await prisma.campus.findUnique({ where: { id: campusId } });
+    if (!existing || existing.tenantId !== tenant.tenantId) {
+      res.status(404).json({ error: { code: "NOT_FOUND", message: "Campus not found" } });
+      return;
+    }
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (campus_type !== undefined) updateData.campusType = campus_type as CampusType;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const campus = await prisma.campus.update({
+      where: { id: campusId },
+      data: updateData,
+    });
+
+    res.json({ campus });
+  } catch (error) {
+    console.error("Update campus error:", error);
+    res.status(500).json({ error: { code: "INTERNAL_ERROR", message: "Failed to update campus" } });
+  }
+}
+
+/**
  * PATCH /api/tenant/features
  * ADMIN only - Update feature flags
  */
