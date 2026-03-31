@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 
 export const emailService = {
-  async sendInviteEmail(to: string, inviteLink: string, tenantName: string = 'Our Organization', loginUrl: string = `${process.env.FRONTEND_URL || 'https://app.vebgenix.com'}/login`): Promise<boolean> {
+  async sendInviteEmail(to: string, inviteLink: string, tenantName: string = 'Our Organization', loginUrl: string = `${process.env.FRONTEND_URL || 'https://d18w0fdwt58ts4.cloudfront.net'}/login`): Promise<boolean> {
       try {
           const subject = `You've been invited to join ${tenantName}`;
           const body = `

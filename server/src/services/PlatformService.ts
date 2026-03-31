@@ -538,7 +538,7 @@ export class PlatformService {
           },
         });
 
-        const appBaseUrl = process.env.FRONTEND_URL || "https://app.vebgenix.com";
+        const appBaseUrl = process.env.FRONTEND_URL || "https://d18w0fdwt58ts4.cloudfront.net";
         inviteLink = `${appBaseUrl}/invite/accept?${new URLSearchParams({
           token: code,
           email: emailLower,
@@ -989,7 +989,7 @@ export class PlatformService {
           },
         });
 
-        const appBaseUrl = process.env.FRONTEND_URL || "https://app.vebgenix.com";
+        const appBaseUrl = process.env.FRONTEND_URL || "https://d18w0fdwt58ts4.cloudfront.net";
         inviteLink = `${appBaseUrl}/invite/accept?${new URLSearchParams({
           token: code,
           email: emailLower,
@@ -1095,7 +1095,7 @@ export class PlatformService {
       },
     });
 
-    const appBaseUrl = process.env.FRONTEND_URL || "https://app.vebgenix.com";
+    const appBaseUrl = process.env.FRONTEND_URL || "https://d18w0fdwt58ts4.cloudfront.net";
     const qs = new URLSearchParams({ token: code, uid: userId });
     if (profile.email) qs.set("email", profile.email);
     const inviteLink = `${appBaseUrl}/invite/accept?${qs.toString()}`;

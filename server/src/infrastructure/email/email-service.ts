@@ -24,7 +24,7 @@ export class EmailService {
     type: "STAFF" | "STUDENT" | "GUARDIAN",
     opts?: { userId?: string },
   ) {
-    const base = process.env.FRONTEND_URL || "https://app.vebgenix.com";
+    const base = process.env.FRONTEND_URL || "https://d18w0fdwt58ts4.cloudfront.net";
     const userId = opts?.userId;
     const qs = new URLSearchParams();
     qs.set("token", token);

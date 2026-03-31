@@ -660,7 +660,7 @@ export class PlatformController {
 
       // TODO: Replace Supabase Magic Link with a local token or other mechanism if needed
       // For now, return a placeholder or "Not Implemented"
-      const frontendBase = process.env.FRONTEND_URL || "https://app.vebgenix.com";
+      const frontendBase = process.env.FRONTEND_URL || "https://d18w0fdwt58ts4.cloudfront.net";
       const impersonationUrl = `${frontendBase}/auth/callback?token=mock-impersonation-token&type=magiclink`;
 
       return res.json({ data: { impersonation_url: impersonationUrl } });

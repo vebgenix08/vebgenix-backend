@@ -15,7 +15,7 @@ const ALLOWED_TENANT_ROLES = [
 ];
 // Fallback constant if env var is missing
 const DEFAULT_APP_BASE_URL =
-  process.env.FRONTEND_URL || "https://app.vebgenix.com";
+  process.env.FRONTEND_URL || "https://d18w0fdwt58ts4.cloudfront.net";
 
 // Helper for email validation
 const isValidEmail = (email: string): boolean => {

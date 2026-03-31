@@ -6,7 +6,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { TemplateType } from "@prisma/client";
 
-const APP_BASE_URL = process.env.FRONTEND_URL || "https://app.vebgenix.com";
+const APP_BASE_URL = process.env.FRONTEND_URL || "https://d18w0fdwt58ts4.cloudfront.net";
 const ADMIN_FALLBACK_EMAIL =
   process.env.ADMIN_FALLBACK_EMAIL || "dhanushags1567@gmail.com";
 const ANON_USER_ID = "00000000-0000-0000-0000-000000000000";
