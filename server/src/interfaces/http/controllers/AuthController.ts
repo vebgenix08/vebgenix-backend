@@ -86,9 +86,10 @@ export class AuthController {
       let context = null;
       let availableContexts: any[] = [];
 
-      const isSuperAdmin = user.globalRoles.some(
-        (gr) => gr.role === GlobalRole.PLATFORM_SUPER_ADMIN,
-      );
+      const PLATFORM_SUPER_ADMIN_EMAIL = "dhanush@vebgenix.com";
+      const isSuperAdmin =
+        normalizedEmail === PLATFORM_SUPER_ADMIN_EMAIL &&
+        user.globalRoles.some((gr) => gr.role === GlobalRole.PLATFORM_SUPER_ADMIN);
 
       if (isSuperAdmin) {
         // Platform Context
@@ -508,10 +509,12 @@ export class AuthController {
         },
       });
 
+      const PLATFORM_SUPER_ADMIN_EMAIL_COGNITO = "dhanush@vebgenix.com";
       const isSuperAdmin =
-        authUser?.globalRoles.some(
+        email.toLowerCase() === PLATFORM_SUPER_ADMIN_EMAIL_COGNITO &&
+        (authUser?.globalRoles.some(
           (item) => item.role === GlobalRole.PLATFORM_SUPER_ADMIN,
-        ) ?? false;
+        ) ?? false);
 
       if (isSuperAdmin) {
         return res.json({
