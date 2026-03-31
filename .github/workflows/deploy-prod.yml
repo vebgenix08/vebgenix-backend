@@ -226,11 +226,14 @@ jobs:
       - name: Deploy Remaining Stacks (excluding AppSync)
         working-directory: aws-infrastructure
         run: |
+          # Deploy Network first to ensure VPC exports are current, then the rest
           npx cdk deploy \
+            VebgenixNetwork-prod \
             VebgenixAuth-prod \
             VebgenixStorage-prod \
             VebgenixAsync-prod \
             VebgenixMonitoring-prod \
+            VebgenixRestApi-prod \
             -c env=prod -c enableNewResolvers=true --require-approval never --exclusively
 
       - name: Package backend artifact
