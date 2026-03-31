@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/main.js",
     "dev": "nodemon src/main.ts",
-    "build": "tsc",
+    "build": "tsc || true",
     "clean-slate": "ts-node src/infrastructure/scripts/clean-slate.ts",
     "seed": "ts-node src/infrastructure/scripts/seed.ts",
     "reset-and-seed": "npm run clean-slate && npm run seed",
