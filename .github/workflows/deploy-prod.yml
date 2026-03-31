@@ -225,6 +225,58 @@ jobs:
             VebgenixRestApi-prod \
             -c env=prod -c enableNewResolvers=true --require-approval never --exclusively
 
+      - name: Seed super admin Cognito user in prod
+        run: |
+          set -euo pipefail
+          USER_POOL_ID=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixAuth-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue | [0]" \
+            --output text --region ap-south-1)
+          SUPER_ADMIN_EMAIL="dhanushags08@gmail.com"
+
+          # Create or update super admin in Cognito
+          if aws cognito-idp admin-get-user --user-pool-id "$USER_POOL_ID" --username "$SUPER_ADMIN_EMAIL" --region ap-south-1 > /dev/null 2>&1; then
+            echo "Super admin Cognito user already exists, updating attributes..."
+            aws cognito-idp admin-update-user-attributes \
+              --user-pool-id "$USER_POOL_ID" \
+              --username "$SUPER_ADMIN_EMAIL" \
+              --user-attributes Name=email_verified,Value=true \
+              --region ap-south-1
+          else
+            echo "Creating super admin Cognito user..."
+            aws cognito-idp admin-create-user \
+              --user-pool-id "$USER_POOL_ID" \
+              --username "$SUPER_ADMIN_EMAIL" \
+              --message-action SUPPRESS \
+              --user-attributes Name=email,Value="$SUPER_ADMIN_EMAIL" Name=email_verified,Value=true \
+              --region ap-south-1
+          fi
+
+          # Add to PLATFORM_SUPER_ADMIN group
+          aws cognito-idp admin-add-user-to-group \
+            --user-pool-id "$USER_POOL_ID" \
+            --username "$SUPER_ADMIN_EMAIL" \
+            --group-name PLATFORM_SUPER_ADMIN \
+            --region ap-south-1 || true
+          echo "Super admin Cognito user seeded."
+
+      - name: Bootstrap Cognito SSM parameters in prod account
+        run: |
+          set -euo pipefail
+          USER_POOL_ID=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixAuth-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue | [0]" \
+            --output text --region ap-south-1)
+          USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixAuth-prod \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue | [0]" \
+            --output text --region ap-south-1)
+          aws ssm put-parameter --name "/vebgenix/prod/rest/USER_POOL_ID" --value "$USER_POOL_ID" --type String --overwrite --region ap-south-1
+          aws ssm put-parameter --name "/vebgenix/prod/rest/USER_POOL_CLIENT_ID" --value "$USER_POOL_CLIENT_ID" --type String --overwrite --region ap-south-1
+          aws ssm put-parameter --name "/vebgenix/prod/frontend/VITE_USER_POOL_ID" --value "$USER_POOL_ID" --type String --overwrite --region ap-south-1
+          aws ssm put-parameter --name "/vebgenix/prod/frontend/VITE_USER_POOL_CLIENT_ID" --value "$USER_POOL_CLIENT_ID" --type String --overwrite --region ap-south-1
+          echo "Cognito SSM parameters bootstrapped: USER_POOL_ID=$USER_POOL_ID"
+
       - name: Bootstrap SMTP SSM parameters in prod account
         env:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
@@ -402,6 +454,7 @@ jobs:
                 "npx prisma db push --accept-data-loss --schema=prisma/schema.prisma",
                 "npx prisma generate --schema=prisma/schema.prisma",
                 "npm run seed:permissions",
+                "SUPER_ADMIN_EMAIL=dhanushags08@gmail.com npm run seed:super-admin",
                 "npm run build",
               "cat >/etc/systemd/system/vebgenix-rest.service <<'EOF'\n[Unit]\nDescription=Vebgenix REST API\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nUser=ec2-user\nWorkingDirectory=/opt/vebgenix/app/server\nEnvironmentFile=/etc/vebgenix-rest.env\nExecStart=/usr/local/bin/node /opt/vebgenix/app/server/dist/src/main.js\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOF",
               "systemctl daemon-reload",

@@ -11,6 +11,7 @@
     "seed": "ts-node src/infrastructure/scripts/seed.ts",
     "reset-and-seed": "npm run clean-slate && npm run seed",
     "seed:permissions": "ts-node --project tsconfig.json scripts/seed-permissions.ts",
+    "seed:super-admin": "ts-node --project tsconfig.json src/infrastructure/scripts/bootstrap-super-admin.ts",
     "backfill:persona": "ts-node --project tsconfig.json scripts/backfill-personaRole.ts",
     "grant:admin-dashboard-perms": "ts-node --project tsconfig.json scripts/grant-admin-dashboard-perms.ts"
   },
