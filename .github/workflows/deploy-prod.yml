@@ -2,6 +2,11 @@ name: Deploy Backend to prod
 
 on:
   workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Deployment reason (optional)'
+        required: false
+        default: 'manual'
 
 permissions:
   id-token: write
