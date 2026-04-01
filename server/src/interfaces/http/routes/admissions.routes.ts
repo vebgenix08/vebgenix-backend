@@ -8,6 +8,8 @@ import { requirePermission } from "../middleware/requirePermission";
 import { requireCampusContext } from "../middleware/requireCampusContext";
 import { requireFeature, FEATURES } from "../../../middleware/feature";
 import * as AdmissionsController from "../controllers/AdmissionsController";
+// NOTE: /applications/approvals MUST be mounted before /applications/:id
+// to prevent "approvals" being treated as a UUID.
 
 const router = Router();
 
@@ -46,6 +48,12 @@ router.get(
   requireRole(["ADMIN", "ACCOUNTANT"]),
   requirePermission("admissions.application.view"),
   AdmissionsController.getApplications,
+);
+// IMPORTANT: /approvals must come before /:id to avoid routing "approvals" as a UUID
+router.get(
+  "/applications/approvals",
+  requireRole(["ADMIN", "ACCOUNTANT"]),
+  AdmissionsController.getApprovalQueue,
 );
 router.get(
   "/applications/:id",

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { SupabaseAdmissionsRepository } from '../../../infrastructure/repositories/SupabaseAdmissionsRepository';
 import { EnquiryStatus, ApplicationStatus } from '../../../domain/admissions/types';
+import prisma from '../../../infrastructure/prisma/client';
 
 const repository = new SupabaseAdmissionsRepository();
 
@@ -91,6 +92,67 @@ export const getApplications = async (req: Request, res: Response) => {
     const result = await repository.getApplications(filters);
     res.json(result);
   } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
+// GET /applications/approvals — must be defined BEFORE /:id to avoid routing conflict
+export const getApprovalQueue = async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenant?.tenantId;
+    const campusId = (req as any).campus?.campusId;
+    const search = (req.query.search as string) || undefined;
+    const statusFilter = (req.query.status as string) || undefined;
+    const page = req.query.page ? parseInt(req.query.page as string) : 1;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+    const skip = (page - 1) * limit;
+
+    // Default to all pending-action statuses when no status specified
+    const defaultStatuses = ["SUBMITTED", "UNDER_REVIEW", "INTERVIEW_SCHEDULED"];
+    const statusIn = statusFilter ? [statusFilter] : defaultStatuses;
+
+    const where: any = {
+      status: { in: statusIn },
+    };
+    if (tenantId) where.tenantId = tenantId;
+    if (campusId) where.campusId = campusId;
+    if (search) {
+      where.OR = [
+        { fullName: { contains: search, mode: "insensitive" } },
+        { applicationNumber: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const [applications, total] = await prisma.$transaction([
+      prisma.application.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" } }),
+      prisma.application.count({ where }),
+    ]);
+
+    // Map to approval queue shape expected by frontend
+    const data = applications.map((a: any) => ({
+      id: a.id,
+      applicationId: a.id,
+      applicationNumber: null,
+      status: a.status,
+      approvedAt: a.approvedAt?.toISOString() ?? null,
+      studentId: null,
+      registrationNumber: null,
+      student: {
+        name: a.fullName ?? "",
+        classApplied: a.gradeApplyingFor ?? "",
+        academicYear: a.academicYear ?? "",
+      },
+      parent: {
+        name: a.fatherName ?? a.motherName ?? "",
+        phone: a.fatherPhone ?? a.motherPhone ?? a.phone ?? "",
+        email: a.email ?? undefined,
+      },
+      createdAt: a.createdAt?.toISOString() ?? "",
+    }));
+
+    res.json({ data, total });
+  } catch (error: any) {
+    console.error("[getApprovalQueue]", error);
     res.status(400).json({ error: error.message });
   }
 };

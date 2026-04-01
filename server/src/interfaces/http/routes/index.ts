@@ -6,6 +6,8 @@ import admissionsRoutes from "./admissions.routes";
 import userRoutes from "./userRoutes";
 import studentRoutes from "./studentRoutes";
 import dashboardRoutes from "./dashboard.routes";
+import resultsRoutes from "./results.routes";
+import financeRoutes from "./finance.routes";
 import { resolveTenant } from "../middleware/resolveTenant";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireCampusContext } from "../middleware/requireCampusContext";
@@ -43,5 +45,7 @@ router.use("/admissions", admissionsRoutes);
 router.use("/admin/users", userRoutes);
 router.use("/admin/students", studentRoutes);
 router.use("/admin/dashboard", dashboardRoutes);
+router.use("/results", resultsRoutes);
+router.use("/admin/finance", financeRoutes);
 
 export default router;
