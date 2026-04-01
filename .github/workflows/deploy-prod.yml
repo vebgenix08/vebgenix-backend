@@ -555,15 +555,19 @@ jobs:
       - name: Verify REST health
         run: |
           set -euo pipefail
-          INSTANCE_DNS=$(aws cloudformation describe-stacks \
+          # Always verify via CloudFront URL (stable — not affected by EC2 IP changes)
+          API_URL=$(aws cloudformation describe-stacks \
             --stack-name VebgenixRestApi-prod \
-            --query "Stacks[0].Outputs[?OutputKey=='InstancePublicDns'].OutputValue | [0]" \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue | [0]" \
             --output text)
+          echo "Checking health at: $API_URL/api/health"
           for i in $(seq 1 30); do
-            if curl --fail --silent --show-error "http://$INSTANCE_DNS/api/health"; then
+            HTTP=$(curl --silent --max-time 10 -o /dev/null -w "%{http_code}" "$API_URL/api/health" 2>/dev/null || echo "000")
+            if [ "$HTTP" = "200" ]; then
+              echo "Health OK (HTTP 200)"
               exit 0
             fi
-            echo "Waiting for REST health endpoint [$i/30]..."
+            echo "Waiting for REST health endpoint [$i/30] (HTTP $HTTP)..."
             sleep 10
           done
           exit 1

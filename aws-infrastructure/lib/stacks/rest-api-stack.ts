@@ -290,9 +290,23 @@ EOF`,
       ],
     });
 
+    // Elastic IP — keeps the public IP stable across EC2 stop/start cycles.
+    // Without EIP, the public DNS changes on every restart and breaks the
+    // CloudFront origin (CloudFormation GetAtt is stale after manual restart).
+    const eip = new ec2.CfnEIP(this, "RestApiEip", { domain: "vpc" });
+    new ec2.CfnEIPAssociation(this, "RestApiEipAssoc", {
+      instanceId: this.instance.instanceId,
+      allocationId: eip.attrAllocationId,
+    });
+    // Derive public DNS from EIP address: ec2-A-B-C-D.region.compute.amazonaws.com
+    const eipPublicDns = cdk.Fn.sub(
+      "ec2-${IpDash}.${AWS::Region}.compute.amazonaws.com",
+      { IpDash: cdk.Fn.join("-", cdk.Fn.split(".", eip.attrPublicIp)) },
+    );
+
     const apiDistribution = new cloudfront.Distribution(this, "ApiDistribution", {
       defaultBehavior: {
-        origin: new origins.HttpOrigin(this.instance.instancePublicDnsName, {
+        origin: new origins.HttpOrigin(eipPublicDns, {
           protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -330,9 +344,9 @@ EOF`,
       stringValue: eventBusName,
     });
     new cdk.CfnOutput(this, "InstanceId", { value: this.instance.instanceId });
-    new cdk.CfnOutput(this, "InstancePublicDns", {
-      value: this.instance.instancePublicDnsName,
-    });
+    new cdk.CfnOutput(this, "InstancePublicDns", { value: eipPublicDns });
+    new cdk.CfnOutput(this, "EipAllocationId", { value: eip.attrAllocationId });
+    new cdk.CfnOutput(this, "EipPublicIp", { value: eip.attrPublicIp });
     new cdk.CfnOutput(this, "ApiUrl", { value: this.apiUrl });
   }
 }
