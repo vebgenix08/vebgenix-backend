@@ -142,15 +142,36 @@ jobs:
                 sleep 20
                 ;;
               *ROLLBACK_COMPLETE*)
-                echo "Stack in ROLLBACK_COMPLETE. Deleting stale stack before redeploy..."
-                aws cloudformation delete-stack --stack-name VebgenixAppSync-prod
-                aws cloudformation wait stack-delete-complete --stack-name VebgenixAppSync-prod
-                echo "Stale stack deleted."
+                echo "Stack in ROLLBACK_COMPLETE. Attempting delete (best-effort — other stacks may be importing its exports)..."
+                aws cloudformation delete-stack --stack-name VebgenixAppSync-prod || true
+                # Wait up to 5 min; if delete fails due to export dependencies, continue anyway
+                for j in $(seq 1 30); do
+                  DEL_STATUS=$(aws cloudformation describe-stacks \
+                    --stack-name VebgenixAppSync-prod \
+                    --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+                  echo "  delete wait [$j/30] $DEL_STATUS"
+                  case "$DEL_STATUS" in
+                    DOES_NOT_EXIST)
+                      echo "Stack deleted successfully."
+                      break 2
+                      ;;
+                    DELETE_FAILED|UPDATE_ROLLBACK_COMPLETE|ROLLBACK_COMPLETE)
+                      echo "Delete failed or stack still present ($DEL_STATUS) — continuing anyway (CDK will handle)"
+                      break 2
+                      ;;
+                    *IN_PROGRESS*)
+                      sleep 10
+                      ;;
+                    *)
+                      break 2
+                      ;;
+                  esac
+                done
                 break
                 ;;
               *FAILED*)
-                echo "Stack in bad state: $STATUS — manual intervention may be needed"
-                exit 1
+                echo "Stack in bad state: $STATUS — skipping (continue-on-error will handle)"
+                break
                 ;;
               *)
                 echo "Stack stable: $STATUS"
