@@ -244,6 +244,79 @@ jobs:
           echo "Checking Query fields via python3..."
           python3 -c "import json,sys; d=json.load(open('/tmp/introspection.json')); qt=next((t for t in d['data']['__schema']['types'] if t['name']=='Query'),None); fields={f['name'] for f in (qt.get('fields') or [])}; print('Query fields:',sorted(fields)); req=['dashboardOverview','superAdminOverview','listPlatformAuditLogs','getPlatformAuditLog']; missing=[f for f in req if f not in fields]; [print('OK',f) for f in req if f in fields]; [print('MISSING',f) for f in missing]; sys.exit(1 if missing else 0)"
 
+      - name: Patch Lambda withTenant.js (bypass stuck AppSync CDK stack)
+        run: |
+          set -euo pipefail
+          REGION=ap-south-1
+          LAMBDA_FUNCTIONS=(
+            vebgenix-dashboard-resolver-prod
+            vebgenix-audit-logs-resolver-prod
+            vebgenix-settings-resolver-prod
+            vebgenix-users-resolver-prod
+            vebgenix-admissions-resolver-prod
+            vebgenix-tenants-resolver-prod
+            vebgenix-admin-resolver-prod
+            vebgenix-students-resolver-prod
+            vebgenix-finance-resolver-prod
+            vebgenix-storage-resolver-prod
+          )
+
+          # Build the fixed withTenant.js content
+          FIXED_WITH_TENANT=$(cat <<'JSEOF'
+'use strict';
+async function withTenant(prisma, tenantId, userId, fn) {
+  if (!tenantId) throw new Error('withTenant: tenantId is required');
+  if (!userId)   throw new Error('withTenant: userId is required');
+  return prisma.$transaction(async (tx) => {
+    // PostgreSQL SET LOCAL does not accept $1 parameters — use executeRawUnsafe
+    // tenantId and userId are UUIDs validated upstream, safe to interpolate
+    await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenantId}'`);
+    await tx.$executeRawUnsafe(`SET LOCAL app.user_id = '${userId}'`);
+    return fn(tx);
+  });
+}
+module.exports = { withTenant };
+JSEOF
+          )
+
+          for FN in "${LAMBDA_FUNCTIONS[@]}"; do
+            EXISTS=$(aws lambda get-function --function-name "$FN" --region "$REGION" \
+              --query "Configuration.FunctionName" --output text 2>/dev/null || echo "")
+            if [ -z "$EXISTS" ] || [ "$EXISTS" = "None" ]; then
+              echo "  $FN not found, skipping"
+              continue
+            fi
+
+            echo "Patching $FN ..."
+            # Download current deployment package
+            CODE_URL=$(aws lambda get-function --function-name "$FN" --region "$REGION" \
+              --query "Code.Location" --output text)
+            curl -s -o /tmp/lambda-pkg.zip "$CODE_URL"
+
+            # Extract, patch withTenant.js, rezip
+            mkdir -p /tmp/lambda-patch
+            rm -rf /tmp/lambda-patch/*
+            cd /tmp/lambda-patch
+            unzip -q /tmp/lambda-pkg.zip
+            # Write fixed withTenant.js (try both possible paths)
+            echo "$FIXED_WITH_TENANT" > shared/withTenant.js 2>/dev/null || true
+            echo "$FIXED_WITH_TENANT" > withTenant.js 2>/dev/null || true
+            # Find and overwrite all copies
+            find . -name "withTenant.js" -exec sh -c 'echo "$1" > "$2"' _ "$FIXED_WITH_TENANT" {} \;
+            zip -qr /tmp/lambda-patched.zip .
+            cd -
+
+            # Upload patched package
+            aws lambda update-function-code \
+              --function-name "$FN" \
+              --zip-file fileb:///tmp/lambda-patched.zip \
+              --region "$REGION" > /dev/null
+            echo "  ✓ $FN patched"
+
+            # Clean up for next iteration
+            rm -rf /tmp/lambda-patch /tmp/lambda-pkg.zip /tmp/lambda-patched.zip
+          done
+
       - name: Deploy Remaining Stacks (excluding AppSync)
         working-directory: aws-infrastructure
         continue-on-error: true

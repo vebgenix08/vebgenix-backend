@@ -142,6 +142,7 @@ export const requireAuth = async (
           tenantId: tenantIdFromToken,
           tenant_role: tenantRoleFromToken ?? profile.role,
           primary_profile_id: profile.id,
+          authUserId: profile.id,   // used by UserController, runWithTenantContext
           permissions: resolved.allKeys,
           global_roles: globalRoles,
         };
