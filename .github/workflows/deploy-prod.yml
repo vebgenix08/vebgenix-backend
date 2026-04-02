@@ -1,6 +1,9 @@
 name: Deploy Backend to prod
 
 on:
+  push:
+    branches:
+      - release
   workflow_dispatch:
     inputs:
       reason:
