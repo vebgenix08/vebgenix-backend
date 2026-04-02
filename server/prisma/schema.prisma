@@ -158,6 +158,8 @@ model Profile {
   allCampusesAccess Boolean      @default(false) @map("all_campuses_access")
   isActive          Boolean      @default(true) @map("is_active")
   lastLoginAt       DateTime?    @map("last_login_at") @db.Timestamptz
+  avatarUrl         String?      @map("avatar_url")
+  avatarKey         String?      @map("avatar_key")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -437,6 +439,8 @@ model Tenant {
   slug               String?  @unique
   isActive           Boolean  @default(true) @map("is_active")
   onboardingComplete Boolean  @default(false) @map("onboarding_complete")
+  logoUrl            String?  @map("logo_url")
+  logoKey            String?  @map("logo_key")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 

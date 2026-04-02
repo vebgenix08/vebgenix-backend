@@ -1001,7 +1001,7 @@ export class FinanceController {
         studentIds.length > 0
           ? await prisma.studentFeeAssignment.findMany({
               where: {
-                tenantId,
+                // Note: StudentFeeAssignment is scoped by studentId (students are already tenant-scoped above)
                 studentId: { in: studentIds },
               },
               orderBy: { assignedAt: "desc" },
