@@ -129,6 +129,11 @@ enum RelationshipType {
   OTHER
 }
 
+enum PublishedResultFileType {
+  PDF
+  EXCEL
+}
+
 enum TemplateType {
   ADMISSION_FORM
   FEE_STRUCTURE
@@ -170,8 +175,9 @@ model Profile {
   grantedPermissions ProfilePermission[]   @relation("GrantedByProfile")
 
   // Auth Relations
-  linkedAuthUsers   UserProfileLink[]
-  membershipPrimary TenantMembership[] @relation("MembershipPrimaryProfile")
+  linkedAuthUsers       UserProfileLink[]
+  membershipPrimary     TenantMembership[]     @relation("MembershipPrimaryProfile")
+  uploadedResultBatches PublishedResultBatch[] @relation("ResultBatchUploader")
 
   @@index([email])
   @@map("profiles")
@@ -449,12 +455,13 @@ model Tenant {
   roleDefinitions    RoleDefinition[]
   
   // New
-  academicYears      AcademicYear[]
-  programs           Program[]
-  templates          Template[]
-  applicants         Applicant[]
-  feeHeads           FeeHead[]
-  feeStructures      FeeStructure[]
+  academicYears        AcademicYear[]
+  programs             Program[]
+  templates            Template[]
+  applicants           Applicant[]
+  feeHeads             FeeHead[]
+  feeStructures        FeeStructure[]
+  publishedResultBatches PublishedResultBatch[]
 
   @@map("tenants")
 }
@@ -498,12 +505,13 @@ model Campus {
   updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userCampusAccess UserCampusAccess[]
-  enquiries        Enquiry[]
-  applications     Application[]
-  students         Student[]
-  sections         Section[]
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userCampusAccess       UserCampusAccess[]
+  enquiries              Enquiry[]
+  applications           Application[]
+  students               Student[]
+  sections               Section[]
+  publishedResultBatches PublishedResultBatch[]
 
   @@unique([tenantId, name])
   @@map("campuses")
@@ -855,15 +863,51 @@ model FeeStructureVersion {
 model StudentFeeAssignment {
   id        String   @id @default(uuid()) @db.Uuid
   studentId String   @map("student_id") @db.Uuid
-  
+
   // Snapshot of what was assigned
   structureName    String @map("structure_name")
   structureVersion Int    @map("structure_version")
   snapshotContent  Json   @map("snapshot_content")
-  
+
   assignedAt DateTime @default(now()) @map("assigned_at")
-  
+
   student    Student @relation(fields: [studentId], references: [id])
-  
+
   @@map("student_fee_assignments")
+}
+
+// Phase 6: Results Models
+
+model PublishedResultBatch {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  campusId    String   @map("campus_id") @db.Uuid
+
+  academicYear String  @map("academic_year")
+  className    String  @map("class_name")
+  sectionName  String  @map("section_name")
+  examName     String  @map("exam_name")
+  title        String
+
+  fileType     PublishedResultFileType @map("file_type")
+  fileKey      String  @map("file_key")
+  fileName     String  @map("file_name")
+  fileUrl      String? @map("file_url")
+
+  isPublished  Boolean   @default(false) @map("is_published")
+  publicToken  String    @unique @map("public_token")
+  publishedAt  DateTime? @map("published_at")
+
+  uploadedByProfileId String?  @map("uploaded_by_profile_id") @db.Uuid
+  uploadedAt          DateTime @default(now()) @map("uploaded_at")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus     Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  uploadedBy Profile? @relation("ResultBatchUploader", fields: [uploadedByProfileId], references: [id])
+
+  @@index([tenantId, campusId, academicYear])
+  @@index([tenantId, campusId, className, sectionName, examName])
+  @@map("published_result_batches")
 }
