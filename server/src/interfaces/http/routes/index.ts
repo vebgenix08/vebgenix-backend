@@ -8,6 +8,7 @@ import studentRoutes from "./studentRoutes";
 import dashboardRoutes from "./dashboard.routes";
 import resultsRoutes from "./results.routes";
 import financeRoutes from "./finance.routes";
+import profileRoutes from "./profileRoutes";
 import { resolveTenant } from "../middleware/resolveTenant";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireCampusContext } from "../middleware/requireCampusContext";
@@ -47,5 +48,6 @@ router.use("/admin/students", studentRoutes);
 router.use("/admin/dashboard", dashboardRoutes);
 router.use("/results", resultsRoutes);
 router.use("/admin/finance", financeRoutes);
+router.use("/profile", profileRoutes);
 
 export default router;
