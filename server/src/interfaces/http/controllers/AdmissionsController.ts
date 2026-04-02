@@ -2,6 +2,11 @@ import { Request, Response } from 'express';
 import { SupabaseAdmissionsRepository } from '../../../infrastructure/repositories/SupabaseAdmissionsRepository';
 import { EnquiryStatus, ApplicationStatus } from '../../../domain/admissions/types';
 import prisma from '../../../infrastructure/prisma/client';
+import {
+  buildAdmissionDocumentKey,
+  uploadMediaObject,
+  getSignedMediaUrl,
+} from '../../../infrastructure/aws/s3-media';
 
 const repository = new SupabaseAdmissionsRepository();
 
@@ -194,10 +199,60 @@ export const enrollStudent = async (req: Request, res: Response) => {
     // req.user.id is from the authenticated Token (Admissions Officer or Admin)
     // The second arg to enrollStudent is userId, but here we likely mean the student's *future* user ID.
     // For this mentorship phase, we will pass null for userId until we implement student account creation flow.
-    
+
     const studentId = await repository.enrollStudent(id, undefined);
     res.status(200).json({ message: 'Student successfully enrolled', studentId });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
+  }
+};
+
+// POST /documents/upload
+// Accepts a file upload and stores it in S3 under the admissions scope.
+export const uploadDocument = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const tenantId = (req as any).tenant?.tenantId as string | undefined;
+    const authUserId = (req as any).auth?.authUserId as string | undefined;
+    const campusId = (req as any).campus?.campusId as string | undefined;
+
+    if (!tenantId || !authUserId) {
+      res.status(400).json({ error: { message: 'Tenant context missing' } });
+      return;
+    }
+
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) {
+      res.status(400).json({ error: { message: 'No file provided' } });
+      return;
+    }
+
+    const stage = (req.body?.stage as 'enquiry' | 'application') || 'application';
+    const fieldKey = (req.body?.fieldKey as string) || 'document';
+
+    const key = buildAdmissionDocumentKey({
+      tenantId,
+      campusId: campusId ?? null,
+      userId: authUserId,
+      stage,
+      fieldKey,
+      filename: file.originalname,
+    });
+
+    const result = await uploadMediaObject({
+      key,
+      body: file.buffer,
+      contentType: file.mimetype,
+    });
+
+    const signedUrl = await getSignedMediaUrl(key);
+
+    res.status(200).json({
+      key: result.key,
+      url: signedUrl ?? result.storageUrl,
+      storageUrl: result.storageUrl,
+    });
+  } catch (error: any) {
+    console.error('[uploadDocument]', error);
+    res.status(500).json({ error: { message: error.message || 'Failed to upload document' } });
   }
 };

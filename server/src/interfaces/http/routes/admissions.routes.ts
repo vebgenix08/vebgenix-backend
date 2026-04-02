@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { verifyJwt } from "../middleware/verifyJwt";
 import { resolveTenant } from "../middleware/resolveTenant";
 import { enforceTenantMatch } from "../middleware/enforceTenantMatch";
@@ -12,6 +13,11 @@ import * as AdmissionsController from "../controllers/AdmissionsController";
 // to prevent "approvals" being treated as a UUID.
 
 const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 // Public Routes (e.g. Website Enquiry Form) - No tenant/auth required
 router.post("/enquiries/public", AdmissionsController.createEnquiry);
@@ -71,6 +77,14 @@ router.post(
   "/applications/:id/enroll",
   requireRole(["ADMIN", "ACCOUNTANT"]),
   AdmissionsController.enrollStudent,
+);
+
+// Document Upload
+router.post(
+  "/documents/upload",
+  requireRole(["ADMIN", "ACCOUNTANT"]),
+  upload.single("file"),
+  AdmissionsController.uploadDocument,
 );
 
 export default router;
