@@ -6,6 +6,10 @@
   "scripts": {
     "start": "node dist/main.js",
     "dev": "nodemon src/main.ts",
+    "db:local:up": "docker compose -f docker-compose.local.yml up -d",
+    "db:local:down": "docker compose -f docker-compose.local.yml down",
+    "db:push": "npx prisma db push --schema=prisma/schema.prisma",
+    "db:generate": "npx prisma generate --schema=prisma/schema.prisma",
     "build": "tsc",
     "clean-slate": "ts-node src/infrastructure/scripts/clean-slate.ts",
     "seed": "ts-node src/infrastructure/scripts/seed.ts",
