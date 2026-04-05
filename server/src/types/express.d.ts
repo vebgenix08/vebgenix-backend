@@ -24,3 +24,6 @@ declare global {
     }
   }
 }
+
+export {};
+
