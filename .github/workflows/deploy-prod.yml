@@ -1,9 +1,6 @@
 name: Deploy Backend to prod
 
 on:
-  push:
-    branches:
-      - release
   workflow_dispatch:
     inputs:
       reason:
@@ -673,3 +670,5 @@ JSEOF
             sleep 10
           done
           exit 1
+
+
