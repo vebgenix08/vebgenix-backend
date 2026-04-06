@@ -266,23 +266,10 @@ jobs:
             vebgenix-storage-resolver-prod
           )
 
-          # Build the fixed withTenant.js content
-          FIXED_WITH_TENANT=$(cat <<'JSEOF'
-'use strict';
-async function withTenant(prisma, tenantId, userId, fn) {
-  if (!tenantId) throw new Error('withTenant: tenantId is required');
-  if (!userId)   throw new Error('withTenant: userId is required');
-  return prisma.$transaction(async (tx) => {
-    // PostgreSQL SET LOCAL does not accept $1 parameters — use executeRawUnsafe
-    // tenantId and userId are UUIDs validated upstream, safe to interpolate
-    await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenantId}'`);
-    await tx.$executeRawUnsafe(`SET LOCAL app.user_id = '${userId}'`);
-    return fn(tx);
-  });
-}
-module.exports = { withTenant };
-JSEOF
-          )
+          # Build the fixed withTenant.js — base64-encoded to avoid YAML column-0 heredoc conflicts
+          # Content: 'use strict'; async function withTenant(prisma,tenantId,userId,fn) using $executeRawUnsafe
+          echo "J3VzZSBzdHJpY3QnOwphc3luYyBmdW5jdGlvbiB3aXRoVGVuYW50KHByaXNtYSwgdGVuYW50SWQsIHVzZXJJZCwgZm4pIHsKICBpZiAoIXRlbmFudElkKSB0aHJvdyBuZXcgRXJyb3IoJ3dpdGhUZW5hbnQ6IHRlbmFudElkIGlzIHJlcXVpcmVkJyk7CiAgaWYgKCF1c2VySWQpICAgdGhyb3cgbmV3IEVycm9yKCd3aXRoVGVuYW50OiB1c2VySWQgaXMgcmVxdWlyZWQnKTsKICByZXR1cm4gcHJpc21hLiR0cmFuc2FjdGlvbihhc3luYyAodHgpID0+IHsKICAgIGF3YWl0IHR4LiRleGVjdXRlUmF3VW5zYWZlKGBTRVQgTE9DQUwgYXBwLnRlbmFudF9pZCA9ICcke3RlbmFudElkfSdgKTsKICAgIGF3YWl0IHR4LiRleGVjdXRlUmF3VW5zYWZlKGBTRVQgTE9DQUwgYXBwLnVzZXJfaWQgPSAnJHt1c2VySWR9J2ApOwogICAgcmV0dXJuIGZuKHR4KTsKICB9KTsKfQptb2R1bGUuZXhwb3J0cyA9IHsgd2l0aFRlbmFudCB9Owo=" \
+            | base64 -d > /tmp/withTenant-fixed.js
 
           for FN in "${LAMBDA_FUNCTIONS[@]}"; do
             EXISTS=$(aws lambda get-function --function-name "$FN" --region "$REGION" \
@@ -303,11 +290,8 @@ JSEOF
             rm -rf /tmp/lambda-patch/*
             cd /tmp/lambda-patch
             unzip -q /tmp/lambda-pkg.zip
-            # Write fixed withTenant.js (try both possible paths)
-            echo "$FIXED_WITH_TENANT" > shared/withTenant.js 2>/dev/null || true
-            echo "$FIXED_WITH_TENANT" > withTenant.js 2>/dev/null || true
-            # Find and overwrite all copies
-            find . -name "withTenant.js" -exec sh -c 'echo "$1" > "$2"' _ "$FIXED_WITH_TENANT" {} \;
+            # Find and overwrite all copies of withTenant.js with the fixed version
+            find . -name "withTenant.js" -exec cp /tmp/withTenant-fixed.js {} \;
             zip -qr /tmp/lambda-patched.zip .
             cd -
 
