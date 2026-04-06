@@ -1,4 +1,4 @@
-name: Deploy Backend to prod
+name: Deploy Backend to prod (Run)
 
 on:
   workflow_dispatch:
@@ -670,5 +670,6 @@ JSEOF
             sleep 10
           done
           exit 1
+
 
 
