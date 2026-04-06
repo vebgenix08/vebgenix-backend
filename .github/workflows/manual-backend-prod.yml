@@ -1,4 +1,4 @@
-name: Manual Backend Prod Deploy
+name: Deploy Backend to prod
 
 on:
   push:
@@ -659,5 +659,6 @@ jobs:
             sleep 10
           done
           exit 1
+
 
 
