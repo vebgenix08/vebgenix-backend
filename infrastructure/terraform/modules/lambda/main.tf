@@ -1,5 +1,7 @@
 locals {
-  name_prefix = "vebgenix"
+  # prod keeps legacy name "vebgenix" (no stage suffix) for backward compat.
+  # dev uses "vebgenix-dev" so functions are fully independent with own env vars.
+  name_prefix = var.stage == "prod" ? "vebgenix" : "vebgenix-${var.stage}"
   stage       = var.stage
   tags = {
     Environment = var.stage
@@ -328,11 +330,10 @@ resource "aws_lambda_alias" "prod" {
 # ---------------------------------------------------------------------------
 # CloudWatch Log Groups
 # ---------------------------------------------------------------------------
-# Lambda functions are shared across stages (dev/prod use aliases on the
-# same functions). Log groups are created once — only in prod — to set
-# the retention policy. Dev skips creation to avoid ResourceAlreadyExists.
+# Each stage now has its own Lambda functions (dev: vebgenix-dev-*, prod: vebgenix-*).
+# Log groups are created for all stages — no conflict since function names differ.
 resource "aws_cloudwatch_log_group" "lambda_logs" {
-  for_each = var.stage == "prod" ? local.all_functions : {}
+  for_each = local.all_functions
 
   name              = "/aws/lambda/${local.name_prefix}-${each.key}"
   retention_in_days = var.log_retention_days

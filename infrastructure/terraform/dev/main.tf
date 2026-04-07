@@ -51,20 +51,21 @@ provider "aws" {
 locals {
   stage = "dev"
 
+  # Dev functions are named vebgenix-dev-* (separate from prod vebgenix-*)
   all_lambda_function_names = [
-    "vebgenix-dashboard-resolver",
-    "vebgenix-students-resolver",
-    "vebgenix-finance-resolver",
-    "vebgenix-admin-resolver",
-    "vebgenix-users-resolver",
-    "vebgenix-tenants-resolver",
-    "vebgenix-admissions-resolver",
-    "vebgenix-audit-logs-resolver",
-    "vebgenix-storage-resolver",
-    "vebgenix-settings-resolver",
-    "vebgenix-email-worker",
-    "vebgenix-jobs-worker",
-    "vebgenix-cognito-provisioner",
+    "vebgenix-dev-dashboard-resolver",
+    "vebgenix-dev-students-resolver",
+    "vebgenix-dev-finance-resolver",
+    "vebgenix-dev-admin-resolver",
+    "vebgenix-dev-users-resolver",
+    "vebgenix-dev-tenants-resolver",
+    "vebgenix-dev-admissions-resolver",
+    "vebgenix-dev-audit-logs-resolver",
+    "vebgenix-dev-storage-resolver",
+    "vebgenix-dev-settings-resolver",
+    "vebgenix-dev-email-worker",
+    "vebgenix-dev-jobs-worker",
+    "vebgenix-dev-cognito-provisioner",
   ]
 }
 
