@@ -139,6 +139,9 @@ resource "aws_cognito_user_pool" "main" {
       schema,
       # advanced security mode — avoid unintentional cost changes on existing pools
       user_pool_add_ons,
+      # username_configuration.case_sensitive forces replacement if pool was
+      # created without it — ignore drift on existing pools
+      username_configuration,
     ]
   }
 }
