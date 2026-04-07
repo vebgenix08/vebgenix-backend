@@ -453,6 +453,9 @@ jobs:
               "systemctl daemon-reload",
               "systemctl enable vebgenix-rest",
               "systemctl restart vebgenix-rest",
+              "echo 'd29ya2VyX3Byb2Nlc3NlcyBhdXRvOwpldmVudHMgeyB3b3JrZXJfY29ubmVjdGlvbnMgMTAyNDsgfQpodHRwIHsKICBpbmNsdWRlIG1pbWUudHlwZXM7CiAgZGVmYXVsdF90eXBlIGFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbTsKICBzZW5kZmlsZSBvbjsKICBrZWVwYWxpdmVfdGltZW91dCA2NTsKICBzZXJ2ZXIgewogICAgbGlzdGVuIDgwIGRlZmF1bHRfc2VydmVyOwogICAgc2VydmVyX25hbWUgXzsKICAgIGNsaWVudF9tYXhfYm9keV9zaXplIDUwbTsKICAgIGxvY2F0aW9uID0gL2hlYWx0aHogewogICAgICBhZGRfaGVhZGVyIENvbnRlbnQtVHlwZSB0ZXh0L3BsYWluOwogICAgICByZXR1cm4gMjAwIG9rOwogICAgfQogICAgbG9jYXRpb24gLyB7CiAgICAgIHByb3h5X3Bhc3MgaHR0cDovLzEyNy4wLjAuMTo1MDAwOwogICAgICBwcm94eV9odHRwX3ZlcnNpb24gMS4xOwogICAgICBwcm94eV9zZXRfaGVhZGVyIEhvc3QgJGhvc3Q7CiAgICAgIHByb3h5X3NldF9oZWFkZXIgWC1SZWFsLUlQICRyZW1vdGVfYWRkcjsKICAgICAgcHJveHlfc2V0X2hlYWRlciBYLUZvcndhcmRlZC1Gb3IgJHByb3h5X2FkZF94X2ZvcndhcmRlZF9mb3I7CiAgICAgIHByb3h5X3NldF9oZWFkZXIgWC1Gb3J3YXJkZWQtUHJvdG8gJHNjaGVtZTsKICAgICAgcHJveHlfc2V0X2hlYWRlciBYLUZvcndhcmRlZC1Ib3N0ICRob3N0OwogICAgfQogIH0KfQo=' | base64 -d > /etc/nginx/nginx.conf",
+              "which nginx || dnf install -y nginx -q",
+              "systemctl enable nginx && systemctl restart nginx",
           ]
           print(json.dumps({"commands": commands}))
           PY
@@ -485,13 +488,52 @@ jobs:
             sleep 10
           done
 
-      - name: Verify REST health
+      - name: Update CloudFront origin to current EC2 DNS
         run: |
           set -euo pipefail
           INSTANCE_DNS=$(aws cloudformation describe-stacks \
             --stack-name VebgenixRestApi-dev \
             --query "Stacks[0].Outputs[?OutputKey=='InstancePublicDns'].OutputValue | [0]" \
             --output text)
+          CF_DIST_ID=$(aws cloudformation describe-stacks \
+            --stack-name VebgenixRestApi-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue | [0]" \
+            --output text 2>/dev/null || echo "")
+          if [ -z "$CF_DIST_ID" ] || [ "$CF_DIST_ID" = "None" ]; then
+            CF_DIST_ID=$(aws cloudfront list-distributions \
+              --query "DistributionList.Items[?contains(Origins.Items[0].DomainName,'compute.amazonaws.com')].Id | [0]" \
+              --output text 2>/dev/null || echo "")
+          fi
+          if [ -n "$CF_DIST_ID" ] && [ "$CF_DIST_ID" != "None" ]; then
+            echo "Updating CloudFront $CF_DIST_ID origin to $INSTANCE_DNS"
+            ETAG=$(aws cloudfront get-distribution-config --id "$CF_DIST_ID" --query "ETag" --output text)
+            aws cloudfront get-distribution-config --id "$CF_DIST_ID" --query "DistributionConfig" --output json > /tmp/cf-config.json
+            python3 -c "
+          import json
+          with open('/tmp/cf-config.json') as f:
+              config = json.load(f)
+          old = config['Origins']['Items'][0]['DomainName']
+          config['Origins']['Items'][0]['DomainName'] = '$INSTANCE_DNS'
+          config['Origins']['Items'][0]['Id'] = '$INSTANCE_DNS'
+          config['DefaultCacheBehavior']['TargetOriginId'] = '$INSTANCE_DNS'
+          with open('/tmp/cf-config-updated.json', 'w') as f:
+              json.dump(config, f)
+          print(f'Updated CF origin: {old} -> $INSTANCE_DNS')
+          "
+            aws cloudfront update-distribution \
+              --id "$CF_DIST_ID" \
+              --distribution-config file:///tmp/cf-config-updated.json \
+              --if-match "$ETAG" \
+              --query "Distribution.Status" --output text || true
+          else
+            echo "CloudFront distribution not found, skipping origin update"
+          fi
+          echo "INSTANCE_DNS=$INSTANCE_DNS" >> "$GITHUB_ENV"
+
+      - name: Verify REST health
+        run: |
+          set -euo pipefail
+          INSTANCE_DNS="${INSTANCE_DNS}"
           for i in $(seq 1 30); do
             if curl --fail --silent --show-error "http://$INSTANCE_DNS/api/health"; then
               exit 0
