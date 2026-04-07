@@ -13,6 +13,11 @@ output "documents_bucket_regional_domain" {
   value       = aws_s3_bucket.documents.bucket_regional_domain_name
 }
 
+output "frontend_bucket_id" {
+  description = "ID (name) of the frontend static files S3 bucket"
+  value       = var.create_frontend_bucket ? aws_s3_bucket.frontend[0].id : ""
+}
+
 output "frontend_bucket_name" {
   description = "Name of the frontend static files S3 bucket"
   value       = var.create_frontend_bucket ? aws_s3_bucket.frontend[0].id : ""

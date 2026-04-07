@@ -12,40 +12,6 @@ variable "domain_name" {
   type        = string
 }
 
-variable "api_cloudfront_domain" {
-  description = "CloudFront domain name for API distribution"
-  type        = string
-}
-
-variable "api_cloudfront_zone_id" {
-  description = "CloudFront hosted zone ID for API distribution"
-  type        = string
-}
-
-variable "frontend_cloudfront_domain" {
-  description = "CloudFront domain name for frontend distribution"
-  type        = string
-}
-
-variable "frontend_cloudfront_zone_id" {
-  description = "CloudFront hosted zone ID for frontend distribution"
-  type        = string
-}
-
-variable "api_subdomain" {
-  description = "Subdomain for the API (e.g., 'api' → api.vebgenix.com)"
-  type        = string
-  default     = "api"
-}
-
-variable "app_subdomain" {
-  description = "Subdomain for the frontend app (e.g., 'app' → app.vebgenix.com)"
-  type        = string
-  default     = "app"
-}
-
-variable "create_root_redirect" {
-  description = "Create an A record for the root domain pointing to the frontend"
-  type        = bool
-  default     = true
-}
+# NOTE: cloudfront domain/zone_id variables removed from this module.
+# Route53 A records are created in prod/main.tf after cloudfront runs.
+# This prevents the cloudfront ↔ dns circular dependency.

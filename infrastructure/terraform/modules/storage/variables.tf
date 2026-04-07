@@ -24,17 +24,8 @@ variable "frontend_url" {
   default     = ""
 }
 
-variable "cloudfront_oac_id" {
-  description = "CloudFront Origin Access Control ID for frontend bucket policy"
-  type        = string
-  default     = ""
-}
-
-variable "cloudfront_distribution_arn" {
-  description = "CloudFront distribution ARN for frontend bucket policy"
-  type        = string
-  default     = ""
-}
+# cloudfront_distribution_arn intentionally removed — S3 bucket policy
+# for CloudFront OAC is created in prod/main.tf to avoid circular deps.
 
 variable "create_frontend_bucket" {
   description = "Whether to create the frontend static files bucket"

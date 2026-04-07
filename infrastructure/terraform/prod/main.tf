@@ -7,7 +7,7 @@ terraform {
       version = "~> 5.0"
     }
     neon = {
-      source  = "kislerdm/neon"
+      source  = "kislerdim/neon"
       version = "~> 0.6"
     }
   }
@@ -33,7 +33,7 @@ provider "aws" {
   }
 }
 
-# us-east-1 provider — required for ACM certificates used by CloudFront
+# Required for ACM certificates used by CloudFront (must be in us-east-1)
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"
@@ -73,59 +73,70 @@ locals {
     "vebgenix-cognito-provisioner",
   ]
 
-  frontend_url_resolved = var.frontend_url != "" ? var.frontend_url : (
-    var.domain_name != "" ? "https://${var.app_subdomain}.${var.domain_name}" : ""
-  )
+  domain_enabled   = var.domain_name != ""
+  frontend_url     = local.domain_enabled ? "https://${var.app_subdomain}.${var.domain_name}" : var.frontend_url
+  api_url          = local.domain_enabled ? "https://${var.api_subdomain}.${var.domain_name}" : ""
 }
 
-# ---------------------------------------------------------------------------
-# Cognito
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# STEP 1 — Foundation (no cross-module deps)
+# ===========================================================================
+
 module "cognito" {
   source = "../modules/cognito"
 
   stage        = local.stage
   aws_region   = var.aws_region
-  frontend_url = local.frontend_url_resolved
+  frontend_url = local.frontend_url
 }
 
-# ---------------------------------------------------------------------------
-# Network (VPC, subnets, security groups)
-# ---------------------------------------------------------------------------
 module "network" {
   source = "../modules/network"
 
-  stage              = local.stage
-  aws_region         = var.aws_region
-  vpc_cidr           = "10.0.0.0/16"
+  stage               = local.stage
+  aws_region          = var.aws_region
+  vpc_cidr            = "10.0.0.0/16"
   public_subnet_cidrs = ["10.0.1.0/24", "10.0.2.0/24"]
-  availability_zones = var.availability_zones
-  enable_flow_logs   = true
+  availability_zones  = var.availability_zones
+  enable_flow_logs    = true
 }
 
-# ---------------------------------------------------------------------------
-# Storage
-# ---------------------------------------------------------------------------
+# Storage: documents + frontend buckets (NO cloudfront dependency here)
 module "storage" {
   source = "../modules/storage"
 
   stage                  = local.stage
   aws_account_id         = var.aws_account_id
   aws_region             = var.aws_region
-  frontend_url           = local.frontend_url_resolved
+  frontend_url           = local.frontend_url
   create_frontend_bucket = true
   force_destroy          = false
-
-  # CloudFront OAC and distribution ARN are set after cloudfront module runs.
-  # Use targeted apply order: storage → cloudfront → storage (for policy).
-  cloudfront_distribution_arn = try(module.cloudfront[0].frontend_distribution_arn, "")
-
-  depends_on = [module.network]
 }
 
-# ---------------------------------------------------------------------------
-# Lambda (13 functions)
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# STEP 2 — DNS Zone + ACM Certificate
+# Created BEFORE CloudFront so cert ARN can be passed to CloudFront.
+# No dependency on CloudFront whatsoever.
+# ===========================================================================
+
+module "dns" {
+  count = local.domain_enabled ? 1 : 0
+
+  source = "../modules/dns"
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  stage       = local.stage
+  domain_name = var.domain_name
+}
+
+# ===========================================================================
+# STEP 3 — Lambda + AppSync (depend on cognito + storage)
+# ===========================================================================
+
 module "lambda" {
   source = "../modules/lambda"
 
@@ -137,17 +148,11 @@ module "lambda" {
   cognito_client_secret = module.cognito.backend_client_secret
   documents_bucket_name = module.storage.documents_bucket_name
   prod_lambda_version   = var.prod_lambda_version
-  log_retention_days    = 90 # 90-day retention for prod
+  log_retention_days    = 90
 
-  depends_on = [
-    module.cognito,
-    module.storage,
-  ]
+  depends_on = [module.cognito, module.storage]
 }
 
-# ---------------------------------------------------------------------------
-# AppSync
-# ---------------------------------------------------------------------------
 module "appsync" {
   source = "../modules/appsync"
 
@@ -156,22 +161,17 @@ module "appsync" {
   cognito_user_pool_id      = module.cognito.user_pool_id
   cognito_user_pool_arn     = module.cognito.user_pool_arn
   lambda_execution_role_arn = module.lambda.execution_role_arn
+  lambda_alias_arns         = module.lambda.appsync_resolver_prod_arns
+  log_field_level           = "ERROR"
+  xray_enabled              = true
 
-  # Use prod aliases in prod environment
-  lambda_alias_arns = module.lambda.appsync_resolver_prod_arns
-
-  log_field_level = "ERROR"
-  xray_enabled    = true
-
-  depends_on = [
-    module.cognito,
-    module.lambda,
-  ]
+  depends_on = [module.cognito, module.lambda]
 }
 
-# ---------------------------------------------------------------------------
-# EC2 REST API
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# STEP 4 — EC2 REST API (depends on network + storage + cognito)
+# ===========================================================================
+
 module "ec2" {
   source = "../modules/ec2"
 
@@ -186,19 +186,16 @@ module "ec2" {
   volume_size_gb             = var.ec2_volume_size_gb
   enable_detailed_monitoring = true
 
-  depends_on = [
-    module.network,
-    module.storage,
-    module.cognito,
-  ]
+  depends_on = [module.network, module.storage, module.cognito]
 }
 
-# ---------------------------------------------------------------------------
-# CloudFront (requires EC2 EIP and frontend S3 bucket)
-# ---------------------------------------------------------------------------
-module "cloudfront" {
-  count = 1 # Always create in prod
+# ===========================================================================
+# STEP 5 — CloudFront
+# Depends on: EC2 EIP (origin), storage buckets, ACM cert from dns module.
+# Does NOT depend on dns A records (those come after).
+# ===========================================================================
 
+module "cloudfront" {
   source = "../modules/cloudfront"
 
   stage                           = local.stage
@@ -208,45 +205,141 @@ module "cloudfront" {
   domain_name                     = var.domain_name
   api_subdomain                   = var.api_subdomain
   app_subdomain                   = var.app_subdomain
-  acm_certificate_arn             = var.domain_name != "" ? try(module.dns[0].certificate_arn, "") : ""
+  acm_certificate_arn             = local.domain_enabled ? module.dns[0].certificate_arn : ""
   price_class                     = "PriceClass_200"
 
-  depends_on = [
-    module.ec2,
-    module.storage,
-    module.dns,
-  ]
+  depends_on = [module.ec2, module.storage, module.dns]
 }
 
-# ---------------------------------------------------------------------------
-# DNS + ACM (only if domain_name is provided)
-# ---------------------------------------------------------------------------
-module "dns" {
-  count = var.domain_name != "" ? 1 : 0
+# ===========================================================================
+# STEP 6 — Post-CloudFront resources (no circular deps)
+# ===========================================================================
 
-  source = "../modules/dns"
+# S3 bucket policy — allow CloudFront OAC to read frontend bucket
+# Created AFTER cloudfront to get the distribution ARN
+resource "aws_s3_bucket_policy" "frontend_oac" {
+  bucket = module.storage.frontend_bucket_id
 
-  providers = {
-    aws           = aws
-    aws.us_east_1 = aws.us_east_1
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontServicePrincipal"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "${module.storage.frontend_bucket_arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = module.cloudfront.frontend_distribution_arn
+          }
+        }
+      }
+    ]
+  })
+
+  depends_on = [module.storage, module.cloudfront]
+}
+
+# Route53 A/AAAA records pointing to CloudFront distributions
+# Created AFTER cloudfront module — this breaks the cloudfront ↔ dns cycle
+resource "aws_route53_record" "api_a" {
+  count   = local.domain_enabled ? 1 : 0
+  zone_id = module.dns[0].zone_id
+  name    = "${var.api_subdomain}.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = module.cloudfront.api_domain_name
+    zone_id                = module.cloudfront.api_hosted_zone_id
+    evaluate_target_health = false
   }
 
-  stage                       = local.stage
-  domain_name                 = var.domain_name
-  api_cloudfront_domain       = try(module.cloudfront[0].api_domain_name, "")
-  api_cloudfront_zone_id      = try(module.cloudfront[0].api_hosted_zone_id, "")
-  frontend_cloudfront_domain  = try(module.cloudfront[0].frontend_domain_name, "")
-  frontend_cloudfront_zone_id = try(module.cloudfront[0].frontend_hosted_zone_id, "")
-  api_subdomain               = var.api_subdomain
-  app_subdomain               = var.app_subdomain
-  create_root_redirect        = true
-
-  depends_on = [module.cloudfront]
+  depends_on = [module.dns, module.cloudfront]
 }
 
-# ---------------------------------------------------------------------------
-# Async (SQS queues, EventBridge, Lambda event source mappings)
-# ---------------------------------------------------------------------------
+resource "aws_route53_record" "api_aaaa" {
+  count   = local.domain_enabled ? 1 : 0
+  zone_id = module.dns[0].zone_id
+  name    = "${var.api_subdomain}.${var.domain_name}"
+  type    = "AAAA"
+
+  alias {
+    name                   = module.cloudfront.api_domain_name
+    zone_id                = module.cloudfront.api_hosted_zone_id
+    evaluate_target_health = false
+  }
+
+  depends_on = [module.dns, module.cloudfront]
+}
+
+resource "aws_route53_record" "app_a" {
+  count   = local.domain_enabled ? 1 : 0
+  zone_id = module.dns[0].zone_id
+  name    = "${var.app_subdomain}.${var.domain_name}"
+  type    = "A"
+
+  alias {
+    name                   = module.cloudfront.frontend_domain_name
+    zone_id                = module.cloudfront.frontend_hosted_zone_id
+    evaluate_target_health = false
+  }
+
+  depends_on = [module.dns, module.cloudfront]
+}
+
+resource "aws_route53_record" "app_aaaa" {
+  count   = local.domain_enabled ? 1 : 0
+  zone_id = module.dns[0].zone_id
+  name    = "${var.app_subdomain}.${var.domain_name}"
+  type    = "AAAA"
+
+  alias {
+    name                   = module.cloudfront.frontend_domain_name
+    zone_id                = module.cloudfront.frontend_hosted_zone_id
+    evaluate_target_health = false
+  }
+
+  depends_on = [module.dns, module.cloudfront]
+}
+
+# Root domain vebgenix.com → app.vebgenix.com (CloudFront frontend)
+resource "aws_route53_record" "root_a" {
+  count   = local.domain_enabled ? 1 : 0
+  zone_id = module.dns[0].zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = module.cloudfront.frontend_domain_name
+    zone_id                = module.cloudfront.frontend_hosted_zone_id
+    evaluate_target_health = false
+  }
+
+  depends_on = [module.dns, module.cloudfront]
+}
+
+resource "aws_route53_record" "root_aaaa" {
+  count   = local.domain_enabled ? 1 : 0
+  zone_id = module.dns[0].zone_id
+  name    = var.domain_name
+  type    = "AAAA"
+
+  alias {
+    name                   = module.cloudfront.frontend_domain_name
+    zone_id                = module.cloudfront.frontend_hosted_zone_id
+    evaluate_target_health = false
+  }
+
+  depends_on = [module.dns, module.cloudfront]
+}
+
+# ===========================================================================
+# STEP 7 — Async + Monitoring
+# ===========================================================================
+
 module "async" {
   source = "../modules/async"
 
@@ -260,9 +353,6 @@ module "async" {
   depends_on = [module.lambda]
 }
 
-# ---------------------------------------------------------------------------
-# Monitoring
-# ---------------------------------------------------------------------------
 module "monitoring" {
   source = "../modules/monitoring"
 
@@ -271,78 +361,51 @@ module "monitoring" {
   alert_email           = var.alert_email
   lambda_function_names = local.all_lambda_function_names
   log_retention_days    = 90
+  email_queue_name      = module.async.email_queue_name
+  email_dlq_name        = module.async.email_dlq_name
+  jobs_queue_name       = module.async.jobs_queue_name
+  jobs_dlq_name         = module.async.jobs_dlq_name
+  ec2_instance_id       = module.ec2.instance_id
 
-  email_queue_name = module.async.email_queue_name
-  email_dlq_name   = module.async.email_dlq_name
-  jobs_queue_name  = module.async.jobs_queue_name
-  jobs_dlq_name    = module.async.jobs_dlq_name
-  ec2_instance_id  = module.ec2.instance_id
-
-  depends_on = [
-    module.lambda,
-    module.async,
-    module.ec2,
-  ]
+  depends_on = [module.lambda, module.async, module.ec2]
 }
 
-# =============================================================================
-# Import blocks (Terraform 1.5+ syntax) for existing resources
-# Run: terraform plan -generate-config-out=generated.tf  (first time)
-# Then: terraform import  or  terraform apply (with import blocks)
-# =============================================================================
+# ===========================================================================
+# Import blocks — existing resources (Terraform 1.5+ syntax)
+# Comment these out after first successful import
+# ===========================================================================
 
-# ---------------------------------------------------------------------------
-# Import: Existing Cognito User Pool (prod)
-# ---------------------------------------------------------------------------
 import {
   id = "ap-south-1_waAjEC9Nj"
   to = module.cognito.aws_cognito_user_pool.main
 }
 
-# ---------------------------------------------------------------------------
-# Import: Existing AppSync API (prod)
-# ---------------------------------------------------------------------------
 import {
   id = "o6cgickkk5dpxej6lirgo7bpna"
   to = module.appsync.aws_appsync_graphql_api.main
 }
 
-# ---------------------------------------------------------------------------
-# Import: Existing S3 Documents Bucket (prod)
-# ---------------------------------------------------------------------------
 import {
   id = "vebgenix-documents-prod-278035644568"
   to = module.storage.aws_s3_bucket.documents
 }
 
-# ---------------------------------------------------------------------------
-# Import: Existing EC2 Instance (prod REST API)
-# ---------------------------------------------------------------------------
 import {
   id = "i-0b1260d7d90d8f7b3"
   to = module.ec2.aws_instance.rest_api
 }
 
-# ---------------------------------------------------------------------------
-# Import: Existing EC2 Elastic IP (prod)
-# ---------------------------------------------------------------------------
 import {
   id = "eipalloc-0d28ee2f60ceecf10"
   to = module.ec2.aws_eip.rest_api
 }
 
-# ---------------------------------------------------------------------------
-# Import: Existing CloudFront API Distribution (prod)
-# ---------------------------------------------------------------------------
 import {
   id = "E11WI5ENBRMIYD"
-  to = module.cloudfront[0].aws_cloudfront_distribution.api
+  to = module.cloudfront.aws_cloudfront_distribution.api
 }
 
-# ---------------------------------------------------------------------------
-# Import: Existing CloudFront Frontend Distribution (prod)
-# ---------------------------------------------------------------------------
 import {
   id = "E1BFBMTG1KVMMD"
-  to = module.cloudfront[0].aws_cloudfront_distribution.frontend
+  to = module.cloudfront.aws_cloudfront_distribution.frontend
 }

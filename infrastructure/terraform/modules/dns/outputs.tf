@@ -10,20 +10,10 @@ output "zone_name_servers" {
 
 output "certificate_arn" {
   description = "ACM certificate ARN (us-east-1) for use with CloudFront"
-  value       = aws_acm_certificate.main.arn
+  value       = aws_acm_certificate_validation.main.certificate_arn
 }
 
 output "certificate_status" {
   description = "ACM certificate validation status"
   value       = aws_acm_certificate.main.status
-}
-
-output "api_fqdn" {
-  description = "Fully qualified API domain name"
-  value       = "${var.api_subdomain}.${var.domain_name}"
-}
-
-output "app_fqdn" {
-  description = "Fully qualified app domain name"
-  value       = "${var.app_subdomain}.${var.domain_name}"
 }

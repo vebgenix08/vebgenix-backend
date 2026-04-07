@@ -176,32 +176,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "frontend" {
   }
 }
 
-# S3 bucket policy — allow CloudFront OAC to read frontend bucket
-resource "aws_s3_bucket_policy" "frontend" {
-  count = var.create_frontend_bucket && var.cloudfront_distribution_arn != "" ? 1 : 0
-
-  bucket = aws_s3_bucket.frontend[0].id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowCloudFrontServicePrincipal"
-        Effect = "Allow"
-        Principal = {
-          Service = "cloudfront.amazonaws.com"
-        }
-        Action   = "s3:GetObject"
-        Resource = "${aws_s3_bucket.frontend[0].arn}/*"
-        Condition = {
-          StringEquals = {
-            "AWS:SourceArn" = var.cloudfront_distribution_arn
-          }
-        }
-      }
-    ]
-  })
-}
+# NOTE: S3 bucket policy for CloudFront OAC is created in prod/main.tf
+# to avoid circular dependency between storage ↔ cloudfront modules.
 
 # ---------------------------------------------------------------------------
 # IAM Policy for Lambda access to documents bucket
