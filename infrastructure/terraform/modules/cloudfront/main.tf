@@ -137,6 +137,14 @@ resource "aws_cloudfront_distribution" "api" {
 
   tags = local.tags
 
+  lifecycle {
+    ignore_changes = [
+      # Existing CDK-created distribution may have different origin config
+      origin,
+      logging_config,
+    ]
+  }
+
   depends_on = [aws_cloudfront_cache_policy.api_no_cache]
 }
 

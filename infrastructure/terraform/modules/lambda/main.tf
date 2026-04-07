@@ -83,8 +83,8 @@ locals {
 
   base_env_vars = merge(
     {
-      STAGE      = var.stage
-      AWS_REGION = var.aws_region
+      STAGE = var.stage
+      # AWS_REGION is reserved by Lambda — injected automatically, cannot be set
       # DATABASE_URL is passed separately as sensitive
       COGNITO_USER_POOL_ID = var.cognito_user_pool_id
       COGNITO_CLIENT_ID    = var.cognito_client_id

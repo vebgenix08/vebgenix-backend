@@ -192,7 +192,8 @@ module "cloudfront" {
   source = "../modules/cloudfront"
 
   stage                           = local.stage
-  api_origin_ip                   = module.ec2.public_ip
+  # CloudFront requires a domain name, not a raw IP — use EC2 public DNS hostname
+  api_origin_ip = "ec2-${replace(module.ec2.public_ip, ".", "-")}.ap-south-1.compute.amazonaws.com"
   frontend_bucket_regional_domain = module.storage.frontend_bucket_regional_domain
   frontend_bucket_arn             = module.storage.frontend_bucket_arn
   domain_name                     = var.domain_name
