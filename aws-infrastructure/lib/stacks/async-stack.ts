@@ -17,6 +17,7 @@ interface AsyncStackProps extends cdk.StackProps {
   dbProxyEndpoint: string;
   dbSecretArn: string;
   emailBucket: s3.Bucket;
+  userPoolId?: string;
 }
 
 export class AsyncStack extends cdk.Stack {

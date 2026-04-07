@@ -39,7 +39,7 @@ export class LambdaStack extends cdk.Stack {
       dbSecretArn,
     } = props;
 
-    const privateSubnets = { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS };
+    const privateSubnets = { subnetType: ec2.SubnetType.PRIVATE_ISOLATED };
 
     // ---------------------------------------------------------------
     // Shared Lambda environment variables
@@ -54,11 +54,14 @@ export class LambdaStack extends cdk.Stack {
       NODE_OPTIONS: "--enable-source-maps",
     };
 
-    // Shared IAM policy for DB access
-    const dbPolicy = new iam.PolicyStatement({
-      actions: ["secretsmanager:GetSecretValue"],
-      resources: [dbSecretArn],
-    });
+    // Shared IAM policy for DB access (only when ARN is valid)
+    const dbPolicy =
+      dbSecretArn && dbSecretArn.startsWith("arn:")
+        ? new iam.PolicyStatement({
+            actions: ["secretsmanager:GetSecretValue"],
+            resources: [dbSecretArn],
+          })
+        : null;
 
     // ---------------------------------------------------------------
     // Helper: create a domain Lambda + AppSync datasource + resolvers
@@ -85,7 +88,9 @@ export class LambdaStack extends cdk.Stack {
         applicationLogLevel: "INFO",
         systemLogLevel: config.stage === "prod" ? "WARN" : "INFO",
       });
-      fn.addToRolePolicy(dbPolicy);
+      if (dbPolicy) {
+        fn.addToRolePolicy(dbPolicy);
+      }
       return fn;
     };
 
@@ -172,7 +177,7 @@ export class LambdaStack extends cdk.Stack {
     const dashboardLambda = domainLambda(
       "DashboardLambda",
       "dashboard-resolver",
-      "lib/lambdas/DashboardLambda",
+      "lambda/dashboard-resolver",
     );
 
     // ---------------------------------------------------------------
@@ -181,7 +186,7 @@ export class LambdaStack extends cdk.Stack {
     const auditLogsLambda = domainLambda(
       "AuditLogsLambda",
       "audit-logs-resolver",
-      "lib/lambdas/AuditLogsLambda",
+      "lambda/audit-logs-resolver",
     );
 
     // ---------------------------------------------------------------

@@ -129,6 +129,43 @@ enum RelationshipType {
   OTHER
 }
 
+enum PublishedResultFileType {
+  PDF
+  EXCEL
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  CHEQUE
+  UPI
+  ONLINE
+}
+
+enum AdjustmentType {
+  DISCOUNT
+  SCHOLARSHIP
+  REFUND
+  WRITE_OFF
+  MANUAL
+}
+
 enum TemplateType {
   ADMISSION_FORM
   FEE_STRUCTURE
@@ -153,6 +190,8 @@ model Profile {
   allCampusesAccess Boolean      @default(false) @map("all_campuses_access")
   isActive          Boolean      @default(true) @map("is_active")
   lastLoginAt       DateTime?    @map("last_login_at") @db.Timestamptz
+  avatarUrl         String?      @map("avatar_url")
+  avatarKey         String?      @map("avatar_key")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -170,8 +209,9 @@ model Profile {
   grantedPermissions ProfilePermission[]   @relation("GrantedByProfile")
 
   // Auth Relations
-  linkedAuthUsers   UserProfileLink[]
-  membershipPrimary TenantMembership[] @relation("MembershipPrimaryProfile")
+  linkedAuthUsers       UserProfileLink[]
+  membershipPrimary     TenantMembership[]     @relation("MembershipPrimaryProfile")
+  uploadedResultBatches PublishedResultBatch[] @relation("ResultBatchUploader")
 
   @@index([email])
   @@map("profiles")
@@ -251,6 +291,10 @@ model Enquiry {
   status         EnquiryStatus @default(NEW)
   assignedToId   String?       @map("assigned_to") @db.Uuid
   notes          String?
+  academicYear   String?       @map("academic_year")
+  source         String?
+  priority       String?
+  customFields   Json?         @map("custom_fields")
   campusScope    CampusScope   @map("campus_scope")
   campusId       String        @map("campus_id") @db.Uuid
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
@@ -302,9 +346,11 @@ model Application {
   previousGradePercentage Decimal? @map("previous_grade_percentage") @db.Decimal(5, 2)
 
   // Status
-  status       ApplicationStatus @default(DRAFT)
-  stageHistory Json?             @default("[]") @map("stage_history")
-  approvedAt   DateTime?         @map("approved_at") @db.Timestamptz
+  status            ApplicationStatus @default(DRAFT)
+  stageHistory      Json?             @default("[]") @map("stage_history")
+  approvedAt        DateTime?         @map("approved_at") @db.Timestamptz
+  applicationNumber String?           @map("application_number")
+  customFields      Json?             @map("custom_fields")
 
   campusScope CampusScope @map("campus_scope")
   campusId    String      @map("campus_id") @db.Uuid
@@ -322,6 +368,7 @@ model Application {
   applicant       Applicant?            @relation(fields: [applicantId], references: [id])
   offer           AdmissionOffer?
 
+  @@unique([tenantId, campusId, applicationNumber])
   @@index([status])
   @@index([tenantId])
   @@index([tenantId, campusId, status])
@@ -401,8 +448,12 @@ model Student {
   application Application @relation(fields: [applicationId], references: [id])
   
   // New Auth Link
-  authLink    StudentAuthLink?
+  authLink       StudentAuthLink?
   feeAssignments StudentFeeAssignment[]
+  invoices       Invoice[]
+  payments       Payment[]
+  receipts       Receipt[]
+  adjustments    Adjustment[]
 
   @@unique([tenantId, campusId, registrationNumber])
   @@index([registrationNumber])
@@ -431,6 +482,8 @@ model Tenant {
   slug               String?  @unique
   isActive           Boolean  @default(true) @map("is_active")
   onboardingComplete Boolean  @default(false) @map("onboarding_complete")
+  logoUrl            String?  @map("logo_url")
+  logoKey            String?  @map("logo_key")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -449,12 +502,18 @@ model Tenant {
   roleDefinitions    RoleDefinition[]
   
   // New
-  academicYears      AcademicYear[]
-  programs           Program[]
-  templates          Template[]
-  applicants         Applicant[]
-  feeHeads           FeeHead[]
-  feeStructures      FeeStructure[]
+  academicYears        AcademicYear[]
+  programs             Program[]
+  templates            Template[]
+  applicants           Applicant[]
+  feeHeads             FeeHead[]
+  feeStructures        FeeStructure[]
+  publishedResultBatches PublishedResultBatch[]
+  invoices             Invoice[]
+  invoiceLines         InvoiceLine[]
+  payments             Payment[]
+  receipts             Receipt[]
+  adjustments          Adjustment[]
 
   @@map("tenants")
 }
@@ -498,12 +557,17 @@ model Campus {
   updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userCampusAccess UserCampusAccess[]
-  enquiries        Enquiry[]
-  applications     Application[]
-  students         Student[]
-  sections         Section[]
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userCampusAccess       UserCampusAccess[]
+  enquiries              Enquiry[]
+  applications           Application[]
+  students               Student[]
+  sections               Section[]
+  publishedResultBatches PublishedResultBatch[]
+  invoices               Invoice[]
+  payments               Payment[]
+  receipts               Receipt[]
+  adjustments            Adjustment[]
 
   @@unique([tenantId, name])
   @@map("campuses")
@@ -855,15 +919,182 @@ model FeeStructureVersion {
 model StudentFeeAssignment {
   id        String   @id @default(uuid()) @db.Uuid
   studentId String   @map("student_id") @db.Uuid
-  
+
   // Snapshot of what was assigned
   structureName    String @map("structure_name")
   structureVersion Int    @map("structure_version")
   snapshotContent  Json   @map("snapshot_content")
-  
+
   assignedAt DateTime @default(now()) @map("assigned_at")
-  
-  student    Student @relation(fields: [studentId], references: [id])
-  
+
+  student  Student   @relation(fields: [studentId], references: [id])
+  invoices Invoice[]
+
   @@map("student_fee_assignments")
+}
+
+// Phase 6: Results Models
+
+model PublishedResultBatch {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  campusId    String   @map("campus_id") @db.Uuid
+
+  academicYear String  @map("academic_year")
+  className    String  @map("class_name")
+  sectionName  String  @map("section_name")
+  examName     String  @map("exam_name")
+  title        String
+
+  fileType     PublishedResultFileType @map("file_type")
+  fileKey      String  @map("file_key")
+  fileName     String  @map("file_name")
+  fileUrl      String? @map("file_url")
+
+  isPublished  Boolean   @default(false) @map("is_published")
+  publicToken  String    @unique @map("public_token")
+  publishedAt  DateTime? @map("published_at")
+
+  uploadedByProfileId String?  @map("uploaded_by_profile_id") @db.Uuid
+  uploadedAt          DateTime @default(now()) @map("uploaded_at")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campus     Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  uploadedBy Profile? @relation("ResultBatchUploader", fields: [uploadedByProfileId], references: [id])
+
+  @@index([tenantId, campusId, academicYear])
+  @@index([tenantId, campusId, className, sectionName, examName])
+  @@map("published_result_batches")
+}
+
+// Phase 7: Finance Transaction Models
+
+model Invoice {
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  campusId       String        @map("campus_id") @db.Uuid
+  studentId      String        @map("student_id") @db.Uuid
+  assignmentId   String?       @map("assignment_id") @db.Uuid
+  invoiceNumber  String        @map("invoice_number")
+  title          String
+  description    String?
+  status         InvoiceStatus @default(OPEN)
+  subtotalAmount Decimal       @default(0) @map("subtotal_amount") @db.Decimal(12, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  totalAmount    Decimal       @default(0) @map("total_amount") @db.Decimal(12, 2)
+  paidAmount     Decimal       @default(0) @map("paid_amount") @db.Decimal(12, 2)
+  dueAmount      Decimal       @default(0) @map("due_amount") @db.Decimal(12, 2)
+  issueDate      DateTime      @default(now()) @map("issue_date") @db.Date
+  dueDate        DateTime?     @map("due_date") @db.Date
+  metadata       Json?
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant     Tenant               @relation(fields: [tenantId], references: [id])
+  campus     Campus               @relation(fields: [campusId], references: [id])
+  student    Student              @relation(fields: [studentId], references: [id])
+  assignment StudentFeeAssignment? @relation(fields: [assignmentId], references: [id])
+  lines      InvoiceLine[]
+  payments   Payment[]
+  adjustments Adjustment[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, campusId, status])
+  @@index([tenantId, studentId])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  invoiceId   String   @map("invoice_id") @db.Uuid
+  description String
+  quantity    Int      @default(1)
+  unitAmount  Decimal  @default(0) @map("unit_amount") @db.Decimal(12, 2)
+  lineTotal   Decimal  @default(0) @map("line_total") @db.Decimal(12, 2)
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, invoiceId])
+  @@map("invoice_lines")
+}
+
+model Payment {
+  id              String        @id @default(uuid()) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  campusId        String        @map("campus_id") @db.Uuid
+  studentId       String        @map("student_id") @db.Uuid
+  invoiceId       String?       @map("invoice_id") @db.Uuid
+  paymentNumber   String        @map("payment_number")
+  amount          Decimal       @default(0) @db.Decimal(12, 2)
+  method          PaymentMethod
+  status          PaymentStatus @default(COMPLETED)
+  reference       String?
+  notes           String?
+  metadata        Json?
+  collectedByUserId String?     @map("collected_by_user_id") @db.Uuid
+  paidAt          DateTime      @default(now()) @map("paid_at") @db.Timestamptz
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  campus  Campus   @relation(fields: [campusId], references: [id])
+  student Student  @relation(fields: [studentId], references: [id])
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+  receipt Receipt?
+
+  @@unique([tenantId, paymentNumber])
+  @@index([tenantId, campusId, status])
+  @@index([tenantId, studentId, paidAt])
+  @@map("payments")
+}
+
+model Receipt {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  campusId      String   @map("campus_id") @db.Uuid
+  studentId     String   @map("student_id") @db.Uuid
+  paymentId     String   @unique @map("payment_id") @db.Uuid
+  receiptNumber String   @map("receipt_number")
+  amount        Decimal  @default(0) @db.Decimal(12, 2)
+  issuedAt      DateTime @default(now()) @map("issued_at") @db.Timestamptz
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  campus  Campus  @relation(fields: [campusId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, receiptNumber])
+  @@index([tenantId, campusId, issuedAt])
+  @@index([tenantId, studentId])
+  @@map("receipts")
+}
+
+model Adjustment {
+  id                String         @id @default(uuid()) @db.Uuid
+  tenantId          String         @map("tenant_id") @db.Uuid
+  campusId          String         @map("campus_id") @db.Uuid
+  studentId         String         @map("student_id") @db.Uuid
+  invoiceId         String?        @map("invoice_id") @db.Uuid
+  type              AdjustmentType
+  amount            Decimal        @default(0) @db.Decimal(12, 2)
+  reason            String
+  createdByUserId   String?        @map("created_by_user_id") @db.Uuid
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  campus  Campus   @relation(fields: [campusId], references: [id])
+  student Student  @relation(fields: [studentId], references: [id])
+  invoice Invoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([tenantId, campusId, type])
+  @@index([tenantId, studentId, createdAt])
+  @@map("adjustments")
 }

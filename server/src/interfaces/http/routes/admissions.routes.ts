@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { verifyJwt } from "../middleware/verifyJwt";
 import { resolveTenant } from "../middleware/resolveTenant";
 import { enforceTenantMatch } from "../middleware/enforceTenantMatch";
@@ -8,8 +9,15 @@ import { requirePermission } from "../middleware/requirePermission";
 import { requireCampusContext } from "../middleware/requireCampusContext";
 import { requireFeature, FEATURES } from "../../../middleware/feature";
 import * as AdmissionsController from "../controllers/AdmissionsController";
+// NOTE: /applications/approvals MUST be mounted before /applications/:id
+// to prevent "approvals" being treated as a UUID.
 
 const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 // Public Routes (e.g. Website Enquiry Form) - No tenant/auth required
 router.post("/enquiries/public", AdmissionsController.createEnquiry);
@@ -47,6 +55,12 @@ router.get(
   requirePermission("admissions.application.view"),
   AdmissionsController.getApplications,
 );
+// IMPORTANT: /approvals must come before /:id to avoid routing "approvals" as a UUID
+router.get(
+  "/applications/approvals",
+  requireRole(["ADMIN", "ACCOUNTANT"]),
+  AdmissionsController.getApprovalQueue,
+);
 router.get(
   "/applications/:id",
   requireRole(["ADMIN", "ACCOUNTANT"]),
@@ -63,6 +77,14 @@ router.post(
   "/applications/:id/enroll",
   requireRole(["ADMIN", "ACCOUNTANT"]),
   AdmissionsController.enrollStudent,
+);
+
+// Document Upload
+router.post(
+  "/documents/upload",
+  requireRole(["ADMIN", "ACCOUNTANT"]),
+  upload.single("file"),
+  AdmissionsController.uploadDocument,
 );
 
 export default router;

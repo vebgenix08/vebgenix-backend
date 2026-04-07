@@ -14,7 +14,7 @@ export const handler = async (event: any) => {
 
   try {
     if (fieldName === 'superAdminOverview') {
-      if (!groups.includes('SUPER_ADMIN')) throw new Error('Unauthorized');
+      if (!groups.includes('PLATFORM_SUPER_ADMIN') && !groups.includes('SUPER_ADMIN')) throw new Error('Unauthorized');
       return await getSuperAdminOverview();
     } 
     

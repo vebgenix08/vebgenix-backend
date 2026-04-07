@@ -3,6 +3,7 @@ import { emailService } from "./EmailService";
 import prisma from "../infrastructure/prisma/client";
 import { grantAdminDashboardPerms } from "../../scripts/grant-admin-dashboard-perms";
 import crypto from "crypto";
+import { ensureCognitoUser } from "../infrastructure/cognito/admin";
 
 /**
  * Platform
@@ -263,13 +264,16 @@ export class PlatformService {
         userId,
         tenantId,
         role: "ORG_OWNER",
+        primaryProfileId: userId,
         status: membershipStatus,
         isPrimaryAdmin: true,
         invitedByUserId: actorId,
         invitedAt: new Date(),
         activatedAt,
       },
-      update: {},
+      update: {
+        primaryProfileId: userId,
+      },
     });
 
     // Step 3b: Auto-grant dashboard permissions
@@ -290,6 +294,26 @@ export class PlatformService {
         permErr,
       );
     }
+
+    // Step 3c: Provision Cognito user with tenant_id (non-blocking)
+    ensureCognitoUser({
+      email: emailLower,
+      fullName,
+      tenantId,
+      role: "ORG_OWNER",
+    }).then((result) => {
+      if (!result.ok) {
+        console.error(
+          `[PlatformService] Cognito provisioning failed for ${emailLower}: ${result.code}`,
+        );
+      } else {
+        console.log(
+          `[PlatformService] Cognito user provisioned for ${emailLower} with tenant ${tenantId}`,
+        );
+      }
+    }).catch((err) => {
+      console.error(`[PlatformService] Cognito provision error for ${emailLower}:`, err);
+    });
 
     // Log audit
     await AuditLogger.logAction({

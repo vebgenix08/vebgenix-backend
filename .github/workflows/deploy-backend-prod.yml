@@ -580,6 +580,8 @@ jobs:
                 "set -a && source /etc/vebgenix-rest.env && set +a",
                 "npx prisma db push --accept-data-loss --schema=prisma/schema.prisma",
                 "npx prisma generate --schema=prisma/schema.prisma",
+                "# Apply custom SQL functions (idempotent — db push doesn't run migration SQL files)",
+                "[ -f prisma/functions.sql ] && npx prisma db execute --file prisma/functions.sql --schema prisma/schema.prisma || true",
                 "npm run seed:permissions",
                 "npm run build",
               "cat >/etc/systemd/system/vebgenix-rest.service <<'EOF'\n[Unit]\nDescription=Vebgenix REST API\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nUser=ec2-user\nWorkingDirectory=/opt/vebgenix/app/server\nEnvironmentFile=/etc/vebgenix-rest.env\nExecStart=/usr/local/bin/node /opt/vebgenix/app/server/dist/src/main.js\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOF",
@@ -654,8 +656,6 @@ jobs:
             sleep 10
           done
           exit 1
-
-
 
 
 

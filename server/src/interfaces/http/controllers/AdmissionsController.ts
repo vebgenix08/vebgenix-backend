@@ -1,6 +1,12 @@
 import { Request, Response } from 'express';
 import { SupabaseAdmissionsRepository } from '../../../infrastructure/repositories/SupabaseAdmissionsRepository';
 import { EnquiryStatus, ApplicationStatus } from '../../../domain/admissions/types';
+import prisma from '../../../infrastructure/prisma/client';
+import {
+  buildAdmissionDocumentKey,
+  uploadMediaObject,
+  getSignedMediaUrl,
+} from '../../../infrastructure/aws/s3-media';
 
 const repository = new SupabaseAdmissionsRepository();
 
@@ -95,6 +101,67 @@ export const getApplications = async (req: Request, res: Response) => {
   }
 };
 
+// GET /applications/approvals — must be defined BEFORE /:id to avoid routing conflict
+export const getApprovalQueue = async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenant?.tenantId;
+    const campusId = (req as any).campus?.campusId;
+    const search = (req.query.search as string) || undefined;
+    const statusFilter = (req.query.status as string) || undefined;
+    const page = req.query.page ? parseInt(req.query.page as string) : 1;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+    const skip = (page - 1) * limit;
+
+    // Default to all pending-action statuses when no status specified
+    const defaultStatuses = ["SUBMITTED", "UNDER_REVIEW", "INTERVIEW_SCHEDULED"];
+    const statusIn = statusFilter ? [statusFilter] : defaultStatuses;
+
+    const where: any = {
+      status: { in: statusIn },
+    };
+    if (tenantId) where.tenantId = tenantId;
+    if (campusId) where.campusId = campusId;
+    if (search) {
+      where.OR = [
+        { fullName: { contains: search, mode: "insensitive" } },
+        { applicationNumber: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const [applications, total] = await prisma.$transaction([
+      prisma.application.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" } }),
+      prisma.application.count({ where }),
+    ]);
+
+    // Map to approval queue shape expected by frontend
+    const data = applications.map((a: any) => ({
+      id: a.id,
+      applicationId: a.id,
+      applicationNumber: null,
+      status: a.status,
+      approvedAt: a.approvedAt?.toISOString() ?? null,
+      studentId: null,
+      registrationNumber: null,
+      student: {
+        name: a.fullName ?? "",
+        classApplied: a.gradeApplyingFor ?? "",
+        academicYear: a.academicYear ?? "",
+      },
+      parent: {
+        name: a.fatherName ?? a.motherName ?? "",
+        phone: a.fatherPhone ?? a.motherPhone ?? a.phone ?? "",
+        email: a.email ?? undefined,
+      },
+      createdAt: a.createdAt?.toISOString() ?? "",
+    }));
+
+    res.json({ data, total });
+  } catch (error: any) {
+    console.error("[getApprovalQueue]", error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
 export const getApplicationById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -132,10 +199,60 @@ export const enrollStudent = async (req: Request, res: Response) => {
     // req.user.id is from the authenticated Token (Admissions Officer or Admin)
     // The second arg to enrollStudent is userId, but here we likely mean the student's *future* user ID.
     // For this mentorship phase, we will pass null for userId until we implement student account creation flow.
-    
+
     const studentId = await repository.enrollStudent(id, undefined);
     res.status(200).json({ message: 'Student successfully enrolled', studentId });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
+  }
+};
+
+// POST /documents/upload
+// Accepts a file upload and stores it in S3 under the admissions scope.
+export const uploadDocument = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const tenantId = (req as any).tenant?.tenantId as string | undefined;
+    const authUserId = (req as any).auth?.authUserId as string | undefined;
+    const campusId = (req as any).campus?.campusId as string | undefined;
+
+    if (!tenantId || !authUserId) {
+      res.status(400).json({ error: { message: 'Tenant context missing' } });
+      return;
+    }
+
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) {
+      res.status(400).json({ error: { message: 'No file provided' } });
+      return;
+    }
+
+    const stage = (req.body?.stage as 'enquiry' | 'application') || 'application';
+    const fieldKey = (req.body?.fieldKey as string) || 'document';
+
+    const key = buildAdmissionDocumentKey({
+      tenantId,
+      campusId: campusId ?? null,
+      userId: authUserId,
+      stage,
+      fieldKey,
+      filename: file.originalname,
+    });
+
+    const result = await uploadMediaObject({
+      key,
+      body: file.buffer,
+      contentType: file.mimetype,
+    });
+
+    const signedUrl = await getSignedMediaUrl(key);
+
+    res.status(200).json({
+      key: result.key,
+      url: signedUrl ?? result.storageUrl,
+      storageUrl: result.storageUrl,
+    });
+  } catch (error: any) {
+    console.error('[uploadDocument]', error);
+    res.status(500).json({ error: { message: error.message || 'Failed to upload document' } });
   }
 };

@@ -23,6 +23,34 @@ router.get(
   StudentController.getAllStudents,
 );
 
+router.get(
+  "/:studentId",
+  ...tenantCampus,
+  requireRole(["ADMIN", "ACCOUNTANT", "TEACHER", "STAFF"]),
+  StudentController.getStudentById,
+);
+
+router.get(
+  "/:studentId/certificates",
+  ...tenantCampus,
+  requireRole(["ADMIN", "STAFF"]),
+  StudentController.getCertificates,
+);
+
+router.post(
+  "/:studentId/certificates",
+  ...tenantCampus,
+  requireRole(["ADMIN", "STAFF"]),
+  StudentController.issueCertificate,
+);
+
+router.patch(
+  "/:studentId/certificates/:certificateId/approve",
+  ...tenantCampus,
+  requireRole(["ADMIN"]),
+  StudentController.approveCertificate,
+);
+
 router.post(
   "/:studentId/enable-portal",
   ...tenantCampus,

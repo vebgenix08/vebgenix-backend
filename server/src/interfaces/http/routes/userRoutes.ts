@@ -4,18 +4,16 @@ import { verifyJwt } from "../middleware/verifyJwt";
 import { resolveTenant } from "../middleware/resolveTenant";
 import { enforceTenantMatch } from "../middleware/enforceTenantMatch";
 import { requireAuth } from "../middleware/requireAuth";
-import { requireCampusContext } from "../middleware/requireCampusContext";
 import { requireRole } from "../middleware/requireRole";
 
 const router = Router();
 
-// Base: /api/admin/users — all require full auth chain + campus + ADMIN
+// Base: /api/admin/users — user management is tenant-wide, no campus context needed
 const adminCampus = [
   verifyJwt,
   resolveTenant,
   enforceTenantMatch,
   requireAuth,
-  requireCampusContext,
   requireRole(["ADMIN"]),
 ];
 

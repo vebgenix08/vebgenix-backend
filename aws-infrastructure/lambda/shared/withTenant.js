@@ -21,9 +21,12 @@ async function withTenant(prisma, tenantId, userId, fn) {
   if (!userId)   throw new Error('withTenant: userId is required');
 
   return prisma.$transaction(async (tx) => {
-    // Activate RLS for this transaction — resets automatically on commit/rollback
-    await tx.$executeRaw`SET LOCAL app.tenant_id = ${tenantId}`;
-    await tx.$executeRaw`SET LOCAL app.user_id = ${userId}`;
+    // Activate RLS for this transaction — resets automatically on commit/rollback.
+    // PostgreSQL SET LOCAL does not support parameterized values ($1), so we must
+    // use executeRawUnsafe with string interpolation. tenantId and userId are UUIDs
+    // validated before reaching this point, making interpolation safe here.
+    await tx.$executeRawUnsafe(`SET LOCAL app.tenant_id = '${tenantId}'`);
+    await tx.$executeRawUnsafe(`SET LOCAL app.user_id = '${userId}'`);
     return fn(tx);
   });
 }

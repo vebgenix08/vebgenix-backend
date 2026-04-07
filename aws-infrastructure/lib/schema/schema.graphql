@@ -40,9 +40,12 @@ type Query {
   # Admin
   platformStats: PlatformStats!
   
-  # Settings
+  # Settings & Master Data
   listAcademicYears: [AcademicYear!]!
   listTemplates(type: String): [Template!]!
+  
+  listCampuses: [Campus!]!
+  getCampus(id: ID!): Campus
   
   # Students
   listStudents(filter: StudentFilter, limit: Int, nextToken: String): StudentConnection!
@@ -73,17 +76,31 @@ type Mutation {
   # Storage
   generateUploadUrl(contentType: String!, filename: String!): UploadUrlPayload!
   
-  # Settings
+  # Settings & Master Data
   createAcademicYear(input: CreateAcademicYearInput!): AcademicYear!
   createTemplate(input: CreateTemplateInput!): Template!
   publishTemplateVersion(input: PublishTemplateVersionInput!): TemplateVersion!
   
+  createCampus(input: CreateCampusInput!): Campus!
+  updateCampus(id: ID!, input: CreateCampusInput!): Campus!
+  
   # Students
   convertApplicationToStudent(applicationId: ID!): Student!
+  enableStudentPortal(studentId: ID!, email: String!): PortalEnablementPayload!
+  enableGuardianPortal(input: EnableGuardianPortalInput!): PortalEnablementPayload!
   
   # Finance
   createFeeHead(input: CreateFeeHeadInput!): FeeHead!
   createFeeStructure(input: CreateFeeStructureInput!): FeeStructure!
+  
+  # Invites
+  acceptInvite(token: String!, password: String): AcceptInvitePayload!
+}
+
+type AcceptInvitePayload {
+  success: Boolean!
+  email: String
+  isExistingUser: Boolean
 }
 
 # --- dashboard.graphql ---
@@ -234,10 +251,15 @@ type User {
   id: ID!
   email: String!
   fullName: String
+  firstName: String
+  lastName: String
   permissions: [String!]!
   roles: [String!]!
   tenantId: String
+  campusScope: String
+  staffType: String
   isPrimaryOwner: Boolean
+  isPlatformAdmin: Boolean
   phone: String
   status: String
   joinedAt: AWSDateTime
@@ -413,6 +435,24 @@ type AcademicYear {
   isActive: Boolean!
 }
 
+type Campus {
+  id: ID!
+  name: String!
+  type: String! # SCHOOL | PU
+  address: String
+  phone: String
+  email: String
+  isActive: Boolean!
+}
+
+input CreateCampusInput {
+  name: String!
+  type: String!
+  address: String
+  phone: String
+  email: String
+}
+
 input CreateAcademicYearInput {
   name: String!
   startDate: String!
@@ -436,6 +476,19 @@ type StudentConnection {
 
 input StudentFilter {
   search: String
+}
+
+input EnableGuardianPortalInput {
+  studentId: ID!
+  guardianName: String!
+  relationship: String!
+  email: String!
+  phone: String!
+}
+
+type PortalEnablementPayload {
+  success: Boolean!
+  message: String
 }
 
 # --- fees.graphql ---

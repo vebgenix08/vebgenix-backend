@@ -1,19 +1,21 @@
 import { Request, Response } from "express";
-import prisma from "../../../infrastructure/prisma/client";
+import prisma, { runWithTenantContext } from "../../../infrastructure/prisma/client";
 import { EmailService } from "../../../infrastructure/services/emailService";
 import { UserRole } from "@prisma/client";
+import { PlatformService } from "../../../services/PlatformService";
 
 const PLATFORM_SUPER_ADMIN_EMAIL = "dhanushags08@gmail.com";
 const ALLOWED_TENANT_ROLES = [
+  "ADMIN",
   "ACCOUNTANT",
   "TEACHER",
   "STUDENT",
   "STAFF",
   "PARENT",
 ];
-// Fallback constant if env var is missing, usually for local dev
+// Fallback constant if env var is missing
 const DEFAULT_APP_BASE_URL =
-  process.env.APP_BASE_URL || "http://localhost:5173";
+  process.env.FRONTEND_URL || "https://d18w0fdwt58ts4.cloudfront.net";
 
 // Helper for email validation
 const isValidEmail = (email: string): boolean => {
@@ -24,7 +26,7 @@ const isValidEmail = (email: string): boolean => {
 // Helper to get public app origin
 const getPublicAppOrigin = (req: Request): string => {
   // 1. Prefer strict Environment Variable (safest for production/docker)
-  if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL;
+  if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL;
 
   // 2. Origin header (browser's view of the frontend)
   const origin = req.headers["origin"];
@@ -48,35 +50,21 @@ const getPublicAppOrigin = (req: Request): string => {
     return `${forwardedProto}://${forwardedHost}`;
   }
 
-  // 5. Fallback to constant default (localhost:5173)
+  // 5. Fallback to constant default
   return DEFAULT_APP_BASE_URL;
 };
 
-// Helper to find auth user with pagination
-async function findAuthUserByEmail(email: string) {
-  // Check AuthUser (Central Identity)
-  const user = await prisma.authUser.findUnique({
-    where: { email: email.toLowerCase() },
-  });
-  return user;
-}
+function mapUserRoleToMembershipRole(role: string): string {
+  const roleMap: Record<string, string> = {
+    ADMIN: "ORG_ADMIN",
+    TEACHER: "TEACHER",
+    STAFF: "STAFF",
+    ACCOUNTANT: "ACCOUNTANT",
+    STUDENT: "STUDENT",
+    PARENT: "PARENT",
+  };
 
-// Helper to get or create auth user
-async function getOrCreateAuthUser(email: string) {
-  const existing = await findAuthUserByEmail(email);
-  if (existing) {
-    return { userId: existing.id, alreadyExisted: true };
-  }
-
-  // Create AuthUser
-  const newUser = await prisma.authUser.create({
-    data: {
-      email: email.toLowerCase(),
-      status: "ACTIVE",
-    },
-  });
-
-  return { userId: newUser.id, alreadyExisted: false };
+  return roleMap[role] || "STAFF";
 }
 
 // Helper to check platform user existence
@@ -101,9 +89,10 @@ export class UserController {
   static async getUsers(req: Request, res: Response) {
     try {
       const tenantId = (req as any).tenant?.tenantId;
+      const authUserId = (req as any).auth?.authUserId;
       // const campusId = (req as any).campus?.campusId;
 
-      if (!tenantId) throw new Error("Tenant context missing");
+      if (!tenantId || !authUserId) throw new Error("Tenant context missing");
 
       const {
         query,
@@ -137,19 +126,21 @@ export class UserController {
       }
 
       const skip = (Number(page) - 1) * Number(limit);
-      const [rows, total] = await Promise.all([
-        prisma.profile.findMany({
-          where,
-          skip,
-          take: Number(limit),
-          orderBy: { createdAt: "desc" },
-          include: {
-            employee: true,
-            campusAccess: { include: { campus: true } },
-          },
-        }),
-        prisma.profile.count({ where }),
-      ]);
+      const [rows, total] = await runWithTenantContext(tenantId, authUserId, (db) => {
+        return Promise.all([
+          db.profile.findMany({
+            where,
+            skip,
+            take: Number(limit),
+            orderBy: { createdAt: "desc" },
+            include: {
+              employee: true,
+              campusAccess: { include: { campus: true } },
+            },
+          }),
+          db.profile.count({ where }),
+        ]);
+      });
 
       const users = rows.map((u) => ({
         id: u.id,
@@ -211,19 +202,22 @@ export class UserController {
   static async getUser(req: Request, res: Response) {
     try {
       const tenantId = (req as any).tenant?.tenantId;
-      if (!tenantId) throw new Error("Tenant context missing");
+      const authUserId = (req as any).auth?.authUserId;
+      if (!tenantId || !authUserId) throw new Error("Tenant context missing");
 
       const { id } = req.params;
 
-      const user = await prisma.profile.findUnique({
-        where: { id },
-        include: {
-          employee: true,
-          campusAccess: {
-            include: { campus: true },
+      const user = await runWithTenantContext(tenantId, authUserId, (db) =>
+        db.profile.findUnique({
+          where: { id },
+          include: {
+            employee: true,
+            campusAccess: {
+              include: { campus: true },
+            },
           },
-        },
-      });
+        }),
+      );
 
       if (!user || user.tenantId !== tenantId) {
         return res
@@ -282,7 +276,8 @@ export class UserController {
   static async createUser(req: Request, res: Response) {
     try {
       const tenantId = (req as any).tenant?.tenantId;
-      if (!tenantId) throw new Error("Tenant context missing");
+      const authUserId = (req as any).auth?.authUserId;
+      if (!tenantId || !authUserId) throw new Error("Tenant context missing");
 
       const {
         email,
@@ -310,13 +305,11 @@ export class UserController {
       // B1: Role Normalization + Allowlist
       const roleUpper = String(role).trim().toUpperCase();
       if (!ALLOWED_TENANT_ROLES.includes(roleUpper)) {
-        // Explicitly forbid ADMIN and SUPER_ADMIN here by exclusion, but also explicit check for clarity
-        if (["ADMIN", "SUPER_ADMIN"].includes(roleUpper)) {
+        if (roleUpper === "SUPER_ADMIN") {
           return res.status(403).json({
             error: {
               code: "ADMIN_ROLE_FORBIDDEN",
-              message:
-                "Only Super Admin creates tenant admins via platform routes",
+              message: "SUPER_ADMIN cannot be created via tenant routes",
             },
           });
         }
@@ -340,12 +333,14 @@ export class UserController {
 
       // B3: Campus IDs must belong to tenant
       if (Array.isArray(campus_ids) && campus_ids.length > 0) {
-        const validCount = await prisma.campus.count({
-          where: {
-            tenantId,
-            id: { in: campus_ids },
-          },
-        });
+        const validCount = await runWithTenantContext(tenantId, authUserId, (db) =>
+          db.campus.count({
+            where: {
+              tenantId,
+              id: { in: campus_ids },
+            },
+          }),
+        );
         if (validCount !== campus_ids.length) {
           return res.status(404).json({
             error: {
@@ -387,10 +382,12 @@ export class UserController {
         campus_ids &&
         campus_ids.length > 1
       ) {
-        const selectedCampuses = await prisma.campus.findMany({
-          where: { id: { in: campus_ids } },
-          select: { campusType: true },
-        });
+        const selectedCampuses = await runWithTenantContext(tenantId, authUserId, (db) =>
+          db.campus.findMany({
+            where: { tenantId, id: { in: campus_ids } },
+            select: { campusType: true },
+          }),
+        );
         const types = new Set(selectedCampuses.map((c) => c.campusType));
         if (types.has("SCHOOL") && types.has("PU")) {
           return res.status(409).json({
@@ -410,12 +407,18 @@ export class UserController {
       // });
       // if (existingProfile && existingProfile.tenantId !== tenantId) { ... }
 
-      // B2: Get or Create Auth User (No Role in Metadata)
-      const { userId, alreadyExisted } =
-        await getOrCreateAuthUser(normalizedEmail);
+      const provisionResult = await PlatformService.provisionTenantUser(
+        tenantId,
+        normalizedEmail,
+        full_name,
+        roleUpper,
+        authUserId,
+        sendInvite !== false,
+      );
+      const { userId, alreadyExisted, inviteSent } = provisionResult;
 
       // 4. Upsert Data
-      await prisma.$transaction(async (tx) => {
+      await runWithTenantContext(tenantId, authUserId, async (tx) => {
         // Upsert Profile
         await tx.profile.upsert({
           where: { id: userId },
@@ -503,25 +506,6 @@ export class UserController {
         }
       });
 
-      // 5. Send Invite
-      let inviteSent = false;
-      if (sendInvite) {
-        // D1: Use public origin
-        const origin = getPublicAppOrigin(req);
-        // B6: Use recovery type so it works for both new and existing users
-        const redirectUrl = `${origin}/auth/callback?type=recovery&token=mock-token-${userId}`;
-
-        // Mock Email Sending
-        await EmailService.sendMail(
-          normalizedEmail || "",
-          "Activate your account", // Subject per B6
-          `<p>You have been invited to join <strong>${(req as any).tenant?.name || "the organization"}</strong> on ERP.</p>
-            <p>Set your password using the link below:</p>
-            <p><a href="${redirectUrl}">Set Password</a></p>`,
-        );
-        inviteSent = true;
-      }
-
       return res.status(alreadyExisted ? 200 : 201).json({
         profileId: userId,
         alreadyExisted,
@@ -546,7 +530,8 @@ export class UserController {
     try {
       const tenantId = (req as any).tenant?.tenantId;
       const requesterId = (req as any).user?.id;
-      if (!tenantId) throw new Error("Tenant context missing");
+      const authUserId = (req as any).auth?.authUserId;
+      if (!tenantId || !authUserId) throw new Error("Tenant context missing");
 
       const { id } = req.params;
       const {
@@ -558,7 +543,9 @@ export class UserController {
         is_active,
       } = req.body;
 
-      const userProfile = await prisma.profile.findUnique({ where: { id } });
+      const userProfile = await runWithTenantContext(tenantId, authUserId, (db) =>
+        db.profile.findUnique({ where: { id } }),
+      );
       if (!userProfile || userProfile.tenantId !== tenantId) {
         return res
           .status(404)
@@ -580,11 +567,11 @@ export class UserController {
       if (role) {
         roleUpper = String(role).trim().toUpperCase();
         if (!ALLOWED_TENANT_ROLES.includes(roleUpper!)) {
-          if (["ADMIN", "SUPER_ADMIN"].includes(roleUpper!)) {
+          if (roleUpper! === "SUPER_ADMIN") {
             return res.status(403).json({
               error: {
                 code: "ADMIN_ROLE_FORBIDDEN",
-                message: "Cannot promote to ADMIN via this endpoint",
+                message: "Cannot promote to SUPER_ADMIN via this endpoint",
               },
             });
           }
@@ -622,12 +609,14 @@ export class UserController {
 
       // B3: Campus IDs must belong to tenant
       if (campus_ids && Array.isArray(campus_ids) && campus_ids.length > 0) {
-        const validCount = await prisma.campus.count({
-          where: {
-            tenantId,
-            id: { in: campus_ids },
-          },
-        });
+        const validCount = await runWithTenantContext(tenantId, authUserId, (db) =>
+          db.campus.count({
+            where: {
+              tenantId,
+              id: { in: campus_ids },
+            },
+          }),
+        );
         if (validCount !== campus_ids.length) {
           return res.status(404).json({
             error: {
@@ -705,9 +694,11 @@ export class UserController {
             });
           }
           // If existing user has specific access, check if it has any campuses.
-          const existingCount = await prisma.userCampusAccess.count({
-            where: { profileId: id },
-          });
+          const existingCount = await runWithTenantContext(tenantId, authUserId, (db) =>
+            db.userCampusAccess.count({
+              where: { profileId: id },
+            }),
+          );
           if (existingCount === 0) {
             return res.status(400).json({
               error: {
@@ -722,10 +713,12 @@ export class UserController {
       // Validate Campus Mix for Restricted Roles
       if (campus_ids && campus_ids.length > 1) {
         if (["TEACHER", "STAFF"].includes(effectiveRole)) {
-          const selectedCampuses = await prisma.campus.findMany({
-            where: { id: { in: campus_ids } },
-            select: { campusType: true },
-          });
+          const selectedCampuses = await runWithTenantContext(tenantId, authUserId, (db) =>
+            db.campus.findMany({
+              where: { tenantId, id: { in: campus_ids } },
+              select: { campusType: true },
+            }),
+          );
           const types = new Set(selectedCampuses.map((c) => c.campusType));
           if (types.has("SCHOOL") && types.has("PU")) {
             return res.status(409).json({
@@ -739,7 +732,7 @@ export class UserController {
         }
       }
 
-      await prisma.$transaction(async (tx) => {
+      await runWithTenantContext(tenantId, authUserId, async (tx) => {
         // Update Profile
         const updateData: any = {};
         if (full_name) updateData.fullName = full_name;
@@ -752,6 +745,23 @@ export class UserController {
           await tx.profile.update({
             where: { id },
             data: updateData,
+          });
+        }
+
+        if (roleUpper) {
+          const nextMembershipRole = mapUserRoleToMembershipRole(roleUpper);
+          await tx.tenantMembership.updateMany({
+            where: {
+              userId: id,
+              tenantId,
+            },
+            data: {
+              role: nextMembershipRole as any,
+              campusScope:
+                roleUpper === "ADMIN" || all_campuses_access === true
+                  ? "ALL"
+                  : undefined,
+            },
           });
         }
 
@@ -800,13 +810,15 @@ export class UserController {
         }
       });
 
-      const updated = await prisma.profile.findUnique({
-        where: { id },
-        include: {
-          employee: true,
-          campusAccess: { include: { campus: true } },
-        },
-      });
+      const updated = await runWithTenantContext(tenantId, authUserId, (db) =>
+        db.profile.findUnique({
+          where: { id },
+          include: {
+            employee: true,
+            campusAccess: { include: { campus: true } },
+          },
+        }),
+      );
       if (!updated)
         return res.status(500).json({
           error: {
@@ -865,10 +877,13 @@ export class UserController {
   static async resendInvite(req: Request, res: Response) {
     try {
       const tenantId = (req as any).tenant?.tenantId;
-      if (!tenantId) throw new Error("Tenant context missing");
+      const authUserId = (req as any).auth?.authUserId;
+      if (!tenantId || !authUserId) throw new Error("Tenant context missing");
 
       const { id } = req.params;
-      const userProfile = await prisma.profile.findUnique({ where: { id } });
+      const userProfile = await runWithTenantContext(tenantId, authUserId, (db) =>
+        db.profile.findUnique({ where: { id } }),
+      );
 
       if (!userProfile || userProfile.tenantId !== tenantId) {
         return res.status(404).json({ error: { message: "User not found" } });
@@ -884,20 +899,8 @@ export class UserController {
         });
       }
 
-      // D1: Get public origin
-      const origin = getPublicAppOrigin(req);
-      // D2: Always generateLink type="recovery"
-      const redirectUrl = `${origin}/auth/callback?type=recovery&token=mock-token-${id}`;
-
-      // D3: Subject: "Activate your account"
-      await EmailService.sendMail(
-        userProfile.email || "",
-        "Activate your account",
-        `<p>You have been invited to join ERP.</p>
-        <p><a href="${redirectUrl}">Set Password</a></p>`,
-      );
-
-      return res.json({ inviteSent: true });
+      const result = await PlatformService.resendInvite(id);
+      return res.json(result);
     } catch (err: any) {
       console.error(`UserController.resendInvite error: ${err.message}`);
       return res
@@ -912,10 +915,13 @@ export class UserController {
   static async resetPassword(req: Request, res: Response) {
     try {
       const tenantId = (req as any).tenant?.tenantId;
-      if (!tenantId) throw new Error("Tenant context missing");
+      const authUserId = (req as any).auth?.authUserId;
+      if (!tenantId || !authUserId) throw new Error("Tenant context missing");
 
       const { id } = req.params;
-      const userProfile = await prisma.profile.findUnique({ where: { id } });
+      const userProfile = await runWithTenantContext(tenantId, authUserId, (db) =>
+        db.profile.findUnique({ where: { id } }),
+      );
 
       if (!userProfile || userProfile.tenantId !== tenantId) {
         return res.status(404).json({ error: { message: "User not found" } });

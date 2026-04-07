@@ -11,106 +11,6 @@ import prisma from "../../../infrastructure/prisma/client";
  */
 
 export class PlatformController {
-  static async listAuditLogs(req: Request, res: Response) {
-    try {
-      const page = Math.max(Number(req.query.page) || 1, 1);
-      const limit = Math.min(Math.max(Number(req.query.limit) || 25, 1), 100);
-      const skip = (page - 1) * limit;
-
-      const [total, logs] = await Promise.all([
-        prisma.platformAuditLog.count(),
-        prisma.platformAuditLog.findMany({
-          orderBy: [{ at: "desc" }, { id: "desc" }],
-          skip,
-          take: limit,
-        }),
-      ]);
-
-      const actorIds = Array.from(
-        new Set(logs.map((log) => log.actorId).filter(Boolean)),
-      );
-
-      const actors = actorIds.length
-        ? await prisma.authUser.findMany({
-            where: { id: { in: actorIds } },
-            select: { id: true, email: true },
-          })
-        : [];
-
-      const actorEmailById = new Map(actors.map((actor) => [actor.id, actor.email]));
-
-      const data = logs.map((log) => ({
-        id: log.id,
-        at: log.at,
-        actorId: log.actorId,
-        actorEmail: actorEmailById.get(log.actorId) ?? null,
-        action: log.action,
-        targetType: log.targetType,
-        targetId: log.targetId,
-        meta: log.meta,
-        metaSummary:
-          typeof log.meta === "string"
-            ? log.meta
-            : log.meta
-              ? JSON.stringify(log.meta)
-              : null,
-      }));
-
-      return res.json({
-        data,
-        pagination: {
-          total,
-          page,
-          limit,
-          pages: Math.max(Math.ceil(total / limit), 1),
-        },
-      });
-    } catch (error: any) {
-      console.error("[PlatformController] listAuditLogs error:", error);
-      return res.status(500).json({ error: error.message });
-    }
-  }
-
-  static async getAuditLog(req: Request, res: Response) {
-    try {
-      const { logId } = req.params;
-      const log = await prisma.platformAuditLog.findUnique({
-        where: { id: logId },
-      });
-
-      if (!log) {
-        return res.status(404).json({ error: "Audit log not found" });
-      }
-
-      const actor = await prisma.authUser.findUnique({
-        where: { id: log.actorId },
-        select: { id: true, email: true },
-      });
-
-      return res.json({
-        data: {
-          id: log.id,
-          at: log.at,
-          actorId: log.actorId,
-          actorEmail: actor?.email ?? null,
-          action: log.action,
-          targetType: log.targetType,
-          targetId: log.targetId,
-          meta: log.meta,
-          metaSummary:
-            typeof log.meta === "string"
-              ? log.meta
-              : log.meta
-                ? JSON.stringify(log.meta)
-                : null,
-        },
-      });
-    } catch (error: any) {
-      console.error("[PlatformController] getAuditLog error:", error);
-      return res.status(500).json({ error: error.message });
-    }
-  }
-
   /**
    * GET /api/platform/tenants
    * List all tenants with primary Admin details
@@ -166,7 +66,7 @@ export class PlatformController {
    */
   static async createTenant(req: Request, res: Response) {
     try {
-      const { name, slug, subdomain } = req.body;
+      const { name, slug, subdomain, features } = req.body;
       const tenantSlug = slug || subdomain;
       const actorId = (req as any).platformUser.id;
 
@@ -178,6 +78,7 @@ export class PlatformController {
         name,
         tenantSlug || null,
         actorId,
+        Array.isArray(features) ? features : undefined,
       );
 
       return res.status(201).json({
@@ -288,10 +189,10 @@ export class PlatformController {
           .json({ error: "Name and campus_type are required" });
       }
 
-      if (!["SCHOOL", "PU"].includes(campus_type)) {
+      if (!["SCHOOL", "PU", "DEGREE"].includes(campus_type)) {
         return res
           .status(400)
-          .json({ error: "campus_type must be SCHOOL or PU" });
+          .json({ error: "campus_type must be SCHOOL, PU, or DEGREE" });
       }
 
       const campus = await PlatformService.createCampus(
@@ -390,7 +291,11 @@ export class PlatformController {
     } catch (error: any) {
       console.error("[PlatformController] createFirstAdmin error:", error);
 
-      if (error.code === "EMAIL_IS_PLATFORM" || error.code === "EMAIL_IN_USE") {
+      if (
+        error.code === "EMAIL_IS_PLATFORM" ||
+        error.code === "EMAIL_IN_USE" ||
+        error.code === "PRIMARY_ADMIN_EMAIL_ALREADY_EXISTS"
+      ) {
         return res.status(409).json({ error: error.message, code: error.code });
       }
 
@@ -405,6 +310,7 @@ export class PlatformController {
   static async listFeatures(req: Request, res: Response) {
     try {
       const { tenantId } = req.params;
+      await PlatformService.ensureRequiredTenantFeatures(tenantId);
 
       const features = await prisma.tenantFeature.findMany({
         where: { tenantId },
@@ -432,6 +338,7 @@ export class PlatformController {
       }
 
       await PlatformService.updateTenantFeatures(tenantId, features, actorId);
+      await PlatformService.ensureRequiredTenantFeatures(tenantId);
 
       // Return updated features
       const updatedFeatures = await prisma.tenantFeature.findMany({
@@ -511,6 +418,132 @@ export class PlatformController {
       return res.json({ data: platformUser });
     } catch (error: any) {
       console.error("[PlatformController] getMe error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/platform/audit-logs
+   * List platform audit logs
+   */
+  static async listAuditLogs(req: Request, res: Response) {
+    try {
+      const limit = Math.min(
+        Math.max(parseInt((req.query.limit as string) || "25", 10), 1),
+        100,
+      );
+      const page = Math.max(parseInt((req.query.page as string) || "1", 10), 1);
+      const skip = (page - 1) * limit;
+
+      const where: any = {};
+      if (req.query.actor_id) where.actorId = String(req.query.actor_id);
+      if (req.query.action) where.action = String(req.query.action);
+      if (req.query.target_type) where.targetType = String(req.query.target_type);
+      if (req.query.target_id) where.targetId = String(req.query.target_id);
+
+      if (req.query.start_date || req.query.end_date) {
+        where.at = {};
+        if (req.query.start_date) where.at.gte = new Date(String(req.query.start_date));
+        if (req.query.end_date) where.at.lte = new Date(String(req.query.end_date));
+      }
+
+      const [logs, total] = await prisma.$transaction([
+        prisma.platformAuditLog.findMany({
+          where,
+          orderBy: [{ at: "desc" }, { id: "desc" }],
+          skip,
+          take: limit,
+        }),
+        prisma.platformAuditLog.count({ where }),
+      ]);
+
+      const actorIds = Array.from(
+        new Set(logs.map((log) => log.actorId).filter(Boolean)),
+      );
+      const actors =
+        actorIds.length > 0
+          ? await prisma.authUser.findMany({
+              where: { id: { in: actorIds } },
+              select: { id: true, email: true },
+            })
+          : [];
+      const actorMap = new Map(actors.map((actor) => [actor.id, actor.email]));
+
+      const items = logs.map((log) => {
+        const meta = (log.meta ?? {}) as Record<string, any>;
+        const after = (meta.after ?? {}) as Record<string, any>;
+        const before = (meta.before ?? {}) as Record<string, any>;
+        const label =
+          after.name ||
+          after.email ||
+          after.feature_key ||
+          before.name ||
+          before.email ||
+          before.feature_key ||
+          null;
+
+        return {
+          id: log.id,
+          at: log.at,
+          actorId: log.actorId,
+          actorEmail: actorMap.get(log.actorId) ?? null,
+          action: log.action,
+          targetType: log.targetType,
+          targetId: log.targetId,
+          meta: log.meta,
+          metaSummary: label ? `${log.action} ${label}` : log.action,
+        };
+      });
+
+      return res.json({
+        data: items,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error: any) {
+      console.error("[PlatformController] listAuditLogs error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/platform/audit-logs/:logId
+   * Get platform audit log detail
+   */
+  static async getAuditLog(req: Request, res: Response) {
+    try {
+      const { logId } = req.params;
+      const log = await prisma.platformAuditLog.findUnique({
+        where: { id: logId },
+      });
+
+      if (!log) {
+        return res.status(404).json({ error: "Audit log not found" });
+      }
+
+      const actor = await prisma.authUser.findUnique({
+        where: { id: log.actorId },
+        select: { id: true, email: true },
+      });
+
+      return res.json({
+        data: {
+          id: log.id,
+          at: log.at,
+          actorId: log.actorId,
+          actorEmail: actor?.email ?? null,
+          action: log.action,
+          targetType: log.targetType,
+          targetId: log.targetId,
+          meta: log.meta,
+        },
+      });
+    } catch (error: any) {
+      console.error("[PlatformController] getAuditLog error:", error);
       return res.status(500).json({ error: error.message });
     }
   }
@@ -627,7 +660,8 @@ export class PlatformController {
 
       // TODO: Replace Supabase Magic Link with a local token or other mechanism if needed
       // For now, return a placeholder or "Not Implemented"
-      const impersonationUrl = `http://localhost:5173/auth/callback?token=mock-impersonation-token&type=magiclink`;
+      const frontendBase = process.env.FRONTEND_URL || "https://d18w0fdwt58ts4.cloudfront.net";
+      const impersonationUrl = `${frontendBase}/auth/callback?token=mock-impersonation-token&type=magiclink`;
 
       return res.json({ data: { impersonation_url: impersonationUrl } });
     } catch (error: any) {
