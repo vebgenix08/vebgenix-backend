@@ -1,0 +1,44 @@
+# =============================================================================
+# Prod environment — terraform.tfvars.example
+# Copy to terraform.tfvars and fill in values. NEVER commit terraform.tfvars.
+# Use AWS Secrets Manager or CI/CD environment variables for sensitive values.
+# =============================================================================
+
+# AWS Configuration
+aws_region     = "ap-south-1"
+aws_account_id = "278035644568"
+
+# Neon PostgreSQL
+# Get your API key from: https://console.neon.tech/app/settings/api-keys
+neon_api_key = "your-neon-api-key-here"
+
+# Get from Neon project → Connection Details → Connection string
+# Format: postgresql://user:password@ep-xxx.ap-south-1.aws.neon.tech/dbname?sslmode=require
+neon_database_url = "postgresql://neondb_owner:password@ep-xxx.ap-south-1.aws.neon.tech/vebgenix_prod?sslmode=require"
+
+# Frontend URL — only needed if not using a custom domain
+# If domain_name is set, this is auto-derived as https://{app_subdomain}.{domain_name}
+# frontend_url = "https://app.vebgenix.com"
+
+# Custom domain (optional — leave empty to use CloudFront default domains)
+# Once set, Terraform will create a Route53 hosted zone and ACM certificate.
+# After apply, update your domain registrar nameservers to the values in dns_nameservers output.
+domain_name   = ""
+# domain_name   = "vebgenix.com"
+
+api_subdomain = "api"
+app_subdomain = "app"
+
+# Lambda prod alias version
+# Update this after each production deployment to promote a new version.
+prod_lambda_version = "1"
+
+# Alert email — receives CloudWatch alarm notifications
+alert_email = "ops@your-company.com"
+
+# EC2 configuration
+ec2_instance_type  = "t4g.small"
+ec2_volume_size_gb = 20
+
+# Availability zones
+availability_zones = ["ap-south-1a", "ap-south-1b"]
