@@ -29,18 +29,8 @@ resource "aws_sns_topic_subscription" "email_alerts" {
   endpoint  = var.alert_email
 }
 
-# ---------------------------------------------------------------------------
-# CloudWatch Log Groups for Lambda Functions
-# ---------------------------------------------------------------------------
-
-resource "aws_cloudwatch_log_group" "lambda" {
-  for_each = toset(var.lambda_function_names)
-
-  name              = "/aws/lambda/${each.value}"
-  retention_in_days = var.log_retention_days
-
-  tags = local.tags
-}
+# Note: Lambda log groups (/aws/lambda/*) are managed by the lambda module.
+# We reference Lambda function names only for alarms — no separate log group here.
 
 # Log groups for EC2 nginx (prod only)
 resource "aws_cloudwatch_log_group" "nginx_access" {

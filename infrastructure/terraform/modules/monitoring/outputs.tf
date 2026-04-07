@@ -14,8 +14,8 @@ output "dashboard_name" {
 }
 
 output "log_group_names" {
-  description = "Map of Lambda function name to CloudWatch log group name"
+  description = "Map of Lambda function name to expected CloudWatch log group name"
   value = {
-    for k, v in aws_cloudwatch_log_group.lambda : k => v.name
+    for fn in var.lambda_function_names : fn => "/aws/lambda/${fn}"
   }
 }
