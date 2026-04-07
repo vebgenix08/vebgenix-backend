@@ -328,8 +328,11 @@ resource "aws_lambda_alias" "prod" {
 # ---------------------------------------------------------------------------
 # CloudWatch Log Groups
 # ---------------------------------------------------------------------------
+# Lambda functions are shared across stages (dev/prod use aliases on the
+# same functions). Log groups are created once — only in prod — to set
+# the retention policy. Dev skips creation to avoid ResourceAlreadyExists.
 resource "aws_cloudwatch_log_group" "lambda_logs" {
-  for_each = local.all_functions
+  for_each = var.stage == "prod" ? local.all_functions : {}
 
   name              = "/aws/lambda/${local.name_prefix}-${each.key}"
   retention_in_days = var.log_retention_days
