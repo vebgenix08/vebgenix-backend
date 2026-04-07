@@ -409,3 +409,60 @@ import {
   id = "Z07052912NSNZDECXAF2"
   to = module.dns[0].aws_route53_zone.main
 }
+
+# Network resources created by previous partial apply
+import {
+  id = "vpc-035734e9ab5cccddb"
+  to = module.network.aws_vpc.main
+}
+
+import {
+  id = "igw-04d755a91ccbf8190"
+  to = module.network.aws_internet_gateway.main
+}
+
+import {
+  id = "subnet-00a088903aaf342bd"
+  to = module.network.aws_subnet.public[0]
+}
+
+import {
+  id = "subnet-0511f2703d01f7f40"
+  to = module.network.aws_subnet.public[1]
+}
+
+import {
+  id = "sg-01220bac97f9331e8"
+  to = module.network.aws_security_group.rest_api
+}
+
+import {
+  id = "sg-091d47bdaf102cec5"
+  to = module.network.aws_security_group.ssm_endpoints
+}
+
+import {
+  id = "rtb-09fcfa369bd01e2fa"
+  to = module.network.aws_route_table.public
+}
+
+import {
+  id = "vpce-052efdb1c06245f01"
+  to = module.network.aws_vpc_endpoint.ssm
+}
+
+import {
+  id = "vpce-0b5fc4f9f93832d67"
+  to = module.network.aws_vpc_endpoint.ssmmessages
+}
+
+import {
+  id = "vpce-011f7309f7765bcd4"
+  to = module.network.aws_vpc_endpoint.ec2messages
+}
+
+# Frontend S3 bucket created by previous partial apply
+import {
+  id = "vebgenix-frontend-prod-278035644568"
+  to = module.storage.aws_s3_bucket.frontend[0]
+}
