@@ -82,11 +82,11 @@ resource "aws_cloudfront_distribution" "api" {
     origin_id   = "ec2-rest-api"
 
     custom_origin_config {
-      http_port              = var.api_origin_port
-      https_port             = 443
-      origin_protocol_policy = "http-only" # EC2 serves HTTP; CloudFront adds HTTPS
-      origin_ssl_protocols   = ["TLSv1.2"]
-      origin_read_timeout    = 60
+      http_port                = var.api_origin_port
+      https_port               = 443
+      origin_protocol_policy   = "http-only" # EC2 serves HTTP; CloudFront adds HTTPS
+      origin_ssl_protocols     = ["TLSv1.2"]
+      origin_read_timeout      = 60
       origin_keepalive_timeout = 5
     }
 
@@ -97,11 +97,11 @@ resource "aws_cloudfront_distribution" "api" {
   }
 
   default_cache_behavior {
-    target_origin_id         = "ec2-rest-api"
-    viewer_protocol_policy   = "redirect-to-https"
-    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods           = ["GET", "HEAD"]
-    compress                 = true
+    target_origin_id       = "ec2-rest-api"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
 
     cache_policy_id          = aws_cloudfront_cache_policy.api_no_cache.id
     origin_request_policy_id = aws_cloudfront_origin_request_policy.api_all_viewer.id
@@ -251,6 +251,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "cf_logs" {
   rule {
     id     = "expire-logs"
     status = "Enabled"
+
+    # filter {} is required by AWS provider >= 4.0 (even for apply-to-all rules)
+    filter {}
 
     expiration {
       days = var.stage == "prod" ? 90 : 30

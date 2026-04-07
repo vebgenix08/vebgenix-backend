@@ -21,13 +21,13 @@ locals {
 # Cognito User Pool
 # ---------------------------------------------------------------------------
 resource "aws_cognito_user_pool" "main" {
-  name = "${local.name_prefix}-users"
+  # Name matches existing prod pool "vebgenix-prod" (name is immutable after creation)
+  name = local.name_prefix
 
   # Username configuration
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
-  # Alias attributes (allow sign-in with email)
   username_configuration {
     case_sensitive = false
   }
@@ -120,7 +120,7 @@ resource "aws_cognito_user_pool" "main" {
     }
   }
 
-  # User pool add-ons (advanced security)
+  # User pool add-ons (advanced security) — managed separately, ignore drift
   user_pool_add_ons {
     advanced_security_mode = var.stage == "prod" ? "ENFORCED" : "AUDIT"
   }
@@ -133,8 +133,12 @@ resource "aws_cognito_user_pool" "main" {
   lifecycle {
     prevent_destroy = true
     ignore_changes = [
-      # Schema changes require recreation; protect against accidental destruction
+      # name is immutable — ignore drift between config and existing pool
+      name,
+      # schema changes require recreation — protect against accidental destruction
       schema,
+      # advanced security mode — avoid unintentional cost changes on existing pools
+      user_pool_add_ons,
     ]
   }
 }
@@ -165,9 +169,9 @@ resource "aws_cognito_user_pool_client" "frontend" {
   ]
 
   # Token validity
-  access_token_validity  = 60   # 60 minutes
-  id_token_validity      = 60   # 60 minutes
-  refresh_token_validity = 30   # 30 days
+  access_token_validity  = 60 # 60 minutes
+  id_token_validity      = 60 # 60 minutes
+  refresh_token_validity = 30 # 30 days
 
   token_validity_units {
     access_token  = "minutes"

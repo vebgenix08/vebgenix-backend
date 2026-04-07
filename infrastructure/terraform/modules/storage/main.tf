@@ -1,7 +1,7 @@
 locals {
-  name_prefix             = "vebgenix"
-  documents_bucket_name   = "${local.name_prefix}-documents-${var.stage}-${var.aws_account_id}"
-  frontend_bucket_name    = "${local.name_prefix}-frontend-${var.stage}-${var.aws_account_id}"
+  name_prefix           = "vebgenix"
+  documents_bucket_name = "${local.name_prefix}-documents-${var.stage}-${var.aws_account_id}"
+  frontend_bucket_name  = "${local.name_prefix}-frontend-${var.stage}-${var.aws_account_id}"
   cors_allowed_origins = compact([
     var.frontend_url != "" ? var.frontend_url : null,
     var.stage == "dev" ? "http://localhost:3000" : null,
@@ -76,6 +76,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "documents" {
     id     = "transition-to-ia"
     status = "Enabled"
 
+    # filter {} required by AWS provider >= 4.0 for rules that apply to all objects
+    filter {}
+
     transition {
       days          = 90
       storage_class = "STANDARD_IA"
@@ -86,6 +89,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "documents" {
     id     = "abort-incomplete-multipart"
     status = "Enabled"
 
+    filter {}
+
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
@@ -94,6 +99,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "documents" {
   rule {
     id     = "expire-old-versions"
     status = "Enabled"
+
+    filter {}
 
     noncurrent_version_expiration {
       noncurrent_days = 90
@@ -161,6 +168,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "frontend" {
     id     = "abort-incomplete-multipart"
     status = "Enabled"
 
+    filter {}
+
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
@@ -169,6 +178,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "frontend" {
   rule {
     id     = "expire-old-versions"
     status = "Enabled"
+
+    filter {}
 
     noncurrent_version_expiration {
       noncurrent_days = 30
