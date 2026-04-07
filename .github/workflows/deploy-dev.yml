@@ -455,6 +455,8 @@ jobs:
               "systemctl restart vebgenix-rest",
               "echo 'd29ya2VyX3Byb2Nlc3NlcyBhdXRvOwpldmVudHMgeyB3b3JrZXJfY29ubmVjdGlvbnMgMTAyNDsgfQpodHRwIHsKICBpbmNsdWRlIG1pbWUudHlwZXM7CiAgZGVmYXVsdF90eXBlIGFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbTsKICBzZW5kZmlsZSBvbjsKICBrZWVwYWxpdmVfdGltZW91dCA2NTsKICBzZXJ2ZXIgewogICAgbGlzdGVuIDgwIGRlZmF1bHRfc2VydmVyOwogICAgc2VydmVyX25hbWUgXzsKICAgIGNsaWVudF9tYXhfYm9keV9zaXplIDUwbTsKICAgIGxvY2F0aW9uID0gL2hlYWx0aHogewogICAgICBhZGRfaGVhZGVyIENvbnRlbnQtVHlwZSB0ZXh0L3BsYWluOwogICAgICByZXR1cm4gMjAwIG9rOwogICAgfQogICAgbG9jYXRpb24gLyB7CiAgICAgIHByb3h5X3Bhc3MgaHR0cDovLzEyNy4wLjAuMTo1MDAwOwogICAgICBwcm94eV9odHRwX3ZlcnNpb24gMS4xOwogICAgICBwcm94eV9zZXRfaGVhZGVyIEhvc3QgJGhvc3Q7CiAgICAgIHByb3h5X3NldF9oZWFkZXIgWC1SZWFsLUlQICRyZW1vdGVfYWRkcjsKICAgICAgcHJveHlfc2V0X2hlYWRlciBYLUZvcndhcmRlZC1Gb3IgJHByb3h5X2FkZF94X2ZvcndhcmRlZF9mb3I7CiAgICAgIHByb3h5X3NldF9oZWFkZXIgWC1Gb3J3YXJkZWQtUHJvdG8gJHNjaGVtZTsKICAgICAgcHJveHlfc2V0X2hlYWRlciBYLUZvcndhcmRlZC1Ib3N0ICRob3N0OwogICAgfQogIH0KfQo=' | base64 -d > /etc/nginx/nginx.conf",
               "which nginx || dnf install -y nginx -q",
+              "nginx -s quit 2>/dev/null || pkill -f nginx 2>/dev/null || true",
+              "sleep 2",
               "systemctl enable nginx && systemctl restart nginx",
           ]
           print(json.dumps({"commands": commands}))
