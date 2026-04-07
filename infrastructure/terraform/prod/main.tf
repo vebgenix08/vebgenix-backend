@@ -446,28 +446,8 @@ import {
 }
 
 import {
-  id = "sg-091d47bdaf102cec5"
-  to = module.network.aws_security_group.ssm_endpoints
-}
-
-import {
   id = "rtb-09fcfa369bd01e2fa"
   to = module.network.aws_route_table.public
-}
-
-import {
-  id = "vpce-052efdb1c06245f01"
-  to = module.network.aws_vpc_endpoint.ssm
-}
-
-import {
-  id = "vpce-0b5fc4f9f93832d67"
-  to = module.network.aws_vpc_endpoint.ssmmessages
-}
-
-import {
-  id = "vpce-011f7309f7765bcd4"
-  to = module.network.aws_vpc_endpoint.ec2messages
 }
 
 # Frontend S3 bucket created by previous partial apply

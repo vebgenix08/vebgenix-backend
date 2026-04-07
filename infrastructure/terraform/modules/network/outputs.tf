@@ -28,10 +28,6 @@ output "rest_api_security_group_id" {
   value       = aws_security_group.rest_api.id
 }
 
-output "ssm_security_group_id" {
-  description = "Security group ID for SSM endpoints"
-  value       = aws_security_group.ssm_endpoints.id
-}
 
 output "public_route_table_id" {
   description = "Public route table ID"

@@ -115,82 +115,8 @@ resource "aws_security_group" "rest_api" {
   }
 }
 
-# ---------------------------------------------------------------------------
-# Security Group — SSM endpoints (allows SSM communication without bastion)
-# ---------------------------------------------------------------------------
-resource "aws_security_group" "ssm_endpoints" {
-  name        = "${local.name_prefix}-ssm-sg"
-  description = "Security group for SSM VPC endpoints"
-  vpc_id      = aws_vpc.main.id
-
-  # SSM requires HTTPS outbound from instances
-  egress {
-    description = "HTTPS to SSM endpoints"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Allow inbound 443 from VPC CIDR (for endpoint traffic)
-  ingress {
-    description = "HTTPS from VPC"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
-  }
-
-  tags = merge(local.tags, {
-    Name = "${local.name_prefix}-ssm-sg"
-  })
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# ---------------------------------------------------------------------------
-# VPC Endpoints for SSM (avoids internet traffic for SSM Session Manager)
-# ---------------------------------------------------------------------------
-resource "aws_vpc_endpoint" "ssm" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ssm"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = aws_subnet.public[*].id
-  security_group_ids  = [aws_security_group.ssm_endpoints.id]
-  private_dns_enabled = true
-
-  tags = merge(local.tags, {
-    Name = "${local.name_prefix}-ssm-endpoint"
-  })
-}
-
-resource "aws_vpc_endpoint" "ssmmessages" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ssmmessages"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = aws_subnet.public[*].id
-  security_group_ids  = [aws_security_group.ssm_endpoints.id]
-  private_dns_enabled = true
-
-  tags = merge(local.tags, {
-    Name = "${local.name_prefix}-ssmmessages-endpoint"
-  })
-}
-
-resource "aws_vpc_endpoint" "ec2messages" {
-  vpc_id              = aws_vpc.main.id
-  service_name        = "com.amazonaws.${var.aws_region}.ec2messages"
-  vpc_endpoint_type   = "Interface"
-  subnet_ids          = aws_subnet.public[*].id
-  security_group_ids  = [aws_security_group.ssm_endpoints.id]
-  private_dns_enabled = true
-
-  tags = merge(local.tags, {
-    Name = "${local.name_prefix}-ec2messages-endpoint"
-  })
-}
+# SSM VPC endpoints removed — EC2 has a public EIP and IGW so SSM agent
+# reaches the SSM service via the internet. VPC endpoints are not required.
 
 # ---------------------------------------------------------------------------
 # VPC Flow Logs
