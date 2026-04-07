@@ -223,6 +223,17 @@ resource "aws_appsync_function" "resolver_functions" {
 }
 
 # ---------------------------------------------------------------------------
+# NONE datasource — for local resolvers that don't call a backend
+# ---------------------------------------------------------------------------
+resource "aws_appsync_datasource" "none" {
+  api_id = aws_appsync_graphql_api.main.id
+  name   = "NONE"
+  type   = "NONE"
+
+  depends_on = [aws_appsync_graphql_api.main]
+}
+
+# ---------------------------------------------------------------------------
 # AppSync Resolvers — health query (simple passthrough)
 # ---------------------------------------------------------------------------
 resource "aws_appsync_resolver" "health" {
@@ -230,7 +241,7 @@ resource "aws_appsync_resolver" "health" {
   type        = "Query"
   field       = "health"
   kind        = "UNIT"
-  data_source = "NONE"
+  data_source = aws_appsync_datasource.none.name
 
   runtime {
     name            = "APPSYNC_JS"

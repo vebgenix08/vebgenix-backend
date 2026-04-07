@@ -139,9 +139,12 @@ resource "aws_cloudfront_distribution" "api" {
 
   lifecycle {
     ignore_changes = [
-      # Existing CDK-created distribution may have different origin config
+      # Existing CDK-created distribution may have different origin/behavior config
       origin,
       logging_config,
+      default_cache_behavior,
+      aliases,
+      viewer_certificate,
     ]
   }
 

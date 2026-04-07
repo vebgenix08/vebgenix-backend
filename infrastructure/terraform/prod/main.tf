@@ -344,6 +344,14 @@ module "async" {
   jobs_worker_alias_arn         = module.lambda.async_worker_prod_arns["jobs-worker"]
   cognito_provisioner_alias_arn = module.lambda.async_worker_prod_arns["cognito-provisioner"]
 
+  # SQS visibility timeout must be >= Lambda function timeout
+  # email-worker: 60s timeout → 360s (6x)
+  # jobs-worker:  300s timeout → 360s (min 6x Lambda recommended)
+  # cognito:      60s timeout → 360s (6x)
+  email_queue_visibility_timeout   = 360
+  jobs_queue_visibility_timeout    = 360
+  cognito_queue_visibility_timeout = 360
+
   depends_on = [module.lambda]
 }
 
@@ -466,4 +474,10 @@ import {
 import {
   id = "vebgenix-frontend-prod-278035644568"
   to = module.storage.aws_s3_bucket.frontend[0]
+}
+
+# EventBridge event bus created by previous partial apply
+import {
+  id = "vebgenix-prod"
+  to = module.async.aws_cloudwatch_event_bus.main
 }
