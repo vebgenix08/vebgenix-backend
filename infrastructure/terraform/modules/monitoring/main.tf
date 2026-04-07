@@ -259,12 +259,13 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
         properties = {
           title  = "SQS Queue Depths"
+          region = var.aws_region
           period = 60
           stat   = "Sum"
           metrics = var.email_queue_name != "" && var.jobs_queue_name != "" ? [
             ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", var.email_queue_name],
             ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", var.jobs_queue_name],
-          ] : []
+          ] : [["AWS/SQS", "ApproximateNumberOfMessagesVisible"]]
         }
       },
       {
@@ -275,6 +276,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
         properties = {
           title  = "Lambda Errors"
+          region = var.aws_region
           period = 60
           stat   = "Sum"
           metrics = [
@@ -291,6 +293,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
         properties = {
           title  = "Lambda Duration (p99)"
+          region = var.aws_region
           period = 60
           stat   = "p99"
           metrics = [
@@ -307,6 +310,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         height = 6
         properties = {
           title  = "Lambda Invocations"
+          region = var.aws_region
           period = 60
           stat   = "Sum"
           metrics = [
