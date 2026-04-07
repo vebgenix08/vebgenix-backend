@@ -358,7 +358,9 @@ module "monitoring" {
   email_dlq_name        = module.async.email_dlq_name
   jobs_queue_name       = module.async.jobs_queue_name
   jobs_dlq_name         = module.async.jobs_dlq_name
-  ec2_instance_id       = module.ec2.instance_id
+  # Pass literal instance ID so count is known at plan time
+  # (module.ec2.instance_id is computed and cannot drive count)
+  ec2_instance_id = "i-0b1260d7d90d8f7b3"
 
   depends_on = [module.lambda, module.async, module.ec2]
 }

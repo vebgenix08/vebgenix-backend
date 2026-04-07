@@ -383,8 +383,12 @@ resource "aws_instance" "rest_api" {
 
   lifecycle {
     ignore_changes = [
-      ami,           # Don't replace on AMI updates — use Systems Manager for patching
-      user_data,     # Don't replace on user_data changes — managed via deployment
+      ami,            # Don't replace on AMI updates — use Systems Manager for patching
+      user_data,      # Don't replace on user_data changes — managed via deployment
+      subnet_id,      # Existing instance is in pre-CDK subnet — ignore drift
+      launch_template, # CDK created instance with launch template — ignore removal
+      vpc_security_group_ids, # Security groups may differ from CDK-created instance
+      iam_instance_profile,   # IAM profile may differ from CDK-created instance
     ]
   }
 }

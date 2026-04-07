@@ -69,24 +69,25 @@ output "ec2_public_ip" {
   value       = module.ec2.public_ip
 }
 
+# cloudfront is a single module (no count/for_each) — access directly
 output "cloudfront_api_distribution_id" {
   description = "Prod CloudFront API distribution ID"
-  value       = module.cloudfront[0].api_distribution_id
+  value       = module.cloudfront.api_distribution_id
 }
 
 output "cloudfront_api_domain" {
   description = "Prod CloudFront API domain name"
-  value       = module.cloudfront[0].api_domain_name
+  value       = module.cloudfront.api_domain_name
 }
 
 output "cloudfront_frontend_distribution_id" {
   description = "Prod CloudFront frontend distribution ID"
-  value       = module.cloudfront[0].frontend_distribution_id
+  value       = module.cloudfront.frontend_distribution_id
 }
 
 output "cloudfront_frontend_domain" {
   description = "Prod CloudFront frontend domain name"
-  value       = module.cloudfront[0].frontend_domain_name
+  value       = module.cloudfront.frontend_domain_name
 }
 
 output "dns_nameservers" {
@@ -96,12 +97,12 @@ output "dns_nameservers" {
 
 output "api_fqdn" {
   description = "API fully qualified domain name"
-  value       = var.domain_name != "" ? module.dns[0].api_fqdn : module.cloudfront[0].api_domain_name
+  value       = var.domain_name != "" ? "${var.api_subdomain}.${var.domain_name}" : module.cloudfront.api_domain_name
 }
 
 output "app_fqdn" {
   description = "App fully qualified domain name"
-  value       = var.domain_name != "" ? module.dns[0].app_fqdn : module.cloudfront[0].frontend_domain_name
+  value       = var.domain_name != "" ? "${var.app_subdomain}.${var.domain_name}" : module.cloudfront.frontend_domain_name
 }
 
 output "email_queue_url" {
