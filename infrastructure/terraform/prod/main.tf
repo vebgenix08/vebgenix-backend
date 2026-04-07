@@ -402,3 +402,8 @@ import {
   id = "E1BFBMTG1KVMMD"
   to = module.cloudfront.aws_cloudfront_distribution.frontend
 }
+
+import {
+  id = "Z07052912NSNZDECXAF2"
+  to = module.dns[0].aws_route53_zone.main
+}
