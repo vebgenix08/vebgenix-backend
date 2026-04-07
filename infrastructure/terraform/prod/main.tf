@@ -6,10 +6,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    neon = {
-      source  = "kislerdim/neon"
-      version = "~> 0.6"
-    }
   }
 
   backend "s3" {
@@ -47,9 +43,6 @@ provider "aws" {
   }
 }
 
-provider "neon" {
-  api_key = var.neon_api_key
-}
 
 # ---------------------------------------------------------------------------
 # Locals

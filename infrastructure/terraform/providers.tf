@@ -5,10 +5,6 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    neon = {
-      source  = "kislerdm/neon"
-      version = "~> 0.6"
-    }
   }
 }
 
@@ -34,8 +30,4 @@ provider "aws" {
       ManagedBy = "terraform"
     }
   }
-}
-
-provider "neon" {
-  api_key = var.neon_api_key
 }

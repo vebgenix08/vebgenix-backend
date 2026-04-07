@@ -10,12 +10,6 @@ variable "aws_account_id" {
   default     = "278035644568" # Prod account
 }
 
-variable "neon_api_key" {
-  description = "Neon serverless PostgreSQL API key"
-  type        = string
-  sensitive   = true
-}
-
 variable "neon_database_url" {
   description = "Neon PostgreSQL connection string for prod environment"
   type        = string

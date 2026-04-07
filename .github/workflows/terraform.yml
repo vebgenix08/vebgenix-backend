@@ -60,8 +60,6 @@ jobs:
       - name: Write terraform.tfvars
         working-directory: infrastructure/terraform/${{ env.ENVIRONMENT }}
         env:
-          NEON_API_KEY:      ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID:   ${{ secrets.NEON_PROJECT_ID }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           ALERT_EMAIL:       ${{ secrets.ALERT_EMAIL }}
           DOMAIN_NAME:       ${{ secrets.DOMAIN_NAME }}
@@ -72,8 +70,6 @@ jobs:
           aws_region     = "ap-south-1"
           aws_account_id = "278035644568"
 
-          neon_api_key      = "$NEON_API_KEY"
-          neon_project_id   = "$NEON_PROJECT_ID"
           neon_database_url = "$NEON_DATABASE_URL"
 
           alert_email  = "${ALERT_EMAIL:-}"

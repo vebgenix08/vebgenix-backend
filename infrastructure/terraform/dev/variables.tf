@@ -7,13 +7,7 @@ variable "aws_region" {
 variable "aws_account_id" {
   description = "AWS account ID"
   type        = string
-  default     = "998105438053" # Dev account
-}
-
-variable "neon_api_key" {
-  description = "Neon serverless PostgreSQL API key"
-  type        = string
-  sensitive   = true
+  default     = "278035644568"
 }
 
 variable "neon_database_url" {
@@ -25,7 +19,7 @@ variable "neon_database_url" {
 variable "frontend_url" {
   description = "Frontend application URL (dev)"
   type        = string
-  default     = "http://localhost:3000"
+  default     = "http://localhost:5173"
 }
 
 variable "prod_lambda_version" {
