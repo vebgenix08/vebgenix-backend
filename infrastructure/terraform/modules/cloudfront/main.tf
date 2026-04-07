@@ -224,6 +224,16 @@ resource "aws_cloudfront_distribution" "frontend" {
   }
 
   tags = local.tags
+
+  lifecycle {
+    ignore_changes = [
+      # Existing CDK-created distribution — ignore config that was set outside Terraform
+      default_cache_behavior,
+      aliases,
+      viewer_certificate,
+      logging_config,
+    ]
+  }
 }
 
 # Data source for the managed cache-optimized policy
