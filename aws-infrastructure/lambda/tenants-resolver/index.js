@@ -292,6 +292,153 @@ exports.handler = async (event) => {
       return true;
     }
 
+    // ── Step 1: Request deletion — send OTP to super admin ───────────────────
+    case 'requestTenantDeletion': {
+      const { tenantId } = args;
+
+      // Guard: tenant must be suspended first
+      const tenant = await prisma.tenant.findUnique({
+        where:  { id: tenantId },
+        select: { id: true, name: true, isActive: true },
+      });
+      if (!tenant) throw new Error('Tenant not found');
+      if (tenant.isActive) throw new Error('Tenant must be suspended before deletion. Deactivate it first.');
+
+      // Find the super admin's AuthUser to send OTP to their email
+      const authUser = await prisma.authUser.findUnique({
+        where:  { id: userId },
+        select: { id: true, email: true },
+      });
+      if (!authUser) throw new Error('Actor not found');
+
+      // Invalidate any previous unused OTPs for this tenant+actor
+      await prisma.passwordResetToken.updateMany({
+        where: {
+          userId,
+          purpose:  'TENANT_DELETE_OTP',
+          tenantId,
+          usedAt:   null,
+        },
+        data: { usedAt: new Date() },
+      });
+
+      // Generate 6-digit OTP
+      const otp      = String(Math.floor(100000 + Math.random() * 900000));
+      const otpHash  = crypto.createHash('sha256').update(otp).digest('hex');
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+      await prisma.passwordResetToken.create({
+        data: {
+          userId,
+          tokenHash:   otpHash,
+          purpose:     'TENANT_DELETE_OTP',
+          tenantId,
+          expiresAt,
+        },
+      });
+
+      // Send OTP email via SQS
+      try {
+        const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
+        const sqs      = new SQSClient({});
+        const queueUrl = process.env.EMAIL_QUEUE_URL;
+        if (queueUrl) {
+          await sqs.send(new SendMessageCommand({
+            QueueUrl:    queueUrl,
+            MessageBody: JSON.stringify({
+              'detail-type': 'TenantDeletionOtp',
+              detail: {
+                toEmail:    authUser.email,
+                otp,
+                tenantName: tenant.name,
+                expiresIn:  5,
+              },
+            }),
+          }));
+        }
+      } catch (emailErr) {
+        console.warn('Failed to queue OTP email:', emailErr.message);
+      }
+
+      // Mask email for response: su***@vebgenix.com
+      const [local, domain] = authUser.email.split('@');
+      const masked = `${local.slice(0, 2)}***@${domain}`;
+
+      return { sent: true, expiresIn: 300, maskedEmail: masked };
+    }
+
+    // ── Step 2: Confirm deletion — verify OTP then delete tenant ─────────────
+    case 'confirmTenantDeletion': {
+      const { tenantId, otp } = args;
+
+      // Verify tenant exists and is suspended
+      const tenant = await prisma.tenant.findUnique({
+        where:  { id: tenantId },
+        select: { id: true, name: true, isActive: true },
+      });
+      if (!tenant)     throw new Error('Tenant not found');
+      if (tenant.isActive) throw new Error('Tenant is still active — suspend it first');
+
+      const otpHash = crypto.createHash('sha256').update(otp.trim()).digest('hex');
+
+      // Find valid OTP token
+      const token = await prisma.passwordResetToken.findFirst({
+        where: {
+          userId,
+          tokenHash:  otpHash,
+          purpose:    'TENANT_DELETE_OTP',
+          tenantId,
+          usedAt:     null,
+          expiresAt:  { gt: new Date() },
+        },
+      });
+
+      if (!token) {
+        // Increment attempt count on any matching unexpired token
+        await prisma.passwordResetToken.updateMany({
+          where: {
+            userId,
+            purpose:   'TENANT_DELETE_OTP',
+            tenantId,
+            usedAt:    null,
+            expiresAt: { gt: new Date() },
+          },
+          data: {
+            attemptCount:  { increment: 1 },
+            lastAttemptAt: new Date(),
+          },
+        });
+        throw new Error('Invalid or expired OTP. Please request a new one.');
+      }
+
+      // Mark OTP as used
+      await prisma.passwordResetToken.update({
+        where: { id: token.id },
+        data:  { usedAt: new Date() },
+      });
+
+      // Log before deletion (after deletion we can't reference tenantId)
+      await prisma.platformAuditLog.create({
+        data: {
+          actorId:    userId,
+          actorEmail: actorEmail ?? null,
+          action:     'TENANT_DELETED',
+          category:   'TENANT',
+          severity:   'CRITICAL',
+          targetType: 'Tenant',
+          targetId:   tenant.id,
+          targetName: tenant.name,
+          meta:       { confirmed: true, otpVerified: true },
+        },
+      });
+
+      // Delete tenant — cascade deletes all related data
+      await prisma.tenant.delete({ where: { id: tenantId } });
+
+      console.log(`Tenant ${tenant.name} (${tenantId}) permanently deleted by ${userId}`);
+      return true;
+    }
+
     default:
       throw new Error(`TenantsLambda: unknown field "${fieldName}"`);
   }

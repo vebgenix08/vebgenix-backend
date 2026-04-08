@@ -63,6 +63,9 @@ async function routeEmail(detailType, detail) {
     case 'TenantAdminInvite':
       return sendTenantAdminInvite(detail);
 
+    case 'TenantDeletionOtp':
+      return sendTenantDeletionOtp(detail);
+
     default:
       console.warn(`EmailWorker: unhandled detailType "${detailType}" — skipping`);
   }
@@ -221,6 +224,60 @@ async function sendTenantAdminInvite(detail) {
   }));
 
   console.log(`Tenant admin invite sent to ${adminEmail} for ${tenantName}`);
+}
+
+async function sendTenantDeletionOtp(detail) {
+  const { toEmail, otp, tenantName, expiresIn = 5 } = detail;
+
+  await sesClient.send(new SendEmailCommand({
+    Source:      FROM_EMAIL,
+    Destination: { ToAddresses: [toEmail] },
+    Message: {
+      Subject: { Data: `⚠️ Tenant Deletion OTP — ${tenantName}` },
+      Body: {
+        Html: {
+          Data: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+    <h2 style="color: #991B1B; margin: 0 0 8px;">⚠️ Permanent Tenant Deletion</h2>
+    <p style="color: #7F1D1D; margin: 0;">This action cannot be undone.</p>
+  </div>
+
+  <p>You requested to permanently delete the tenant <strong>${tenantName}</strong> from Vebgenix.</p>
+  <p>Use the OTP below to confirm this action:</p>
+
+  <div style="text-align: center; margin: 32px 0;">
+    <div style="display: inline-block; background: #1F2937; color: #F9FAFB;
+                font-size: 36px; font-weight: bold; letter-spacing: 12px;
+                padding: 16px 32px; border-radius: 8px; font-family: monospace;">
+      ${otp}
+    </div>
+  </div>
+
+  <p style="color: #DC2626; font-weight: bold; text-align: center;">
+    This OTP expires in ${expiresIn} minutes.
+  </p>
+
+  <p style="color: #6B7280; font-size: 14px;">
+    If you did not request this deletion, please secure your account immediately.
+    All tenant data including students, admissions, fees and documents will be permanently deleted.
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 20px 0;">
+  <p style="color: #9CA3AF; font-size: 12px;">Vebgenix Platform — Security Alert</p>
+</body>
+</html>`,
+        },
+        Text: {
+          Data: `TENANT DELETION OTP\n\nYou requested to permanently delete: ${tenantName}\n\nYour OTP: ${otp}\n\nThis OTP expires in ${expiresIn} minutes.\n\nIf you did not request this, secure your account immediately.`,
+        },
+      },
+    },
+  }));
+
+  console.log(`Tenant deletion OTP sent to ${toEmail} for tenant: ${tenantName}`);
 }
 
 // Basic HTML escaping — prevents XSS in templates

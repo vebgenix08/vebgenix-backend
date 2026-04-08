@@ -69,6 +69,8 @@ type Mutation {
   updateTenant(input: UpdateTenantInput!): Tenant!
   deactivateTenant(id: ID!): Boolean
   provisionTenant(input: ProvisionTenantInput!): ProvisionTenantResult!
+  requestTenantDeletion(tenantId: ID!): TenantDeletionOtpResult!
+  confirmTenantDeletion(tenantId: ID!, otp: String!): Boolean!
 
   # Admissions
   createAdmission(input: CreateAdmissionInput!): Admission!
@@ -554,6 +556,12 @@ type ProvisionTenantResult {
   tenant:     Tenant!
   adminEmail: String!
   inviteSent: Boolean!
+}
+
+type TenantDeletionOtpResult {
+  sent:         Boolean!
+  expiresIn:    Int!     # seconds until OTP expires (300 = 5 min)
+  maskedEmail:  String!  # e.g. "su***@vebgenix.com" — where OTP was sent
 }
 
 # ── Audit log enhancements ────────────────────────────────────────────────────

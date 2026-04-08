@@ -104,6 +104,7 @@ enum MembershipStatus {
 enum ResetTokenPurpose {
   INVITE_SET_PASSWORD
   FORGOT_PASSWORD
+  TENANT_DELETE_OTP
 }
 
 enum GlobalRole {

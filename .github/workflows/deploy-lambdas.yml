@@ -444,6 +444,8 @@ jobs:
             "Query.validateSubdomain=tenants-resolver"
             "Query.listAvailableFeatures=tenants-resolver"
             "Mutation.provisionTenant=tenants-resolver"
+            "Mutation.requestTenantDeletion=tenants-resolver"
+            "Mutation.confirmTenantDeletion=tenants-resolver"
 
             # Admin (super admin)
             "Query.platformStats=admin-resolver"
