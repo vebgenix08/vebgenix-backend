@@ -394,7 +394,157 @@ jobs:
           echo "Schema applied successfully ✓"
 
       # -----------------------------------------------------------------------
-      # 12. Smoke test — invoke health query via AppSync API key
+      # 13. Sync AppSync resolvers — create or update pipeline resolvers
+      #     for every Query/Mutation field mapped to a Lambda function.
+      #
+      #     Mapping: field → Lambda function name suffix
+      #     New queries added to schema.graphql are picked up automatically.
+      #     Safe to re-run — existing resolvers are updated in-place.
+      # -----------------------------------------------------------------------
+      - name: Sync AppSync resolvers
+        run: |
+          set -euo pipefail
+
+          API_ID="$APPSYNC_API_ID"
+
+          # ── field → lambda suffix ──────────────────────────────────────────
+          # Format: "TypeName.fieldName=lambda-suffix"
+          # Add a new line here whenever you add a new Query or Mutation field.
+          RESOLVER_MAP=(
+            # Dashboard
+            "Query.dashboardOverview=dashboard-resolver"
+            "Query.superAdminOverview=dashboard-resolver"
+
+            # Admissions
+            "Query.listAdmissions=admissions-resolver"
+            "Query.getAdmission=admissions-resolver"
+            "Mutation.updateAdmissionStatus=admissions-resolver"
+            "Mutation.createAdmission=admissions-resolver"
+            "Mutation.updateAdmission=admissions-resolver"
+            "Mutation.deleteAdmission=admissions-resolver"
+
+            # Users
+            "Query.me=users-resolver"
+            "Query.listUsers=users-resolver"
+            "Query.getUser=users-resolver"
+            "Mutation.createUser=users-resolver"
+            "Mutation.updateUser=users-resolver"
+            "Mutation.deleteUser=users-resolver"
+            "Mutation.inviteUser=users-resolver"
+            "Mutation.activateUser=users-resolver"
+            "Mutation.deactivateUser=users-resolver"
+
+            # Tenants
+            "Query.listTenants=tenants-resolver"
+            "Query.getTenant=tenants-resolver"
+            "Mutation.createTenant=tenants-resolver"
+            "Mutation.updateTenant=tenants-resolver"
+
+            # Admin (super admin)
+            "Query.platformStats=admin-resolver"
+            "Mutation.createSuperAdmin=admin-resolver"
+
+            # Audit logs
+            "Query.listPlatformAuditLogs=audit-logs-resolver"
+            "Query.getPlatformAuditLog=audit-logs-resolver"
+
+            # Storage
+            "Mutation.getUploadUrl=storage-resolver"
+            "Mutation.getDownloadUrl=storage-resolver"
+
+            # Settings / Master data
+            "Query.listAcademicYears=admin-resolver"
+            "Query.listTemplates=admin-resolver"
+            "Query.listCampuses=admin-resolver"
+            "Query.getCampus=admin-resolver"
+          )
+
+          # ── Get the AppSync function IDs for each Lambda ───────────────────
+          echo "Fetching AppSync function IDs..."
+          declare -A FN_ID_MAP
+
+          FUNCTIONS_JSON=$(aws appsync list-functions \
+            --api-id "$API_ID" \
+            --query "functions[].{id:functionId,name:name}" \
+            --output json)
+
+          for lambda_suffix in \
+            dashboard-resolver admissions-resolver users-resolver \
+            tenants-resolver admin-resolver audit-logs-resolver storage-resolver \
+            cognito-provisioner; do
+
+            FULL_NAME="${FN_PREFIX}-${lambda_suffix}"
+            FN_ID=$(echo "$FUNCTIONS_JSON" | python3 -c "
+          import json, sys
+          fns = json.load(sys.stdin)
+          match = next((f['id'] for f in fns if f['name'] == '$FULL_NAME'), None)
+          print(match or '')
+          ")
+
+            if [ -n "$FN_ID" ]; then
+              FN_ID_MAP["$lambda_suffix"]="$FN_ID"
+              echo "  ✓ $FULL_NAME → $FN_ID"
+            else
+              echo "  ⚠ No AppSync function found for $FULL_NAME (skipping its resolvers)"
+            fi
+          done
+
+          # ── Create or update each resolver ────────────────────────────────
+          echo ""
+          echo "Syncing resolvers..."
+
+          for entry in "${RESOLVER_MAP[@]}"; do
+            TYPE_FIELD="${entry%%=*}"
+            LAMBDA_SUFFIX="${entry##*=}"
+            TYPE_NAME="${TYPE_FIELD%%.*}"
+            FIELD_NAME="${TYPE_FIELD##*.}"
+
+            FN_ID="${FN_ID_MAP[$LAMBDA_SUFFIX]:-}"
+            if [ -z "$FN_ID" ]; then
+              echo "  SKIP $TYPE_NAME.$FIELD_NAME — no AppSync function for $LAMBDA_SUFFIX"
+              continue
+            fi
+
+            # Check if resolver already exists
+            EXISTING=$(aws appsync get-resolver \
+              --api-id "$API_ID" \
+              --type-name "$TYPE_NAME" \
+              --field-name "$FIELD_NAME" \
+              --query "resolver.resolverArn" \
+              --output text 2>/dev/null || echo "")
+
+            if [ -n "$EXISTING" ] && [ "$EXISTING" != "None" ]; then
+              # Update existing resolver
+              aws appsync update-resolver \
+                --api-id "$API_ID" \
+                --type-name "$TYPE_NAME" \
+                --field-name "$FIELD_NAME" \
+                --kind PIPELINE \
+                --pipeline-config "functions=$FN_ID" \
+                --request-mapping-template '{"version":"2018-05-29","operation":"Invoke","payload":{"field":"'"$FIELD_NAME"'","args":$util.toJson($ctx.args),"identity":$util.toJson($ctx.identity)}}' \
+                --response-mapping-template '$util.toJson($ctx.result)' \
+                --query "resolver.fieldName" --output text > /dev/null
+              echo "  ↺ $TYPE_NAME.$FIELD_NAME (updated)"
+            else
+              # Create new resolver
+              aws appsync create-resolver \
+                --api-id "$API_ID" \
+                --type-name "$TYPE_NAME" \
+                --field-name "$FIELD_NAME" \
+                --kind PIPELINE \
+                --pipeline-config "functions=$FN_ID" \
+                --request-mapping-template '{"version":"2018-05-29","operation":"Invoke","payload":{"field":"'"$FIELD_NAME"'","args":$util.toJson($ctx.args),"identity":$util.toJson($ctx.identity)}}' \
+                --response-mapping-template '$util.toJson($ctx.result)' \
+                --query "resolver.fieldName" --output text > /dev/null
+              echo "  ✚ $TYPE_NAME.$FIELD_NAME (created)"
+            fi
+          done
+
+          echo ""
+          echo "AppSync resolvers synced ✓"
+
+      # -----------------------------------------------------------------------
+      # 14. Smoke test — invoke health query via AppSync API key
       # -----------------------------------------------------------------------
       - name: Smoke test (AppSync health query)
         run: |
