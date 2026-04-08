@@ -1,7 +1,7 @@
 "use strict";
 
-const { getPrisma } = require("../shared/db");
-const { withTenant } = require("../shared/withTenant");
+const { getPrisma } = require("lambda-shared/db");
+const { withTenant } = require("lambda-shared/withTenant");
 
 /**
  * DashboardLambda — AppSync resolver for dashboard queries

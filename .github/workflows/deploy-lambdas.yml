@@ -111,6 +111,17 @@ jobs:
           cp -R server/node_modules/.prisma \
               "$LAYER_DIR/node_modules/"
 
+          # c2) Copy shared utilities as lambda-shared package
+          mkdir -p "$LAYER_DIR/node_modules/lambda-shared"
+          cp aws-infrastructure/lambda/shared/db.js         "$LAYER_DIR/node_modules/lambda-shared/"
+          cp aws-infrastructure/lambda/shared/identity.js   "$LAYER_DIR/node_modules/lambda-shared/"
+          cp aws-infrastructure/lambda/shared/withTenant.js "$LAYER_DIR/node_modules/lambda-shared/"
+          cat > "$LAYER_DIR/node_modules/lambda-shared/package.json" << 'PKGJSON'
+          {"name":"lambda-shared","version":"1.0.0","main":"db.js"}
+          PKGJSON
+          echo "lambda-shared copied:"
+          ls "$LAYER_DIR/node_modules/lambda-shared/"
+
           # c) Verify arm64 binary is present
           BINARY_PATH="$LAYER_DIR/node_modules/.prisma/client"
           if ls "$BINARY_PATH"/libquery_engine-linux-arm64* 1>/dev/null 2>&1; then
@@ -140,6 +151,7 @@ jobs:
 
           zip -r /tmp/lambda.zip . \
             --exclude "node_modules/*" \
+            --exclude "shared/*" \
             --exclude "*.git*" \
             --exclude "**/test/**" \
             --exclude "**/__tests__/**" \
@@ -234,6 +246,7 @@ jobs:
             "dashboard-resolver"
             "email-worker"
             "jobs-worker"
+            "pre-token-generation"
             "storage-resolver"
             "tenants-resolver"
             "users-resolver"
@@ -303,7 +316,55 @@ jobs:
           echo "All Lambda functions deployed successfully."
 
       # -----------------------------------------------------------------------
-      # 11. Push updated schema to AppSync
+      # 11. Attach pre-token-generation Lambda trigger to Cognito User Pool
+      #     Idempotent — safe to run on every deploy.
+      # -----------------------------------------------------------------------
+      - name: Attach pre-token-generation trigger to Cognito
+        run: |
+          set -euo pipefail
+
+          if [ "$ENVIRONMENT" = "prod" ]; then
+            POOL_ID="ap-south-1_waAjEC9Nj"
+          else
+            POOL_ID="ap-south-1_1pLVzImKk"
+          fi
+
+          FN_NAME="${FN_PREFIX}-pre-token-generation"
+
+          # Get the Lambda ARN
+          LAMBDA_ARN=$(aws lambda get-function \
+            --function-name "$FN_NAME" \
+            --query "Configuration.FunctionArn" \
+            --output text)
+
+          echo "Attaching $LAMBDA_ARN to Cognito pool $POOL_ID"
+
+          # Get current lambda config (if any)
+          CURRENT=$(aws cognito-idp describe-user-pool \
+            --user-pool-id "$POOL_ID" \
+            --query "UserPool.LambdaConfig" \
+            --output json)
+
+          echo "Current lambda config: $CURRENT"
+
+          # Update with pre-token-generation trigger
+          aws cognito-idp update-user-pool \
+            --user-pool-id "$POOL_ID" \
+            --lambda-config "PreTokenGeneration=$LAMBDA_ARN"
+
+          # Grant Cognito permission to invoke this Lambda (idempotent)
+          aws lambda add-permission \
+            --function-name "$FN_NAME" \
+            --statement-id "CognitoInvoke-${POOL_ID}" \
+            --action "lambda:InvokeFunction" \
+            --principal "cognito-idp.amazonaws.com" \
+            --source-arn "arn:aws:cognito-idp:ap-south-1:278035644568:userpool/$POOL_ID" \
+            2>/dev/null || echo "Permission already exists (ok)"
+
+          echo "Pre-token-generation trigger attached ✓"
+
+      # -----------------------------------------------------------------------
+      # 12. Push updated schema to AppSync
       # -----------------------------------------------------------------------
       - name: Update AppSync schema
         run: |
@@ -398,6 +459,7 @@ jobs:
           echo "    ✓ dashboard-resolver"
           echo "    ✓ email-worker"
           echo "    ✓ jobs-worker"
+          echo "    ✓ pre-token-generation (Cognito trigger)"
           echo "    ✓ storage-resolver"
           echo "    ✓ tenants-resolver"
           echo "    ✓ users-resolver"
@@ -406,4 +468,7 @@ jobs:
           echo "    - finance-resolver"
           echo "    - settings-resolver"
           echo "    - students-resolver"
+          echo ""
+          echo "  Retired (no longer deployed):"
+          echo "    - appsync-authorizer (AppSync uses Cognito auth natively)"
           echo "╚══════════════════════════════════════════╝"

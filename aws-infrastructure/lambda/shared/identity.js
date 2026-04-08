@@ -1,49 +1,48 @@
-"use strict";
+'use strict';
 
 /**
  * Shared identity helper for AppSync resolvers.
  *
- * Supports both auth modes:
- *   USER_POOL  → identity.claims      (Cognito JWT)
- *   LAMBDA     → identity.resolverContext  (Express JWT via appsync-authorizer)
+ * AppSync is configured with AMAZON_COGNITO_USER_POOLS as the default auth.
+ * The Cognito Pre-Token Generation trigger populates:
+ *   claims["custom:global_roles"]  — JSON array
+ *   claims["custom:tenant_id"]     — UUID string
+ *   claims["custom:role"]          — role string
+ *
+ * identity.claims is always present for authenticated requests.
  */
 function extractIdentity(identity) {
-  const isLambdaAuth = !!identity?.resolverContext;
-  const claims = identity?.claims || {};
-  const rc = identity?.resolverContext || {};
+  const claims = identity?.claims ?? {};
 
-  const userId = isLambdaAuth ? rc.userId : claims.sub;
-  const email = isLambdaAuth ? rc.email : claims.email;
-  const tenantId = isLambdaAuth ? rc.tenant_id : claims["custom:tenant_id"];
-  const tenantRole = isLambdaAuth ? rc.tenant_role : null;
-  const primaryProfileId = isLambdaAuth ? rc.primary_profile_id : null;
+  const userId    = claims.sub    ?? '';
+  const email     = claims.email  ?? '';
+  const tenantId  = claims['custom:tenant_id'] ?? '';
+  const tenantRole = claims['custom:role']      ?? '';
 
-  // Parse global roles
+  // Global roles injected by pre-token-generation trigger
   let globalRoles = [];
-  if (isLambdaAuth) {
-    try {
-      globalRoles = JSON.parse(rc.global_roles || "[]");
-    } catch (_) {
-      globalRoles = [];
-    }
-  } else {
-    globalRoles = claims["cognito:groups"] || [];
+  try {
+    const raw = claims['custom:global_roles'];
+    if (raw) globalRoles = JSON.parse(raw);
+  } catch (_) {
+    globalRoles = [];
   }
 
-  // Unified super admin check (covers both naming conventions)
-  const isSuperAdmin =
-    globalRoles.includes("PLATFORM_SUPER_ADMIN") ||
-    globalRoles.includes("SUPER_ADMIN");
+  // Also honour Cognito Groups (fallback for super admins added via console)
+  const cognitoGroups = claims['cognito:groups'] ?? [];
+  const allRoles = [...new Set([...globalRoles, ...cognitoGroups])];
+
+  const isSuperAdmin = allRoles.some(
+    (r) => r === 'PLATFORM_SUPER_ADMIN' || r === 'SUPER_ADMIN'
+  );
 
   return {
     userId,
     email,
     tenantId,
     tenantRole,
-    primaryProfileId,
-    globalRoles,
+    globalRoles: allRoles,
     isSuperAdmin,
-    isLambdaAuth,
   };
 }
 

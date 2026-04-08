@@ -1,7 +1,7 @@
 "use strict";
 
-const { getPrisma } = require("../shared/db");
-const { extractIdentity } = require("../shared/identity");
+const { getPrisma } = require("lambda-shared/db");
+const { extractIdentity } = require("lambda-shared/identity");
 
 /**
  * AuditLogsLambda — AppSync resolver for platform audit log queries

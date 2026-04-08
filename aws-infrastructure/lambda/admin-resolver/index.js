@@ -1,6 +1,6 @@
 "use strict";
 
-const { extractIdentity } = require("../shared/identity");
+const { extractIdentity } = require("lambda-shared/identity");
 
 /**
  * AdminLambda — AppSync resolver for Admin (SUPER_ADMIN) platform ops

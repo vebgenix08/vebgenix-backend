@@ -1,7 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
-const { getPrisma } = require("../shared/db");
+const { getPrisma } = require("lambda-shared/db");
 
 function isUuid(v) {
   return (

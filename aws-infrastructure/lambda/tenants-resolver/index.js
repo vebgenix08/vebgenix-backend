@@ -1,8 +1,8 @@
 "use strict";
 
-const { getPrisma } = require("../shared/db");
-const { withTenant } = require("../shared/withTenant");
-const { extractIdentity } = require("../shared/identity");
+const { getPrisma } = require("lambda-shared/db");
+const { withTenant } = require("lambda-shared/withTenant");
+const { extractIdentity } = require("lambda-shared/identity");
 
 /**
  * TenantsLambda — AppSync resolver for Tenant management
