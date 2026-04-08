@@ -304,20 +304,20 @@ exports.handler = async (event) => {
       if (!tenant) throw new Error('Tenant not found');
       if (tenant.isActive) throw new Error('Tenant must be suspended before deletion. Deactivate it first.');
 
-      // Find the super admin's AuthUser to send OTP to their email
+      // Find super admin by EMAIL — Cognito sub != AuthUser.id in DB
       const authUser = await prisma.authUser.findUnique({
-        where:  { id: userId },
+        where:  { email: actorEmail.toLowerCase() },
         select: { id: true, email: true },
       });
-      if (!authUser) throw new Error('Actor not found');
+      if (!authUser) throw new Error('Actor AuthUser not found — ensure your account exists in the DB');
 
       // Invalidate any previous unused OTPs for this tenant+actor
       await prisma.passwordResetToken.updateMany({
         where: {
-          userId,
-          purpose:  'TENANT_DELETE_OTP',
+          userId:  authUser.id,   // DB UUID, not Cognito sub
+          purpose: 'TENANT_DELETE_OTP',
           tenantId,
-          usedAt:   null,
+          usedAt:  null,
         },
         data: { usedAt: new Date() },
       });
@@ -329,9 +329,9 @@ exports.handler = async (event) => {
 
       await prisma.passwordResetToken.create({
         data: {
-          userId,
-          tokenHash:   otpHash,
-          purpose:     'TENANT_DELETE_OTP',
+          userId:    authUser.id,   // DB UUID, not Cognito sub
+          tokenHash: otpHash,
+          purpose:   'TENANT_DELETE_OTP',
           tenantId,
           expiresAt,
         },
@@ -379,17 +379,24 @@ exports.handler = async (event) => {
       if (!tenant)     throw new Error('Tenant not found');
       if (tenant.isActive) throw new Error('Tenant is still active — suspend it first');
 
+      // Find super admin by email — Cognito sub != AuthUser.id in DB
+      const actorUser = await prisma.authUser.findUnique({
+        where:  { email: actorEmail.toLowerCase() },
+        select: { id: true },
+      });
+      if (!actorUser) throw new Error('Actor not found');
+
       const otpHash = crypto.createHash('sha256').update(otp.trim()).digest('hex');
 
-      // Find valid OTP token
+      // Find valid OTP token using DB userId
       const token = await prisma.passwordResetToken.findFirst({
         where: {
-          userId,
-          tokenHash:  otpHash,
-          purpose:    'TENANT_DELETE_OTP',
+          userId:    actorUser.id,   // DB UUID, not Cognito sub
+          tokenHash: otpHash,
+          purpose:   'TENANT_DELETE_OTP',
           tenantId,
-          usedAt:     null,
-          expiresAt:  { gt: new Date() },
+          usedAt:    null,
+          expiresAt: { gt: new Date() },
         },
       });
 
@@ -397,7 +404,7 @@ exports.handler = async (event) => {
         // Increment attempt count on any matching unexpired token
         await prisma.passwordResetToken.updateMany({
           where: {
-            userId,
+            userId:    actorUser.id,
             purpose:   'TENANT_DELETE_OTP',
             tenantId,
             usedAt:    null,
