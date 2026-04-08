@@ -18,8 +18,9 @@ const CDK_SCHEMA_FILE = path.join(CDK_SCHEMA_DIR, "schema.graphql");
 
 // Order matters: base types (common.graphql) MUST come first so AppSync
 // sees 'type Query' before any 'extend type Query' blocks.
+// Add new feature files here when you create them.
 const ORDER = [
-  "common.graphql",
+  "common.graphql",      // base Query/Mutation types — always first
   "dashboard.graphql",
   "admissions.graphql",
   "students.graphql",
@@ -27,6 +28,7 @@ const ORDER = [
   "fees.graphql",
   "templates.graphql",
   "auditLogs.graphql",
+  // "attendance.graphql", ← example: add new feature file here
 ];
 
 // ---------------------------------------------------------------------------
