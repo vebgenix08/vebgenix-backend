@@ -80,37 +80,39 @@ jobs:
           npx prisma generate --schema=prisma/schema.prisma
 
       # -----------------------------------------------------------------------
-      # 6. Install Lambda npm deps FIRST (before Prisma copy)
-      #    IMPORTANT: npm ci must run BEFORE copying Prisma client or it will
-      #    overwrite the generated arm64 binary with the bare npm package.
+      # 6. Build the Lambda Layer (nodejs/node_modules)
+      #    Layer structure Lambda expects:  nodejs/node_modules/...
+      #    Mounted at runtime under:        /opt/nodejs/node_modules/
+      #
+      #    Steps:
+      #      a) npm ci  — install lambda deps (aws-jwt-verify, etc.)
+      #      b) copy Prisma client + arm64 binary on top
+      #      c) verify arm64 binary present
+      #      d) zip into layer.zip with the nodejs/ prefix
       # -----------------------------------------------------------------------
-      - name: Install Lambda npm dependencies
-        working-directory: aws-infrastructure/lambda
-        run: npm ci
-
-      # -----------------------------------------------------------------------
-      # 7. Copy Prisma runtime into lambda/node_modules (runs AFTER npm ci)
-      #    This ensures the generated arm64 binary is not overwritten by npm ci.
-      # -----------------------------------------------------------------------
-      - name: Copy Prisma runtime into Lambda asset folder
+      - name: Build Lambda Layer
         run: |
           set -euo pipefail
 
-          mkdir -p aws-infrastructure/lambda/node_modules/@prisma
-          mkdir -p aws-infrastructure/lambda/node_modules/.prisma
+          LAYER_DIR=/tmp/layer/nodejs
 
+          # a) Install lambda npm deps into the layer staging dir
+          mkdir -p "$LAYER_DIR"
+          cp aws-infrastructure/lambda/package.json "$LAYER_DIR/"
+          cp aws-infrastructure/lambda/package-lock.json "$LAYER_DIR/"
+          cd "$LAYER_DIR"
+          npm ci --omit=dev
+          cd -
+
+          # b) Copy generated Prisma client (with arm64 binary) on top
+          mkdir -p "$LAYER_DIR/node_modules/@prisma"
           cp -R server/node_modules/@prisma/client \
-              aws-infrastructure/lambda/node_modules/@prisma/
-
+              "$LAYER_DIR/node_modules/@prisma/"
           cp -R server/node_modules/.prisma \
-              aws-infrastructure/lambda/node_modules/
+              "$LAYER_DIR/node_modules/"
 
-          echo "Prisma runtime copied:"
-          ls aws-infrastructure/lambda/node_modules/@prisma/
-          ls aws-infrastructure/lambda/node_modules/.prisma/
-
-          # Verify the arm64 binary is present
-          BINARY_PATH="aws-infrastructure/lambda/node_modules/.prisma/client"
+          # c) Verify arm64 binary is present
+          BINARY_PATH="$LAYER_DIR/node_modules/.prisma/client"
           if ls "$BINARY_PATH"/libquery_engine-linux-arm64* 1>/dev/null 2>&1; then
             echo "✓ arm64 Prisma binary confirmed:"
             ls -lh "$BINARY_PATH"/libquery_engine-linux-arm64*
@@ -120,39 +122,52 @@ jobs:
             exit 1
           fi
 
+          # d) Zip with the nodejs/ prefix (Lambda layer requirement)
+          cd /tmp/layer
+          zip -r /tmp/layer.zip nodejs/ \
+            --exclude "*.git*"
+
+          echo "Layer size: $(du -sh /tmp/layer.zip | cut -f1)"
+          ls -lh /tmp/layer.zip
+
       # -----------------------------------------------------------------------
-      # 8. Zip the lambda directory
+      # 7. Package handler code only (no node_modules — they live in the layer)
       # -----------------------------------------------------------------------
-      - name: Package Lambda zip
+      - name: Package Lambda handler zip
         run: |
           set -euo pipefail
           cd aws-infrastructure/lambda
 
           zip -r /tmp/lambda.zip . \
+            --exclude "node_modules/*" \
             --exclude "*.git*" \
             --exclude "**/test/**" \
             --exclude "**/__tests__/**" \
-            --exclude "**/*.test.js"
+            --exclude "**/*.test.js" \
+            --exclude "package.json" \
+            --exclude "package-lock.json"
 
-          echo "Lambda package size: $(du -sh /tmp/lambda.zip | cut -f1)"
+          echo "Handler zip size: $(du -sh /tmp/lambda.zip | cut -f1)"
           ls -lh /tmp/lambda.zip
 
       # -----------------------------------------------------------------------
-      # 9. Resolve environment-specific variables
-      #    prod: prefix=vebgenix,     AppSync ID = o6cgickkk5dpxej6lirgo7bpna
-      #    dev:  prefix=vebgenix-dev, AppSync ID = dynamic lookup
+      # 8. Resolve environment-specific variables
+      #    prod: prefix=vebgenix,     layer=vebgenix-deps,     AppSync = o6cgickkk5dpxej6lirgo7bpna
+      #    dev:  prefix=vebgenix-dev, layer=vebgenix-dev-deps, AppSync = dynamic lookup
       # -----------------------------------------------------------------------
       - name: Resolve deployment variables
         run: |
           set -euo pipefail
 
           if [ "$ENVIRONMENT" = "prod" ]; then
-            echo "FN_PREFIX=vebgenix"                   >> $GITHUB_ENV
+            echo "FN_PREFIX=vebgenix"                        >> $GITHUB_ENV
+            echo "LAYER_NAME=vebgenix-deps"                  >> $GITHUB_ENV
             echo "APPSYNC_API_ID=o6cgickkk5dpxej6lirgo7bpna" >> $GITHUB_ENV
-            echo "UPDATE_ALIAS=true"                    >> $GITHUB_ENV
+            echo "UPDATE_ALIAS=true"                         >> $GITHUB_ENV
           else
-            echo "FN_PREFIX=vebgenix-dev"               >> $GITHUB_ENV
-            echo "UPDATE_ALIAS=false"                   >> $GITHUB_ENV
+            echo "FN_PREFIX=vebgenix-dev"                    >> $GITHUB_ENV
+            echo "LAYER_NAME=vebgenix-dev-deps"              >> $GITHUB_ENV
+            echo "UPDATE_ALIAS=false"                        >> $GITHUB_ENV
 
             # Lookup AppSync API ID by name
             API_ID=$(aws appsync list-graphql-apis \
@@ -170,7 +185,34 @@ jobs:
           fi
 
       # -----------------------------------------------------------------------
+      # 9. Publish Lambda Layer and capture the new Layer Version ARN
+      # -----------------------------------------------------------------------
+      - name: Publish Lambda Layer
+        run: |
+          set -euo pipefail
+
+          echo "Publishing layer: $LAYER_NAME"
+
+          LAYER_ARN=$(aws lambda publish-layer-version \
+            --layer-name "$LAYER_NAME" \
+            --description "node_modules + Prisma arm64 binary ($ENVIRONMENT)" \
+            --zip-file fileb:///tmp/layer.zip \
+            --compatible-runtimes nodejs20.x \
+            --compatible-architectures arm64 \
+            --query "LayerVersionArn" \
+            --output text)
+
+          echo "Published layer ARN: $LAYER_ARN"
+          echo "LAYER_ARN=$LAYER_ARN" >> $GITHUB_ENV
+
+      # -----------------------------------------------------------------------
       # 10. Deploy to all implemented Lambda functions
+      #
+      #     For each function:
+      #       a) Fix handler path  (e.g. dashboard-resolver/index.handler)
+      #       b) Attach the new layer version (replaces any previous layer)
+      #       c) Update function code (handler zip — no node_modules)
+      #       d) prod only: publish version + move alias
       #
       #     Implemented (10):
       #       admin-resolver, admissions-resolver, audit-logs-resolver,
@@ -203,22 +245,22 @@ jobs:
             echo ""
             echo "━━━ Deploying: $FULL_NAME (handler: $HANDLER) ━━━"
 
-            # Ensure the handler is set correctly (Terraform placeholder uses index.handler)
+            # a) Fix handler + attach layer in one update-function-configuration call
             CURRENT_HANDLER=$(aws lambda get-function-configuration \
               --function-name "$FULL_NAME" \
               --query "Handler" --output text 2>/dev/null || echo "")
 
-            if [ "$CURRENT_HANDLER" != "$HANDLER" ]; then
-              echo "  Updating handler: $CURRENT_HANDLER → $HANDLER"
-              aws lambda update-function-configuration \
-                --function-name "$FULL_NAME" \
-                --handler "$HANDLER" \
-                --query "Handler" --output text
-              aws lambda wait function-updated --function-name "$FULL_NAME"
-            else
-              echo "  Handler already correct: $HANDLER"
-            fi
+            echo "  Attaching layer: $LAYER_ARN"
+            aws lambda update-function-configuration \
+              --function-name "$FULL_NAME" \
+              --handler "$HANDLER" \
+              --layers "$LAYER_ARN" \
+              --query "{Handler:Handler,Layers:Layers}" \
+              --output json
+            aws lambda wait function-updated --function-name "$FULL_NAME"
+            echo "  Handler + layer updated ✓"
 
+            # b) Push the handler zip (code only, no node_modules)
             if [ "$UPDATE_ALIAS" = "true" ]; then
               # prod: publish a new numbered version, then point the 'prod' alias at it
               OUTPUT=$(aws lambda update-function-code \
@@ -231,7 +273,6 @@ jobs:
               VERSION=$(echo "$OUTPUT" | python3 -c "import json,sys; print(json.load(sys.stdin)['Version'])")
               echo "  Published version: $VERSION"
 
-              # Wait until the function update is complete
               aws lambda wait function-updated --function-name "$FULL_NAME"
 
               # Move the 'prod' alias to the freshly published version
