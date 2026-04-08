@@ -440,6 +440,11 @@ jobs:
             "Mutation.createTenant=tenants-resolver"
             "Mutation.updateTenant=tenants-resolver"
 
+            # Tenants — new operations
+            "Query.validateSubdomain=tenants-resolver"
+            "Query.listAvailableFeatures=tenants-resolver"
+            "Mutation.provisionTenant=tenants-resolver"
+
             # Admin (super admin)
             "Query.platformStats=admin-resolver"
             "Mutation.createSuperAdmin=admin-resolver"

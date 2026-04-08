@@ -60,6 +60,9 @@ async function routeEmail(detailType, detail) {
     case 'EnquiryReceived':
       return sendEnquiryAckEmail(detail);
 
+    case 'TenantAdminInvite':
+      return sendTenantAdminInvite(detail);
+
     default:
       console.warn(`EmailWorker: unhandled detailType "${detailType}" — skipping`);
   }
@@ -172,6 +175,52 @@ async function ses({ to, subject, html }) {
     },
   }));
   console.log(`Email sent to ${toAddresses.join(', ')}: "${subject}"`);
+}
+
+async function sendTenantAdminInvite(detail) {
+  const { adminEmail, adminName, tenantName, inviteUrl, expiresInDays = 7 } = detail;
+
+  const displayName = adminName || adminEmail.split('@')[0];
+
+  await sesClient.send(new SendEmailCommand({
+    Source: FROM_EMAIL,
+    Destination: { ToAddresses: [adminEmail] },
+    Message: {
+      Subject: {
+        Data: `You're invited to manage ${tenantName} on Vebgenix`,
+      },
+      Body: {
+        Html: {
+          Data: `
+<!DOCTYPE html>
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h2>Welcome to Vebgenix</h2>
+  <p>Hi ${displayName},</p>
+  <p>You have been invited to be the primary administrator for <strong>${tenantName}</strong> on Vebgenix.</p>
+  <p>Click the button below to set your password and activate your account:</p>
+  <p style="text-align: center; margin: 30px 0;">
+    <a href="${inviteUrl}"
+       style="background-color: #4F46E5; color: white; padding: 14px 28px;
+              text-decoration: none; border-radius: 6px; font-size: 16px;">
+      Accept Invitation
+    </a>
+  </p>
+  <p style="color: #666; font-size: 14px;">This invitation expires in ${expiresInDays} days.</p>
+  <p style="color: #666; font-size: 14px;">If you did not expect this invitation, please ignore this email.</p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+  <p style="color: #999; font-size: 12px;">Vebgenix School Management Platform</p>
+</body>
+</html>`,
+        },
+        Text: {
+          Data: `Hi ${displayName},\n\nYou have been invited to be the primary administrator for ${tenantName} on Vebgenix.\n\nAccept your invitation here: ${inviteUrl}\n\nThis invitation expires in ${expiresInDays} days.`,
+        },
+      },
+    },
+  }));
+
+  console.log(`Tenant admin invite sent to ${adminEmail} for ${tenantName}`);
 }
 
 // Basic HTML escaping — prevents XSS in templates

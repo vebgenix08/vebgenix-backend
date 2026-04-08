@@ -27,7 +27,9 @@ type Query {
   # Tenants
   listTenants(limit: Int, nextToken: String): TenantConnection!
   getTenant(id: ID!): Tenant
-  
+  validateSubdomain(subdomain: String!): SubdomainValidation!
+  listAvailableFeatures: [AvailableFeature!]!
+
   _studentsEmpty: String
   _feesEmpty: String
   _templatesEmpty: String
@@ -66,7 +68,8 @@ type Mutation {
   createTenant(input: CreateTenantInput!): Tenant!
   updateTenant(input: UpdateTenantInput!): Tenant!
   deactivateTenant(id: ID!): Boolean
-  
+  provisionTenant(input: ProvisionTenantInput!): ProvisionTenantResult!
+
   # Admissions
   createAdmission(input: CreateAdmissionInput!): Admission!
   updateAdmission(input: UpdateAdmissionInput!): Admission!
@@ -309,11 +312,19 @@ input UpdateUserInput {
 # --- tenants.graphql ---
 
 type Tenant {
-  id: ID!
-  name: String!
-  slug: String
-  isActive: Boolean!
-  createdAt: AWSDateTime!
+  id:                 ID!
+  name:               String!
+  slug:               String
+  fullDomain:         String
+  isActive:           Boolean!
+  onboardingComplete: Boolean!
+  features:           [TenantFeatureItem!]!
+  createdAt:          String!
+}
+
+type TenantFeatureItem {
+  key:     String!
+  enabled: Boolean!
 }
 
 type TenantConnection {
@@ -324,13 +335,14 @@ type TenantConnection {
 input CreateTenantInput {
   name: String!
   slug: String
-  email: String! 
+  plan: String
 }
 
 input UpdateTenantInput {
-  id: ID!
-  name: String
-  isActive: Boolean
+  id:      ID!
+  name:    String
+  slug:    String
+  logoUrl: String
 }
 
 # --- admin.graphql ---
@@ -512,4 +524,51 @@ input CreateFeeHeadInput {
 
 input CreateFeeStructureInput {
   name: String!
+}
+
+# ── Tenant provisioning ───────────────────────────────────────────────────────
+
+type AvailableFeature {
+  key:            String!
+  name:           String!
+  description:    String!
+  defaultEnabled: Boolean!
+}
+
+type SubdomainValidation {
+  available:   Boolean!
+  normalized:  String!
+  fullDomain:  String!
+  suggestion:  String
+}
+
+input ProvisionTenantInput {
+  organizationName: String!
+  subdomain:        String!
+  features:         [String!]!
+  adminName:        String!
+  adminEmail:       String!
+}
+
+type ProvisionTenantResult {
+  tenant:     Tenant!
+  adminEmail: String!
+  inviteSent: Boolean!
+}
+
+# ── Audit log enhancements ────────────────────────────────────────────────────
+
+type AuditLogEntry {
+  id:         ID!
+  at:         String!
+  actorId:    String!
+  actorEmail: String
+  action:     String!
+  category:   String
+  severity:   String!
+  targetType: String!
+  targetId:   String
+  targetName: String
+  meta:       AWSJSON
+  ipAddress:  String
 }

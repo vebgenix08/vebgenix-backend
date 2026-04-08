@@ -48,6 +48,8 @@ async function listPlatformAuditLogs(prisma, input) {
     if (filter.action) where.action = filter.action;
     if (filter.targetType) where.targetType = filter.targetType;
     if (filter.targetId) where.targetId = filter.targetId;
+    if (filter.category) where.category = filter.category;
+    if (filter.severity) where.severity = filter.severity;
     if (filter.fromAt || filter.toAt) {
       where.at = {};
       if (filter.fromAt) where.at.gte = new Date(filter.fromAt);
@@ -96,10 +98,15 @@ async function listPlatformAuditLogs(prisma, input) {
         id: log.id,
         at: log.at.toISOString(),
         actorId: log.actorId,
+        actorEmail: log.actorEmail ?? null,
         action: log.action,
+        category: log.category ?? null,
+        severity: log.severity ?? 'INFO',
         targetType: normalizeTargetType(log.targetType),
         targetId: log.targetId,
+        targetName: log.targetName ?? null,
         metaSummary,
+        ipAddress: log.ipAddress ?? null,
       },
     };
   });

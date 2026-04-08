@@ -1,0 +1,86 @@
+# ── Tenant types ─────────────────────────────────────────────────────────────
+
+type Tenant {
+  id:        ID!
+  name:      String!
+  slug:      String          # subdomain prefix e.g. "abc" → abc.vebgenix.com
+  fullDomain: String         # full domain: abc.vebgenix.com
+  isActive:  Boolean!
+  onboardingComplete: Boolean!
+  features:  [TenantFeatureItem!]!
+  createdAt: String!
+}
+
+type TenantFeatureItem {
+  key:     String!
+  enabled: Boolean!
+}
+
+type TenantConnection {
+  items:     [Tenant!]!
+  nextToken: String
+}
+
+# ── Available features (static list returned by API) ─────────────────────────
+
+type AvailableFeature {
+  key:            String!
+  name:           String!
+  description:    String!
+  defaultEnabled: Boolean!
+}
+
+# ── Subdomain validation ──────────────────────────────────────────────────────
+
+type SubdomainValidation {
+  available:   Boolean!
+  normalized:  String!
+  fullDomain:  String!
+  suggestion:  String
+}
+
+# ── Tenant provisioning (wizard final step) ───────────────────────────────────
+
+input ProvisionTenantInput {
+  organizationName: String!
+  subdomain:        String!    # prefix only — .vebgenix.com is appended
+  features:         [String!]! # feature keys to enable
+  adminName:        String!
+  adminEmail:       String!
+}
+
+type ProvisionTenantResult {
+  tenant:      Tenant!
+  adminEmail:  String!
+  inviteSent:  Boolean!
+}
+
+# ── Update tenant ─────────────────────────────────────────────────────────────
+
+input CreateTenantInput {
+  name: String!
+  slug: String
+  plan: String
+}
+
+input UpdateTenantInput {
+  id:      ID!
+  name:    String
+  slug:    String
+  logoUrl: String
+}
+
+# ── Queries & Mutations ───────────────────────────────────────────────────────
+
+extend type Query {
+  listTenants(limit: Int, nextToken: String): TenantConnection!
+  getTenant(id: ID!): Tenant
+  validateSubdomain(subdomain: String!): SubdomainValidation!
+  listAvailableFeatures: [AvailableFeature!]!
+}
+
+extend type Mutation {
+  provisionTenant(input: ProvisionTenantInput!): ProvisionTenantResult!
+  updateTenant(input: UpdateTenantInput!): Tenant!
+  deactivateTenant(id: ID!): Boolean
+}

@@ -28,6 +28,7 @@ const ORDER = [
   "fees.graphql",
   "templates.graphql",
   "auditLogs.graphql",
+  "tenants.graphql",
   // "attendance.graphql", ← example: add new feature file here
 ];
 
