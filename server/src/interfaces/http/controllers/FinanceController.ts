@@ -390,8 +390,8 @@ export class FinanceController {
       const assignment = await prisma.studentFeeAssignment.findFirst({
         where: {
           id: assignmentId,
-          tenantId,
           student: {
+            tenantId,
             ...(campusId ? { campusId } : {}),
           },
         },
@@ -1159,7 +1159,7 @@ export class FinanceController {
       }
 
       const existing = await prisma.studentFeeAssignment.findFirst({
-        where: { tenantId, studentId },
+        where: { studentId },
         orderBy: { assignedAt: "desc" },
       });
 
@@ -1172,7 +1172,7 @@ export class FinanceController {
       const version = await prisma.feeStructureVersion.findFirst({
         where: {
           id: feeStructureVersionId,
-          tenantId,
+          feeStructure: { tenantId },
         },
         include: {
           feeStructure: true,
@@ -1186,7 +1186,6 @@ export class FinanceController {
       const assignment = await prisma.$transaction(async (tx) => {
         const created = await tx.studentFeeAssignment.create({
           data: {
-            tenantId,
             studentId,
             structureName: version.feeStructure.name,
             structureVersion: version.version,

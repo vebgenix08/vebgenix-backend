@@ -48,7 +48,6 @@ export const requireAuth = async (
       tenantIdFromClaims ?? ((req.headers["x-tenant-id"] as string) || null);
     const tenantRoleFromToken =
       getClaimString(claims, "custom:role", "tenant_role") ?? undefined;
-    const primaryProfileId = getClaimString(claims, "sub");
     const globalRoles = getClaimStringArray(claims, "cognito:groups");
     
     // Check if we are in a tenant context (URL param)

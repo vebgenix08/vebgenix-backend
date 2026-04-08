@@ -66,7 +66,7 @@ export class PlatformController {
    */
   static async createTenant(req: Request, res: Response) {
     try {
-      const { name, slug, subdomain, features } = req.body;
+      const { name, slug, subdomain } = req.body;
       const tenantSlug = slug || subdomain;
       const actorId = (req as any).platformUser.id;
 
@@ -78,7 +78,6 @@ export class PlatformController {
         name,
         tenantSlug || null,
         actorId,
-        Array.isArray(features) ? features : undefined,
       );
 
       return res.status(201).json({
@@ -310,7 +309,6 @@ export class PlatformController {
   static async listFeatures(req: Request, res: Response) {
     try {
       const { tenantId } = req.params;
-      await PlatformService.ensureRequiredTenantFeatures(tenantId);
 
       const features = await prisma.tenantFeature.findMany({
         where: { tenantId },
@@ -338,7 +336,6 @@ export class PlatformController {
       }
 
       await PlatformService.updateTenantFeatures(tenantId, features, actorId);
-      await PlatformService.ensureRequiredTenantFeatures(tenantId);
 
       // Return updated features
       const updatedFeatures = await prisma.tenantFeature.findMany({
