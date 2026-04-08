@@ -7,7 +7,7 @@ type PageInfo {
 
 type Query {
   _empty: String
-  health: String
+  health: String @aws_api_key
   dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
   superAdminOverview(input: SuperAdminOverviewInput): SuperAdminOverview!
   
