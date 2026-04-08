@@ -1,9 +1,8 @@
-name: Deploy Backend to dev
+name: Deploy Backend to dev (CDK — deprecated)
 
+# CDK-based deploy is disabled. Use "Deploy Lambda Functions" workflow instead.
+# Kept here for reference only.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
