@@ -69,8 +69,9 @@ jobs:
 
       # -----------------------------------------------------------------------
       # 5. Generate Prisma client with Lambda binary targets
-      #    schema.prisma has: binaryTargets = ["native", "rhel-openssl-3.0.x"]
-      #    rhel-openssl-3.0.x is the correct target for Lambda arm64 (AL2023)
+      #    schema.prisma has:
+      #      binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
+      #    linux-arm64-openssl-3.0.x = Lambda arm64 (AL2023)
       # -----------------------------------------------------------------------
       - name: Install server deps and generate Prisma client
         working-directory: server
@@ -79,7 +80,17 @@ jobs:
           npx prisma generate --schema=prisma/schema.prisma
 
       # -----------------------------------------------------------------------
-      # 6. Copy Prisma runtime into lambda/node_modules
+      # 6. Install Lambda npm deps FIRST (before Prisma copy)
+      #    IMPORTANT: npm ci must run BEFORE copying Prisma client or it will
+      #    overwrite the generated arm64 binary with the bare npm package.
+      # -----------------------------------------------------------------------
+      - name: Install Lambda npm dependencies
+        working-directory: aws-infrastructure/lambda
+        run: npm ci
+
+      # -----------------------------------------------------------------------
+      # 7. Copy Prisma runtime into lambda/node_modules (runs AFTER npm ci)
+      #    This ensures the generated arm64 binary is not overwritten by npm ci.
       # -----------------------------------------------------------------------
       - name: Copy Prisma runtime into Lambda asset folder
         run: |
@@ -98,12 +109,16 @@ jobs:
           ls aws-infrastructure/lambda/node_modules/@prisma/
           ls aws-infrastructure/lambda/node_modules/.prisma/
 
-      # -----------------------------------------------------------------------
-      # 7. Install remaining Lambda npm deps (aws-jwt-verify, jsonwebtoken, etc.)
-      # -----------------------------------------------------------------------
-      - name: Install Lambda npm dependencies
-        working-directory: aws-infrastructure/lambda
-        run: npm ci
+          # Verify the arm64 binary is present
+          BINARY_PATH="aws-infrastructure/lambda/node_modules/.prisma/client"
+          if ls "$BINARY_PATH"/libquery_engine-linux-arm64* 1>/dev/null 2>&1; then
+            echo "✓ arm64 Prisma binary confirmed:"
+            ls -lh "$BINARY_PATH"/libquery_engine-linux-arm64*
+          else
+            echo "ERROR: arm64 Prisma binary NOT found in $BINARY_PATH"
+            ls -la "$BINARY_PATH"/ || true
+            exit 1
+          fi
 
       # -----------------------------------------------------------------------
       # 8. Zip the lambda directory
