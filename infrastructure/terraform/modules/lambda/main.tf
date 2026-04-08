@@ -261,7 +261,9 @@ resource "aws_lambda_function" "functions" {
   source_code_hash = filebase64sha256("${path.module}/placeholder.zip")
 
   runtime       = "nodejs20.x"
-  handler       = "index.handler"
+  # Handler matches directory layout: lambda/{fn-name}/index.js → exports.handler
+  # e.g. admin-resolver/index.handler, email-worker/index.handler
+  handler       = "${each.key}/index.handler"
   architectures = ["arm64"]
   publish       = true # Enable versioning
 
@@ -292,11 +294,12 @@ resource "aws_lambda_function" "functions" {
   tags = local.tags
 
   lifecycle {
-    # Ignore source_code_hash changes — GitHub Actions manages deployments
+    # Ignore code/config changes — GitHub Actions manages deployments
     ignore_changes = [
       source_code_hash,
       filename,
-      environment, # Managed via CI/CD; prevent Terraform drift on secrets
+      handler,      # deploy-lambdas.yml sets the real handler; placeholder is index.handler
+      environment,  # Managed via CI/CD; prevent Terraform drift on secrets
     ]
   }
 }

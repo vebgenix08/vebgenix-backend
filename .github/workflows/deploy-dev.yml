@@ -36,7 +36,7 @@ jobs:
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v5
         with:
-          role-to-assume: arn:aws:iam::998105438053:role/GitHubDeployRole-vebgenix-backend-dev
+          role-to-assume: arn:aws:iam::278035644568:role/GitHubDeployRole-vebgenix-backend-prod
           aws-region: ap-south-1
 
       - name: AWS CLI version + caller identity (debug)

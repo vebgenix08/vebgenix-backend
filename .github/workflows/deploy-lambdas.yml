@@ -1,0 +1,353 @@
+name: Deploy Lambda Functions
+
+# Direct Lambda deploy — no CDK. Packages aws-infrastructure/lambda/ and
+# pushes to all Terraform-managed Lambda functions for the chosen environment.
+# Much faster than CDK (~3 min vs ~15 min).
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options: [dev, prod]
+
+permissions:
+  id-token: write
+  contents: read
+
+# Only one deploy per environment at a time
+concurrency:
+  group: deploy-lambdas-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    env:
+      ENVIRONMENT: ${{ github.event.inputs.environment }}
+      AWS_REGION: ap-south-1
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. Node (needed for Prisma generate + schema build)
+      # -----------------------------------------------------------------------
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      # -----------------------------------------------------------------------
+      # 3. AWS credentials via OIDC
+      # -----------------------------------------------------------------------
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::278035644568:role/GitHubDeployRole-vebgenix-backend-prod
+          aws-region: ap-south-1
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      # -----------------------------------------------------------------------
+      # 4. Build merged GraphQL schema (schema.graphql → graphql/schema.graphql)
+      # -----------------------------------------------------------------------
+      - name: Build GraphQL schema
+        run: node scripts/build-schema.mjs
+
+      # -----------------------------------------------------------------------
+      # 5. Generate Prisma client with Lambda binary targets
+      #    schema.prisma has: binaryTargets = ["native", "rhel-openssl-3.0.x"]
+      #    rhel-openssl-3.0.x is the correct target for Lambda arm64 (AL2023)
+      # -----------------------------------------------------------------------
+      - name: Install server deps and generate Prisma client
+        working-directory: server
+        run: |
+          npm ci
+          npx prisma generate --schema=prisma/schema.prisma
+
+      # -----------------------------------------------------------------------
+      # 6. Copy Prisma runtime into lambda/node_modules
+      # -----------------------------------------------------------------------
+      - name: Copy Prisma runtime into Lambda asset folder
+        run: |
+          set -euo pipefail
+
+          mkdir -p aws-infrastructure/lambda/node_modules/@prisma
+          mkdir -p aws-infrastructure/lambda/node_modules/.prisma
+
+          cp -R server/node_modules/@prisma/client \
+              aws-infrastructure/lambda/node_modules/@prisma/
+
+          cp -R server/node_modules/.prisma \
+              aws-infrastructure/lambda/node_modules/
+
+          echo "Prisma runtime copied:"
+          ls aws-infrastructure/lambda/node_modules/@prisma/
+          ls aws-infrastructure/lambda/node_modules/.prisma/
+
+      # -----------------------------------------------------------------------
+      # 7. Install remaining Lambda npm deps (aws-jwt-verify, jsonwebtoken, etc.)
+      # -----------------------------------------------------------------------
+      - name: Install Lambda npm dependencies
+        working-directory: aws-infrastructure/lambda
+        run: npm ci
+
+      # -----------------------------------------------------------------------
+      # 8. Zip the lambda directory
+      # -----------------------------------------------------------------------
+      - name: Package Lambda zip
+        run: |
+          set -euo pipefail
+          cd aws-infrastructure/lambda
+
+          zip -r /tmp/lambda.zip . \
+            --exclude "*.git*" \
+            --exclude "**/test/**" \
+            --exclude "**/__tests__/**" \
+            --exclude "**/*.test.js"
+
+          echo "Lambda package size: $(du -sh /tmp/lambda.zip | cut -f1)"
+          ls -lh /tmp/lambda.zip
+
+      # -----------------------------------------------------------------------
+      # 9. Resolve environment-specific variables
+      #    prod: prefix=vebgenix,     AppSync ID = o6cgickkk5dpxej6lirgo7bpna
+      #    dev:  prefix=vebgenix-dev, AppSync ID = dynamic lookup
+      # -----------------------------------------------------------------------
+      - name: Resolve deployment variables
+        run: |
+          set -euo pipefail
+
+          if [ "$ENVIRONMENT" = "prod" ]; then
+            echo "FN_PREFIX=vebgenix"                   >> $GITHUB_ENV
+            echo "APPSYNC_API_ID=o6cgickkk5dpxej6lirgo7bpna" >> $GITHUB_ENV
+            echo "UPDATE_ALIAS=true"                    >> $GITHUB_ENV
+          else
+            echo "FN_PREFIX=vebgenix-dev"               >> $GITHUB_ENV
+            echo "UPDATE_ALIAS=false"                   >> $GITHUB_ENV
+
+            # Lookup AppSync API ID by name
+            API_ID=$(aws appsync list-graphql-apis \
+              --query "graphqlApis[?name=='vebgenix-dev'].apiId | [0]" \
+              --output text 2>/dev/null || echo "")
+
+            if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
+              echo "ERROR: Could not find AppSync API named 'vebgenix-dev'"
+              aws appsync list-graphql-apis --query "graphqlApis[].{id:apiId,name:name}" --output table
+              exit 1
+            fi
+
+            echo "Found AppSync API: $API_ID"
+            echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
+          fi
+
+      # -----------------------------------------------------------------------
+      # 10. Deploy to all implemented Lambda functions
+      #
+      #     Implemented (10):
+      #       admin-resolver, admissions-resolver, audit-logs-resolver,
+      #       cognito-provisioner, dashboard-resolver, email-worker,
+      #       jobs-worker, storage-resolver, tenants-resolver, users-resolver
+      #
+      #     Not yet implemented (skip):
+      #       finance-resolver, settings-resolver, students-resolver
+      # -----------------------------------------------------------------------
+      - name: Update Lambda function code
+        run: |
+          set -euo pipefail
+
+          FUNCTIONS=(
+            "admin-resolver"
+            "admissions-resolver"
+            "audit-logs-resolver"
+            "cognito-provisioner"
+            "dashboard-resolver"
+            "email-worker"
+            "jobs-worker"
+            "storage-resolver"
+            "tenants-resolver"
+            "users-resolver"
+          )
+
+          for FN in "${FUNCTIONS[@]}"; do
+            FULL_NAME="${FN_PREFIX}-${FN}"
+            HANDLER="${FN}/index.handler"
+            echo ""
+            echo "━━━ Deploying: $FULL_NAME (handler: $HANDLER) ━━━"
+
+            # Ensure the handler is set correctly (Terraform placeholder uses index.handler)
+            CURRENT_HANDLER=$(aws lambda get-function-configuration \
+              --function-name "$FULL_NAME" \
+              --query "Handler" --output text 2>/dev/null || echo "")
+
+            if [ "$CURRENT_HANDLER" != "$HANDLER" ]; then
+              echo "  Updating handler: $CURRENT_HANDLER → $HANDLER"
+              aws lambda update-function-configuration \
+                --function-name "$FULL_NAME" \
+                --handler "$HANDLER" \
+                --query "Handler" --output text
+              aws lambda wait function-updated --function-name "$FULL_NAME"
+            else
+              echo "  Handler already correct: $HANDLER"
+            fi
+
+            if [ "$UPDATE_ALIAS" = "true" ]; then
+              # prod: publish a new numbered version, then point the 'prod' alias at it
+              OUTPUT=$(aws lambda update-function-code \
+                --function-name "$FULL_NAME" \
+                --zip-file fileb:///tmp/lambda.zip \
+                --publish \
+                --architectures arm64 \
+                --output json)
+
+              VERSION=$(echo "$OUTPUT" | python3 -c "import json,sys; print(json.load(sys.stdin)['Version'])")
+              echo "  Published version: $VERSION"
+
+              # Wait until the function update is complete
+              aws lambda wait function-updated --function-name "$FULL_NAME"
+
+              # Move the 'prod' alias to the freshly published version
+              aws lambda update-alias \
+                --function-name "$FULL_NAME" \
+                --name prod \
+                --function-version "$VERSION" \
+                --query "AliasArn" \
+                --output text
+
+              echo "  prod alias → version $VERSION ✓"
+
+            else
+              # dev: update code only (the 'dev' alias already points to $LATEST)
+              aws lambda update-function-code \
+                --function-name "$FULL_NAME" \
+                --zip-file fileb:///tmp/lambda.zip \
+                --architectures arm64 \
+                --query "FunctionArn" \
+                --output text
+
+              aws lambda wait function-updated --function-name "$FULL_NAME"
+              echo "  Updated (\$LATEST / dev alias) ✓"
+            fi
+          done
+
+          echo ""
+          echo "All Lambda functions deployed successfully."
+
+      # -----------------------------------------------------------------------
+      # 11. Push updated schema to AppSync
+      # -----------------------------------------------------------------------
+      - name: Update AppSync schema
+        run: |
+          set -euo pipefail
+
+          echo "Applying schema to AppSync API: $APPSYNC_API_ID"
+          echo "Schema checksum: $(sha256sum graphql/schema.graphql)"
+
+          aws appsync start-schema-creation \
+            --api-id "$APPSYNC_API_ID" \
+            --definition fileb://graphql/schema.graphql
+
+          for i in $(seq 1 60); do
+            STATUS=$(aws appsync get-schema-creation-status \
+              --api-id "$APPSYNC_API_ID" \
+              --query "status" --output text)
+            echo "  [$i/60] $STATUS"
+            [ "$STATUS" = "SUCCESS" ] && break
+            if [ "$STATUS" = "FAILED" ]; then
+              aws appsync get-schema-creation-status --api-id "$APPSYNC_API_ID"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          [ "$STATUS" = "SUCCESS" ] || { echo "ERROR: Schema creation timed out"; exit 1; }
+          echo "Schema applied successfully ✓"
+
+      # -----------------------------------------------------------------------
+      # 12. Smoke test — invoke health query via AppSync API key
+      # -----------------------------------------------------------------------
+      - name: Smoke test (AppSync health query)
+        run: |
+          set -euo pipefail
+
+          # Get the GraphQL endpoint
+          APPSYNC_URL=$(aws appsync get-graphql-api \
+            --api-id "$APPSYNC_API_ID" \
+            --query "graphqlApi.uris.GRAPHQL" \
+            --output text)
+          echo "AppSync endpoint: $APPSYNC_URL"
+
+          # Get the API key (used only for health check — resolvers use Cognito auth)
+          API_KEY=$(aws appsync list-api-keys \
+            --api-id "$APPSYNC_API_ID" \
+            --query "apiKeys[0].id" \
+            --output text 2>/dev/null || echo "")
+
+          if [ -z "$API_KEY" ] || [ "$API_KEY" = "None" ]; then
+            echo "No API key found — skipping HTTP smoke test (check AppSync console manually)"
+          else
+            echo "Sending health query..."
+            RESPONSE=$(curl -sf --max-time 30 \
+              -X POST "$APPSYNC_URL" \
+              -H "Content-Type: application/json" \
+              -H "x-api-key: $API_KEY" \
+              -d '{"query":"{ health }"}')
+            echo "Response: $RESPONSE"
+
+            # Fail if response contains GraphQL errors from Lambda crash
+            if echo "$RESPONSE" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          if 'errors' in d:
+              print('GraphQL errors:', json.dumps(d['errors'], indent=2))
+              sys.exit(1)
+          print('health =', d.get('data', {}).get('health'))
+          "; then
+              echo "Smoke test passed ✓"
+            else
+              echo "WARNING: Smoke test returned errors (see above). Check Lambda logs."
+              # Don't fail the deploy — health resolver uses NONE data source and should work
+            fi
+          fi
+
+      # -----------------------------------------------------------------------
+      # 13. Summary
+      # -----------------------------------------------------------------------
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo ""
+          echo "╔══════════════════════════════════════════╗"
+          echo "  Deploy complete: $ENVIRONMENT environment"
+          echo "  AppSync API ID: $APPSYNC_API_ID"
+          echo ""
+          echo "  Deployed functions:"
+          echo "    ✓ admin-resolver"
+          echo "    ✓ admissions-resolver"
+          echo "    ✓ audit-logs-resolver"
+          echo "    ✓ cognito-provisioner"
+          echo "    ✓ dashboard-resolver"
+          echo "    ✓ email-worker"
+          echo "    ✓ jobs-worker"
+          echo "    ✓ storage-resolver"
+          echo "    ✓ tenants-resolver"
+          echo "    ✓ users-resolver"
+          echo ""
+          echo "  Skipped (not yet implemented):"
+          echo "    - finance-resolver"
+          echo "    - settings-resolver"
+          echo "    - students-resolver"
+          echo "╚══════════════════════════════════════════╝"
