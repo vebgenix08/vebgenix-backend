@@ -528,7 +528,7 @@ jobs:
                 --field-name "$FIELD_NAME" \
                 --kind PIPELINE \
                 --pipeline-config "functions=$FN_ID" \
-                --request-mapping-template '{"version":"2018-05-29","operation":"Invoke","payload":{"field":"'"$FIELD_NAME"'","args":$util.toJson($ctx.args),"identity":$util.toJson($ctx.identity)}}' \
+                --request-mapping-template '{"version":"2018-05-29","operation":"Invoke","payload":{"fieldName":"'"$FIELD_NAME"'","arguments":$util.toJson($ctx.args),"identity":$util.toJson($ctx.identity)}}' \
                 --response-mapping-template '$util.toJson($ctx.result)' \
                 --query "resolver.fieldName" --output text > /dev/null
               echo "  ↺ $TYPE_NAME.$FIELD_NAME (updated)"
@@ -540,7 +540,7 @@ jobs:
                 --field-name "$FIELD_NAME" \
                 --kind PIPELINE \
                 --pipeline-config "functions=$FN_ID" \
-                --request-mapping-template '{"version":"2018-05-29","operation":"Invoke","payload":{"field":"'"$FIELD_NAME"'","args":$util.toJson($ctx.args),"identity":$util.toJson($ctx.identity)}}' \
+                --request-mapping-template '{"version":"2018-05-29","operation":"Invoke","payload":{"fieldName":"'"$FIELD_NAME"'","arguments":$util.toJson($ctx.args),"identity":$util.toJson($ctx.identity)}}' \
                 --response-mapping-template '$util.toJson($ctx.result)' \
                 --query "resolver.fieldName" --output text > /dev/null
               echo "  ✚ $TYPE_NAME.$FIELD_NAME (created)"
