@@ -33,12 +33,12 @@ jobs:
     env:
       ENVIRONMENT:  ${{ github.event.inputs.environment }}
       AWS_REGION:   ap-south-1
-      ALIAS:        ${{ github.event.inputs.environment }}   # alias name: 'dev' or 'prod'
+      ALIAS:        ${{ github.event.inputs.environment }}   # 'dev' or 'prod'
       FN_PREFIX:    vebgenix
-      # CDK-created function names (cannot change without CDK redeploy):
-      #   dev  → vebgenix-{fn}-dev     alias: dev
-      #   prod → vebgenix-{fn}         alias: prod
-      # FN_SUFFIX and LAYER_NAME are set per-environment in "Resolve environment variables"
+      LAYER_NAME:   vebgenix-deps
+      # ONE function per resolver, TWO aliases:
+      #   vebgenix-tenants-resolver:dev   → dev published version
+      #   vebgenix-tenants-resolver:prod  → prod published version
 
     steps:
       # -----------------------------------------------------------------------
@@ -81,9 +81,6 @@ jobs:
           if [ "$ENVIRONMENT" = "prod" ]; then
             echo "APPSYNC_API_ID=o6cgickkk5dpxej6lirgo7bpna"  >> $GITHUB_ENV
             echo "COGNITO_POOL_ID=ap-south-1_waAjEC9Nj"        >> $GITHUB_ENV
-            # prod CDK: vebgenix-{fn}  (no suffix)
-            echo "FN_SUFFIX="                                   >> $GITHUB_ENV
-            echo "LAYER_NAME=vebgenix-deps"                     >> $GITHUB_ENV
           else
             API_ID=$(aws appsync list-graphql-apis \
               --query "graphqlApis[?name=='vebgenix-dev'].apiId | [0]" \
@@ -98,9 +95,6 @@ jobs:
 
             echo "APPSYNC_API_ID=$API_ID"               >> $GITHUB_ENV
             echo "COGNITO_POOL_ID=ap-south-1_1pLVzImKk" >> $GITHUB_ENV
-            # dev CDK: vebgenix-{fn}-dev  (-dev suffix)
-            echo "FN_SUFFIX=-dev"                        >> $GITHUB_ENV
-            echo "LAYER_NAME=vebgenix-dev-deps"          >> $GITHUB_ENV
           fi
 
       # -----------------------------------------------------------------------
@@ -231,8 +225,7 @@ jobs:
           )
 
           for FN in "${FUNCTIONS[@]}"; do
-            # dev: vebgenix-{fn}-dev   prod: vebgenix-{fn}
-            FULL_NAME="${FN_PREFIX}-${FN}${FN_SUFFIX}"
+            FULL_NAME="${FN_PREFIX}-${FN}"
             echo ""
             echo "━━━ $FULL_NAME ━━━"
 
@@ -289,7 +282,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          FN_NAME="${FN_PREFIX}-pre-token-generation${FN_SUFFIX}"
+          FN_NAME="${FN_PREFIX}-pre-token-generation"
 
           # Get alias ARN (dev or prod)
           ALIAS_ARN=$(aws lambda get-alias \
@@ -437,7 +430,7 @@ print(json.dumps(cfg))
             # Only update each data source once
             if [ -z "${UPDATED_DS[$DS_NAME]+_}" ]; then
               ALIAS_ARN=$(aws lambda get-alias \
-                --function-name "${FN_PREFIX}-${LAMBDA_NAME}${FN_SUFFIX}" \
+                --function-name "${FN_PREFIX}-${LAMBDA_NAME}" \
                 --name          "$ALIAS" \
                 --query "AliasArn" --output text 2>/dev/null || echo "")
 
@@ -556,7 +549,7 @@ print(json.dumps(cfg))
           echo "  AppSync: $APPSYNC_API_ID"
           echo "  Cognito: $COGNITO_POOL_ID"
           echo ""
-          echo "  Pattern: vebgenix-{fn}${FN_SUFFIX}:$ALIAS → published version"
+          echo "  Pattern: vebgenix-{fn}:$ALIAS → published version"
           echo ""
           echo "  Functions deployed:"
           echo "    admin-resolver       admissions-resolver"
