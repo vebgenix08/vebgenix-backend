@@ -472,15 +472,19 @@ jobs:
           REQ='{"version":"2017-02-28","operation":"Invoke","payload":$util.toJson($ctx)}'
           RES='$util.toJson($ctx.result)'
 
-          # Convert lambda-name to data source name: tenants-resolver → TenantsDs
+          # Convert lambda-name to data source name (environment-aware):
+          #   prod: admin-resolver  → AdminDs        (PascalCase + Ds, CDK-created)
+          #   dev:  admin-resolver  → admin_resolver  (dashes → underscores)
           lambda_to_ds() {
             local name="$1"
-            # Remove "-resolver" suffix, title-case, append "Ds"
-            echo "$name" \
-              | sed 's/-resolver//' \
-              | awk -F'-' '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1))substr($i,2)}1' OFS='' \
-            | sed 's/$/Ds/'
-            # e.g. tenants → TenantsDs, dashboard → DashboardDs
+            if [ "$ENVIRONMENT" = "prod" ]; then
+              echo "$name" \
+                | sed 's/-resolver//' \
+                | awk -F'-' '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1))substr($i,2)}1' OFS='' \
+                | sed 's/$/Ds/'
+            else
+              echo "$name" | tr '-' '_'
+            fi
           }
 
           # Update each data source's Lambda ARN to use the current alias
