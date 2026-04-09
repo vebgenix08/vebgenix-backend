@@ -173,11 +173,14 @@ jobs:
 
           if [ "$ENVIRONMENT" = "prod" ]; then
             echo "FN_PREFIX=vebgenix"                        >> $GITHUB_ENV
+            echo "FN_SUFFIX="                                >> $GITHUB_ENV
             echo "LAYER_NAME=vebgenix-deps"                  >> $GITHUB_ENV
             echo "APPSYNC_API_ID=o6cgickkk5dpxej6lirgo7bpna" >> $GITHUB_ENV
             echo "UPDATE_ALIAS=true"                         >> $GITHUB_ENV
           else
-            echo "FN_PREFIX=vebgenix-dev"                    >> $GITHUB_ENV
+            # Actual function name pattern: vebgenix-{name}-dev  (suffix, not prefix)
+            echo "FN_PREFIX=vebgenix"                        >> $GITHUB_ENV
+            echo "FN_SUFFIX=-dev"                            >> $GITHUB_ENV
             echo "LAYER_NAME=vebgenix-dev-deps"              >> $GITHUB_ENV
             echo "UPDATE_ALIAS=false"                        >> $GITHUB_ENV
 
@@ -253,7 +256,7 @@ jobs:
           )
 
           for FN in "${FUNCTIONS[@]}"; do
-            FULL_NAME="${FN_PREFIX}-${FN}"
+            FULL_NAME="${FN_PREFIX}-${FN}${FN_SUFFIX}"
             HANDLER="${FN}/index.handler"
             echo ""
             echo "━━━ Deploying: $FULL_NAME (handler: $HANDLER) ━━━"

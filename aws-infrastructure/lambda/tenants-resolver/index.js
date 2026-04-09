@@ -26,7 +26,10 @@ const AVAILABLE_FEATURES = [
  * SUPER_ADMIN only
  */
 exports.handler = async (event) => {
-  const { fieldName, arguments: args, identity } = event;
+  // AppSync sends full $ctx as payload — fieldName is at info.fieldName
+  const fieldName = event.info?.fieldName ?? event.fieldName;
+  const args      = event.arguments ?? event.args ?? {};
+  const identity  = event.identity;
   const { isSuperAdmin, userId, email: actorEmail } = extractIdentity(identity);
 
   if (!isSuperAdmin) {
