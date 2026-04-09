@@ -1,8 +1,11 @@
 name: Deploy Lambda Functions
 
-# Direct Lambda deploy — no CDK. Packages aws-infrastructure/lambda/ and
-# pushes to all Terraform-managed Lambda functions for the chosen environment.
-# Much faster than CDK (~3 min vs ~15 min).
+# Single-function-per-resolver with dev/prod ALIASES.
+#   vebgenix-tenants-resolver:dev  → dev code
+#   vebgenix-tenants-resolver:prod → prod code
+#
+# Every deploy: publishes a new version, moves the alias.
+# AppSync data sources point to the alias ARN — no ARN changes needed.
 
 on:
   workflow_dispatch:
@@ -18,7 +21,6 @@ permissions:
   id-token: write
   contents: read
 
-# Only one deploy per environment at a time
 concurrency:
   group: deploy-lambdas-${{ github.event.inputs.environment }}
   cancel-in-progress: false
@@ -29,8 +31,14 @@ jobs:
     environment: ${{ github.event.inputs.environment }}
 
     env:
-      ENVIRONMENT: ${{ github.event.inputs.environment }}
-      AWS_REGION: ap-south-1
+      ENVIRONMENT:  ${{ github.event.inputs.environment }}
+      AWS_REGION:   ap-south-1
+      ALIAS:        ${{ github.event.inputs.environment }}   # alias name: 'dev' or 'prod'
+      FN_PREFIX:    vebgenix
+      # CDK-created function names (cannot change without CDK redeploy):
+      #   dev  → vebgenix-{fn}-dev     alias: dev
+      #   prod → vebgenix-{fn}         alias: prod
+      # FN_SUFFIX and LAYER_NAME are set per-environment in "Resolve environment variables"
 
     steps:
       # -----------------------------------------------------------------------
@@ -40,7 +48,7 @@ jobs:
         uses: actions/checkout@v4
 
       # -----------------------------------------------------------------------
-      # 2. Node (needed for Prisma generate + schema build)
+      # 2. Node
       # -----------------------------------------------------------------------
       - name: Setup Node 20
         uses: actions/setup-node@v4
@@ -62,16 +70,47 @@ jobs:
         run: aws sts get-caller-identity
 
       # -----------------------------------------------------------------------
-      # 4. Build merged GraphQL schema (schema.graphql → graphql/schema.graphql)
+      # 4. Resolve environment-specific variables
+      #    prod: fixed AppSync API ID + Cognito pool
+      #    dev:  lookup AppSync by name + dev Cognito pool
+      # -----------------------------------------------------------------------
+      - name: Resolve environment variables
+        run: |
+          set -euo pipefail
+
+          if [ "$ENVIRONMENT" = "prod" ]; then
+            echo "APPSYNC_API_ID=o6cgickkk5dpxej6lirgo7bpna"  >> $GITHUB_ENV
+            echo "COGNITO_POOL_ID=ap-south-1_waAjEC9Nj"        >> $GITHUB_ENV
+            # prod CDK: vebgenix-{fn}  (no suffix)
+            echo "FN_SUFFIX="                                   >> $GITHUB_ENV
+            echo "LAYER_NAME=vebgenix-deps"                     >> $GITHUB_ENV
+          else
+            API_ID=$(aws appsync list-graphql-apis \
+              --query "graphqlApis[?name=='vebgenix-dev'].apiId | [0]" \
+              --output text 2>/dev/null || echo "")
+
+            if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
+              echo "ERROR: AppSync API 'vebgenix-dev' not found"
+              aws appsync list-graphql-apis \
+                --query "graphqlApis[].{id:apiId,name:name}" --output table
+              exit 1
+            fi
+
+            echo "APPSYNC_API_ID=$API_ID"               >> $GITHUB_ENV
+            echo "COGNITO_POOL_ID=ap-south-1_1pLVzImKk" >> $GITHUB_ENV
+            # dev CDK: vebgenix-{fn}-dev  (-dev suffix)
+            echo "FN_SUFFIX=-dev"                        >> $GITHUB_ENV
+            echo "LAYER_NAME=vebgenix-dev-deps"          >> $GITHUB_ENV
+          fi
+
+      # -----------------------------------------------------------------------
+      # 5. Build GraphQL schema
       # -----------------------------------------------------------------------
       - name: Build GraphQL schema
         run: node scripts/build-schema.mjs
 
       # -----------------------------------------------------------------------
-      # 5. Generate Prisma client with Lambda binary targets
-      #    schema.prisma has:
-      #      binaryTargets = ["native", "rhel-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
-      #    linux-arm64-openssl-3.0.x = Lambda arm64 (AL2023)
+      # 6. Generate Prisma client (arm64 binary)
       # -----------------------------------------------------------------------
       - name: Install server deps and generate Prisma client
         working-directory: server
@@ -80,15 +119,9 @@ jobs:
           npx prisma generate --schema=prisma/schema.prisma
 
       # -----------------------------------------------------------------------
-      # 6. Build the Lambda Layer (nodejs/node_modules)
-      #    Layer structure Lambda expects:  nodejs/node_modules/...
-      #    Mounted at runtime under:        /opt/nodejs/node_modules/
-      #
-      #    Steps:
-      #      a) npm ci  — install lambda deps (aws-jwt-verify, etc.)
-      #      b) copy Prisma client + arm64 binary on top
-      #      c) verify arm64 binary present
-      #      d) zip into layer.zip with the nodejs/ prefix
+      # 7. Build Lambda Layer
+      #    Structure: nodejs/node_modules/  (mounted at /opt/nodejs/node_modules/)
+      #    Contents:  npm deps + Prisma arm64 client + lambda-shared utilities
       # -----------------------------------------------------------------------
       - name: Build Lambda Layer
         run: |
@@ -96,53 +129,42 @@ jobs:
 
           LAYER_DIR=/tmp/layer/nodejs
 
-          # a) Install lambda npm deps into the layer staging dir
+          # Install Lambda npm deps
           mkdir -p "$LAYER_DIR"
-          cp aws-infrastructure/lambda/package.json "$LAYER_DIR/"
+          cp aws-infrastructure/lambda/package.json     "$LAYER_DIR/"
           cp aws-infrastructure/lambda/package-lock.json "$LAYER_DIR/"
-          cd "$LAYER_DIR"
-          npm ci --omit=dev
-          cd -
+          cd "$LAYER_DIR" && npm ci --omit=dev && cd -
 
-          # b) Copy generated Prisma client (with arm64 binary) on top
+          # Copy Prisma client + arm64 binary on top
           mkdir -p "$LAYER_DIR/node_modules/@prisma"
-          cp -R server/node_modules/@prisma/client \
-              "$LAYER_DIR/node_modules/@prisma/"
-          cp -R server/node_modules/.prisma \
-              "$LAYER_DIR/node_modules/"
+          cp -R server/node_modules/@prisma/client "$LAYER_DIR/node_modules/@prisma/"
+          cp -R server/node_modules/.prisma        "$LAYER_DIR/node_modules/"
 
-          # c2) Copy shared utilities as lambda-shared package
+          # Verify arm64 binary
+          if ls "$LAYER_DIR/node_modules/.prisma/client"/libquery_engine-linux-arm64* \
+               1>/dev/null 2>&1; then
+            echo "✓ arm64 binary present"
+          else
+            echo "ERROR: arm64 Prisma binary missing"; exit 1
+          fi
+
+          # Copy shared utilities as lambda-shared package
           mkdir -p "$LAYER_DIR/node_modules/lambda-shared"
           cp aws-infrastructure/lambda/shared/db.js         "$LAYER_DIR/node_modules/lambda-shared/"
           cp aws-infrastructure/lambda/shared/identity.js   "$LAYER_DIR/node_modules/lambda-shared/"
           cp aws-infrastructure/lambda/shared/withTenant.js "$LAYER_DIR/node_modules/lambda-shared/"
-          cat > "$LAYER_DIR/node_modules/lambda-shared/package.json" << 'PKGJSON'
+          cat > "$LAYER_DIR/node_modules/lambda-shared/package.json" \
+            <<'EOF'
           {"name":"lambda-shared","version":"1.0.0","main":"db.js"}
-          PKGJSON
-          echo "lambda-shared copied:"
-          ls "$LAYER_DIR/node_modules/lambda-shared/"
+          EOF
 
-          # c) Verify arm64 binary is present
-          BINARY_PATH="$LAYER_DIR/node_modules/.prisma/client"
-          if ls "$BINARY_PATH"/libquery_engine-linux-arm64* 1>/dev/null 2>&1; then
-            echo "✓ arm64 Prisma binary confirmed:"
-            ls -lh "$BINARY_PATH"/libquery_engine-linux-arm64*
-          else
-            echo "ERROR: arm64 Prisma binary NOT found in $BINARY_PATH"
-            ls -la "$BINARY_PATH"/ || true
-            exit 1
-          fi
-
-          # d) Zip with the nodejs/ prefix (Lambda layer requirement)
+          # Zip with nodejs/ prefix
           cd /tmp/layer
-          zip -r /tmp/layer.zip nodejs/ \
-            --exclude "*.git*"
-
+          zip -r /tmp/layer.zip nodejs/ --exclude "*.git*"
           echo "Layer size: $(du -sh /tmp/layer.zip | cut -f1)"
-          ls -lh /tmp/layer.zip
 
       # -----------------------------------------------------------------------
-      # 7. Package handler code only (no node_modules — they live in the layer)
+      # 8. Package handler zip (no node_modules — those are in the layer)
       # -----------------------------------------------------------------------
       - name: Package Lambda handler zip
         run: |
@@ -160,84 +182,37 @@ jobs:
             --exclude "package-lock.json"
 
           echo "Handler zip size: $(du -sh /tmp/lambda.zip | cut -f1)"
-          ls -lh /tmp/lambda.zip
 
       # -----------------------------------------------------------------------
-      # 8. Resolve environment-specific variables
-      #    prod: prefix=vebgenix,     layer=vebgenix-deps,     AppSync = o6cgickkk5dpxej6lirgo7bpna
-      #    dev:  prefix=vebgenix-dev, layer=vebgenix-dev-deps, AppSync = dynamic lookup
-      # -----------------------------------------------------------------------
-      - name: Resolve deployment variables
-        run: |
-          set -euo pipefail
-
-          if [ "$ENVIRONMENT" = "prod" ]; then
-            echo "FN_PREFIX=vebgenix"                        >> $GITHUB_ENV
-            echo "FN_SUFFIX="                                >> $GITHUB_ENV
-            echo "LAYER_NAME=vebgenix-deps"                  >> $GITHUB_ENV
-            echo "APPSYNC_API_ID=o6cgickkk5dpxej6lirgo7bpna" >> $GITHUB_ENV
-            echo "UPDATE_ALIAS=true"                         >> $GITHUB_ENV
-          else
-            # Actual function name pattern: vebgenix-{name}-dev  (suffix, not prefix)
-            echo "FN_PREFIX=vebgenix"                        >> $GITHUB_ENV
-            echo "FN_SUFFIX=-dev"                            >> $GITHUB_ENV
-            echo "LAYER_NAME=vebgenix-dev-deps"              >> $GITHUB_ENV
-            echo "UPDATE_ALIAS=false"                        >> $GITHUB_ENV
-
-            # Lookup AppSync API ID by name
-            API_ID=$(aws appsync list-graphql-apis \
-              --query "graphqlApis[?name=='vebgenix-dev'].apiId | [0]" \
-              --output text 2>/dev/null || echo "")
-
-            if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
-              echo "ERROR: Could not find AppSync API named 'vebgenix-dev'"
-              aws appsync list-graphql-apis --query "graphqlApis[].{id:apiId,name:name}" --output table
-              exit 1
-            fi
-
-            echo "Found AppSync API: $API_ID"
-            echo "APPSYNC_API_ID=$API_ID" >> $GITHUB_ENV
-          fi
-
-      # -----------------------------------------------------------------------
-      # 9. Publish Lambda Layer and capture the new Layer Version ARN
+      # 9. Publish Lambda Layer version
       # -----------------------------------------------------------------------
       - name: Publish Lambda Layer
         run: |
           set -euo pipefail
 
-          echo "Publishing layer: $LAYER_NAME"
-
           LAYER_ARN=$(aws lambda publish-layer-version \
-            --layer-name "$LAYER_NAME" \
-            --description "node_modules + Prisma arm64 binary ($ENVIRONMENT)" \
-            --zip-file fileb:///tmp/layer.zip \
-            --compatible-runtimes nodejs20.x \
+            --layer-name      "$LAYER_NAME" \
+            --description     "node_modules + Prisma arm64 + lambda-shared ($ENVIRONMENT)" \
+            --zip-file        fileb:///tmp/layer.zip \
+            --compatible-runtimes    nodejs20.x \
             --compatible-architectures arm64 \
-            --query "LayerVersionArn" \
-            --output text)
+            --query "LayerVersionArn" --output text)
 
-          echo "Published layer ARN: $LAYER_ARN"
+          echo "Published layer: $LAYER_ARN"
           echo "LAYER_ARN=$LAYER_ARN" >> $GITHUB_ENV
 
       # -----------------------------------------------------------------------
-      # 10. Deploy to all implemented Lambda functions
+      # 10. Deploy Lambda functions
       #
-      #     For each function:
-      #       a) Fix handler path  (e.g. dashboard-resolver/index.handler)
-      #       b) Attach the new layer version (replaces any previous layer)
-      #       c) Update function code (handler zip — no node_modules)
-      #       d) prod only: publish version + move alias
+      #     For EVERY function:
+      #       a) Update handler + attach new layer version
+      #       b) Update code + PUBLISH a new numbered version
+      #       c) Move the '$ALIAS' alias (dev|prod) to that version
       #
-      #     Implemented (10):
-      #       admin-resolver, admissions-resolver, audit-logs-resolver,
-      #       cognito-provisioner, dashboard-resolver, email-worker,
-      #       jobs-worker, storage-resolver, tenants-resolver, users-resolver
-      #
-      #     Not yet implemented (skip):
-      #       finance-resolver, settings-resolver, students-resolver
+      #     AppSync data sources point to the alias ARN — the ARN never
+      #     changes between deploys, so no AppSync data source update needed.
       # -----------------------------------------------------------------------
-      - name: Update Lambda function code
+      - name: Deploy Lambda functions
         run: |
           set -euo pipefail
 
@@ -256,153 +231,135 @@ jobs:
           )
 
           for FN in "${FUNCTIONS[@]}"; do
+            # dev: vebgenix-{fn}-dev   prod: vebgenix-{fn}
             FULL_NAME="${FN_PREFIX}-${FN}${FN_SUFFIX}"
-            HANDLER="${FN}/index.handler"
             echo ""
-            echo "━━━ Deploying: $FULL_NAME (handler: $HANDLER) ━━━"
+            echo "━━━ $FULL_NAME ━━━"
 
-            # a) Fix handler + attach layer in one update-function-configuration call
-            CURRENT_HANDLER=$(aws lambda get-function-configuration \
-              --function-name "$FULL_NAME" \
-              --query "Handler" --output text 2>/dev/null || echo "")
+            # Check function exists before attempting update
+            if ! aws lambda get-function --function-name "$FULL_NAME" \
+                --query "Configuration.FunctionName" --output text > /dev/null 2>&1; then
+              echo "  SKIP: $FULL_NAME not found in AWS"
+              continue
+            fi
 
-            echo "  Attaching layer: $LAYER_ARN"
+            # a) Update handler + layer
             aws lambda update-function-configuration \
               --function-name "$FULL_NAME" \
-              --handler "$HANDLER" \
-              --layers "$LAYER_ARN" \
-              --query "{Handler:Handler,Layers:Layers}" \
-              --output json
+              --handler       "${FN}/index.handler" \
+              --layers        "$LAYER_ARN" \
+              --query "{Handler:Handler}" --output json
             aws lambda wait function-updated --function-name "$FULL_NAME"
-            echo "  Handler + layer updated ✓"
 
-            # b) Push the handler zip (code only, no node_modules)
-            if [ "$UPDATE_ALIAS" = "true" ]; then
-              # prod: publish a new numbered version, then point the 'prod' alias at it
-              OUTPUT=$(aws lambda update-function-code \
-                --function-name "$FULL_NAME" \
-                --zip-file fileb:///tmp/lambda.zip \
-                --publish \
-                --architectures arm64 \
-                --output json)
+            # b) Update code + publish new version
+            VERSION=$(aws lambda update-function-code \
+              --function-name "$FULL_NAME" \
+              --zip-file      fileb:///tmp/lambda.zip \
+              --publish \
+              --architectures arm64 \
+              --query "Version" --output text)
 
-              VERSION=$(echo "$OUTPUT" | python3 -c "import json,sys; print(json.load(sys.stdin)['Version'])")
-              echo "  Published version: $VERSION"
+            aws lambda wait function-updated --function-name "$FULL_NAME"
+            echo "  Published version: $VERSION"
 
-              aws lambda wait function-updated --function-name "$FULL_NAME"
+            # c) Move alias to new version (create alias if it doesn't exist yet)
+            aws lambda update-alias \
+              --function-name    "$FULL_NAME" \
+              --name             "$ALIAS" \
+              --function-version "$VERSION" \
+              --query "AliasArn" --output text \
+            2>/dev/null \
+            || aws lambda create-alias \
+              --function-name    "$FULL_NAME" \
+              --name             "$ALIAS" \
+              --function-version "$VERSION" \
+              --query "AliasArn" --output text
 
-              # Move the 'prod' alias to the freshly published version
-              aws lambda update-alias \
-                --function-name "$FULL_NAME" \
-                --name prod \
-                --function-version "$VERSION" \
-                --query "AliasArn" \
-                --output text
-
-              echo "  prod alias → version $VERSION ✓"
-
-            else
-              # dev: update code only (the 'dev' alias already points to $LATEST)
-              aws lambda update-function-code \
-                --function-name "$FULL_NAME" \
-                --zip-file fileb:///tmp/lambda.zip \
-                --architectures arm64 \
-                --query "FunctionArn" \
-                --output text
-
-              aws lambda wait function-updated --function-name "$FULL_NAME"
-              echo "  Updated (\$LATEST / dev alias) ✓"
-            fi
+            echo "  $FULL_NAME:$ALIAS → v$VERSION ✓"
           done
 
           echo ""
-          echo "All Lambda functions deployed successfully."
+          echo "All Lambda functions deployed."
 
       # -----------------------------------------------------------------------
-      # 11. Attach pre-token-generation Lambda trigger to Cognito User Pool
-      #     Idempotent — safe to run on every deploy.
+      # 11. Attach pre-token-generation trigger to Cognito
+      #     Uses the alias ARN so Cognito always invokes the right version.
       # -----------------------------------------------------------------------
       - name: Attach pre-token-generation trigger to Cognito
         run: |
           set -euo pipefail
 
-          if [ "$ENVIRONMENT" = "prod" ]; then
-            POOL_ID="ap-south-1_waAjEC9Nj"
-          else
-            POOL_ID="ap-south-1_1pLVzImKk"
-          fi
+          FN_NAME="${FN_PREFIX}-pre-token-generation${FN_SUFFIX}"
 
-          FN_NAME="${FN_PREFIX}-pre-token-generation"
-
-          # Get the Lambda ARN
-          LAMBDA_ARN=$(aws lambda get-function \
+          # Get alias ARN (dev or prod)
+          ALIAS_ARN=$(aws lambda get-alias \
             --function-name "$FN_NAME" \
-            --query "Configuration.FunctionArn" \
-            --output text)
+            --name          "$ALIAS" \
+            --query "AliasArn" --output text)
 
-          echo "Attaching $LAMBDA_ARN to Cognito pool $POOL_ID"
+          echo "Attaching $ALIAS_ARN to Cognito pool $COGNITO_POOL_ID"
 
-          # Get current lambda config (if any)
-          CURRENT=$(aws cognito-idp describe-user-pool \
-            --user-pool-id "$POOL_ID" \
-            --query "UserPool.LambdaConfig" \
-            --output json)
+          # Fetch existing lambda config so we don't wipe other triggers
+          EXISTING_CONFIG=$(aws cognito-idp describe-user-pool \
+            --user-pool-id "$COGNITO_POOL_ID" \
+            --query "UserPool.LambdaConfig" --output json 2>/dev/null || echo "{}")
 
-          echo "Current lambda config: $CURRENT"
+          # Merge: overwrite only PreTokenGeneration, keep everything else
+          MERGED_CONFIG=$(echo "$EXISTING_CONFIG" | python3 -c "
+import json, sys
+cfg = json.load(sys.stdin) or {}
+cfg['PreTokenGeneration'] = '$ALIAS_ARN'
+print(json.dumps(cfg))
+")
 
-          # Update with pre-token-generation trigger
           aws cognito-idp update-user-pool \
-            --user-pool-id "$POOL_ID" \
-            --lambda-config "PreTokenGeneration=$LAMBDA_ARN"
+            --user-pool-id  "$COGNITO_POOL_ID" \
+            --lambda-config "$MERGED_CONFIG"
 
-          # Grant Cognito permission to invoke this Lambda (idempotent)
+          # Grant Cognito invoke permission on the alias (idempotent)
           aws lambda add-permission \
-            --function-name "$FN_NAME" \
-            --statement-id "CognitoInvoke-${POOL_ID}" \
-            --action "lambda:InvokeFunction" \
-            --principal "cognito-idp.amazonaws.com" \
-            --source-arn "arn:aws:cognito-idp:ap-south-1:278035644568:userpool/$POOL_ID" \
+            --function-name "$FN_NAME:$ALIAS" \
+            --statement-id  "CognitoInvoke-${COGNITO_POOL_ID}" \
+            --action        "lambda:InvokeFunction" \
+            --principal     "cognito-idp.amazonaws.com" \
+            --source-arn    "arn:aws:cognito-idp:ap-south-1:278035644568:userpool/$COGNITO_POOL_ID" \
             2>/dev/null || echo "Permission already exists (ok)"
 
-          echo "Pre-token-generation trigger attached ✓"
+          echo "Pre-token trigger attached ✓"
 
       # -----------------------------------------------------------------------
-      # 12. Push updated schema to AppSync
+      # 12. Push updated GraphQL schema to AppSync
       # -----------------------------------------------------------------------
       - name: Update AppSync schema
         run: |
           set -euo pipefail
 
-          echo "Applying schema to AppSync API: $APPSYNC_API_ID"
-          echo "Schema checksum: $(sha256sum graphql/schema.graphql)"
-
           aws appsync start-schema-creation \
-            --api-id "$APPSYNC_API_ID" \
+            --api-id    "$APPSYNC_API_ID" \
             --definition fileb://graphql/schema.graphql
 
           for i in $(seq 1 60); do
             STATUS=$(aws appsync get-schema-creation-status \
-              --api-id "$APPSYNC_API_ID" \
-              --query "status" --output text)
-            echo "  [$i/60] $STATUS"
+              --api-id "$APPSYNC_API_ID" --query "status" --output text)
+            echo "  [$i] $STATUS"
             [ "$STATUS" = "SUCCESS" ] && break
-            if [ "$STATUS" = "FAILED" ]; then
-              aws appsync get-schema-creation-status --api-id "$APPSYNC_API_ID"
-              exit 1
-            fi
+            [ "$STATUS" = "FAILED"  ] && aws appsync get-schema-creation-status \
+              --api-id "$APPSYNC_API_ID" && exit 1
             sleep 5
           done
 
-          [ "$STATUS" = "SUCCESS" ] || { echo "ERROR: Schema creation timed out"; exit 1; }
-          echo "Schema applied successfully ✓"
+          echo "Schema applied ✓"
 
       # -----------------------------------------------------------------------
-      # 13. Sync AppSync resolvers — create or update pipeline resolvers
-      #     for every Query/Mutation field mapped to a Lambda function.
+      # 13. Sync AppSync resolvers (UNIT resolvers → Lambda data sources)
       #
-      #     Mapping: field → Lambda function name suffix
-      #     New queries added to schema.graphql are picked up automatically.
-      #     Safe to re-run — existing resolvers are updated in-place.
+      #     Data source names follow the CDK convention: <Name>Ds
+      #     e.g. tenants-resolver → TenantsDs
+      #
+      #     The data source Lambda ARN is updated to the alias ARN on every
+      #     deploy so dev/prod always invoke the correct Lambda version.
+      #
+      #     Add a new line to RESOLVER_MAP whenever you add a GraphQL field.
       # -----------------------------------------------------------------------
       - name: Sync AppSync resolvers
         run: |
@@ -410,225 +367,205 @@ jobs:
 
           API_ID="$APPSYNC_API_ID"
 
-          # ── field → lambda suffix ──────────────────────────────────────────
-          # Format: "TypeName.fieldName=lambda-suffix"
-          # Add a new line here whenever you add a new Query or Mutation field.
+          # "TypeName.fieldName=lambda-name" → data source = PascalCase(lambda-name) + Ds
           RESOLVER_MAP=(
-            # Dashboard
+            # ── Dashboard ──
             "Query.dashboardOverview=dashboard-resolver"
             "Query.superAdminOverview=dashboard-resolver"
 
-            # Admissions
+            # ── Admissions ──
             "Query.listAdmissions=admissions-resolver"
             "Query.getAdmission=admissions-resolver"
-            "Mutation.updateAdmissionStatus=admissions-resolver"
             "Mutation.createAdmission=admissions-resolver"
             "Mutation.updateAdmission=admissions-resolver"
-            "Mutation.deleteAdmission=admissions-resolver"
+            "Mutation.updateAdmissionStatus=admissions-resolver"
+            "Mutation.submitAdmission=admissions-resolver"
+            "Mutation.reviewAdmission=admissions-resolver"
+            "Mutation.withdrawAdmission=admissions-resolver"
 
-            # Users
+            # ── Users ──
             "Query.me=users-resolver"
             "Query.listUsers=users-resolver"
             "Query.getUser=users-resolver"
             "Mutation.createUser=users-resolver"
             "Mutation.updateUser=users-resolver"
-            "Mutation.deleteUser=users-resolver"
-            "Mutation.inviteUser=users-resolver"
-            "Mutation.activateUser=users-resolver"
             "Mutation.deactivateUser=users-resolver"
 
-            # Tenants
+            # ── Tenants ──
             "Query.listTenants=tenants-resolver"
             "Query.getTenant=tenants-resolver"
-            "Mutation.createTenant=tenants-resolver"
-            "Mutation.updateTenant=tenants-resolver"
-
-            # Tenants — new operations
             "Query.validateSubdomain=tenants-resolver"
             "Query.listAvailableFeatures=tenants-resolver"
+            "Mutation.createTenant=tenants-resolver"
             "Mutation.provisionTenant=tenants-resolver"
+            "Mutation.updateTenant=tenants-resolver"
+            "Mutation.deactivateTenant=tenants-resolver"
             "Mutation.requestTenantDeletion=tenants-resolver"
             "Mutation.confirmTenantDeletion=tenants-resolver"
 
-            # Admin (super admin)
-            "Query.platformStats=admin-resolver"
-            "Mutation.createSuperAdmin=admin-resolver"
-
-            # Audit logs
+            # ── Audit Logs ──
             "Query.listPlatformAuditLogs=audit-logs-resolver"
             "Query.getPlatformAuditLog=audit-logs-resolver"
 
-            # Storage
-            "Mutation.getUploadUrl=storage-resolver"
-            "Mutation.getDownloadUrl=storage-resolver"
+            # ── Storage ──
+            "Mutation.generateUploadUrl=storage-resolver"
 
-            # Settings / Master data
-            "Query.listAcademicYears=admin-resolver"
-            "Query.listTemplates=admin-resolver"
-            "Query.listCampuses=admin-resolver"
-            "Query.getCampus=admin-resolver"
+            # ── Admin ──
+            "Query.platformStats=admin-resolver"
           )
 
-          # ── Get the AppSync function IDs for each Lambda ───────────────────
-          echo "Fetching AppSync function IDs..."
-          declare -A FN_ID_MAP
+          REQ='{"version":"2017-02-28","operation":"Invoke","payload":$util.toJson($ctx)}'
+          RES='$util.toJson($ctx.result)'
 
-          FUNCTIONS_JSON=$(aws appsync list-functions \
-            --api-id "$API_ID" \
-            --query "functions[].{id:functionId,name:name}" \
-            --output json)
+          # Convert lambda-name to data source name: tenants-resolver → TenantsDs
+          lambda_to_ds() {
+            local name="$1"
+            # Remove "-resolver" suffix, title-case, append "Ds"
+            echo "$name" \
+              | sed 's/-resolver//' \
+              | awk -F'-' '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1))substr($i,2)}1' OFS='' \
+            | sed 's/$/Ds/'
+            # e.g. tenants → TenantsDs, dashboard → DashboardDs
+          }
 
-          for lambda_suffix in \
-            dashboard-resolver admissions-resolver users-resolver \
-            tenants-resolver admin-resolver audit-logs-resolver storage-resolver \
-            cognito-provisioner; do
+          # Update each data source's Lambda ARN to use the current alias
+          declare -A UPDATED_DS
+          for entry in "${RESOLVER_MAP[@]}"; do
+            LAMBDA_NAME="${entry##*=}"
+            DS_NAME=$(lambda_to_ds "$LAMBDA_NAME")
 
-            FULL_NAME="${FN_PREFIX}-${lambda_suffix}"
-            FN_ID=$(echo "$FUNCTIONS_JSON" | python3 -c "
-          import json, sys
-          fns = json.load(sys.stdin)
-          match = next((f['id'] for f in fns if f['name'] == '$FULL_NAME'), None)
-          print(match or '')
-          ")
+            # Only update each data source once
+            if [ -z "${UPDATED_DS[$DS_NAME]+_}" ]; then
+              ALIAS_ARN=$(aws lambda get-alias \
+                --function-name "${FN_PREFIX}-${LAMBDA_NAME}${FN_SUFFIX}" \
+                --name          "$ALIAS" \
+                --query "AliasArn" --output text 2>/dev/null || echo "")
 
-            if [ -n "$FN_ID" ]; then
-              FN_ID_MAP["$lambda_suffix"]="$FN_ID"
-              echo "  ✓ $FULL_NAME → $FN_ID"
-            else
-              echo "  ⚠ No AppSync function found for $FULL_NAME (skipping its resolvers)"
+              if [ -n "$ALIAS_ARN" ] && [ "$ALIAS_ARN" != "None" ]; then
+                # Get existing service role ARN so we can reuse it
+                SVC_ROLE=$(aws appsync get-data-source \
+                  --api-id "$API_ID" --name "$DS_NAME" \
+                  --query "dataSource.serviceRoleArn" --output text 2>/dev/null || echo "")
+
+                if [ -n "$SVC_ROLE" ] && [ "$SVC_ROLE" != "None" ]; then
+                  aws appsync update-data-source \
+                    --api-id          "$API_ID" \
+                    --name            "$DS_NAME" \
+                    --type            AWS_LAMBDA \
+                    --lambda-config   "lambdaFunctionArn=$ALIAS_ARN" \
+                    --service-role-arn "$SVC_ROLE" \
+                    --query "dataSource.name" --output text > /dev/null \
+                  && echo "  DS $DS_NAME → $ALIAS_ARN ✓" \
+                  || echo "  WARN: failed to update $DS_NAME"
+                else
+                  echo "  SKIP $DS_NAME (data source not found — create it in AppSync console)"
+                fi
+                UPDATED_DS[$DS_NAME]=1
+              else
+                echo "  WARN: alias ${FN_PREFIX}-${LAMBDA_NAME}:$ALIAS not found"
+              fi
             fi
           done
 
-          # ── Create or update each resolver ────────────────────────────────
           echo ""
           echo "Syncing resolvers..."
 
           for entry in "${RESOLVER_MAP[@]}"; do
             TYPE_FIELD="${entry%%=*}"
-            LAMBDA_SUFFIX="${entry##*=}"
+            LAMBDA_NAME="${entry##*=}"
             TYPE_NAME="${TYPE_FIELD%%.*}"
             FIELD_NAME="${TYPE_FIELD##*.}"
+            DS_NAME=$(lambda_to_ds "$LAMBDA_NAME")
 
-            FN_ID="${FN_ID_MAP[$LAMBDA_SUFFIX]:-}"
-            if [ -z "$FN_ID" ]; then
-              echo "  SKIP $TYPE_NAME.$FIELD_NAME — no AppSync function for $LAMBDA_SUFFIX"
-              continue
-            fi
-
-            # Check if resolver already exists
             EXISTING=$(aws appsync get-resolver \
-              --api-id "$API_ID" \
+              --api-id    "$API_ID" \
               --type-name "$TYPE_NAME" \
               --field-name "$FIELD_NAME" \
-              --query "resolver.resolverArn" \
-              --output text 2>/dev/null || echo "")
+              --query "resolver.resolverArn" --output text 2>/dev/null || echo "")
 
             if [ -n "$EXISTING" ] && [ "$EXISTING" != "None" ]; then
-              # Update existing resolver
               aws appsync update-resolver \
-                --api-id "$API_ID" \
-                --type-name "$TYPE_NAME" \
-                --field-name "$FIELD_NAME" \
-                --kind PIPELINE \
-                --pipeline-config "functions=$FN_ID" \
-                --request-mapping-template '{"version":"2018-05-29","operation":"Invoke","payload":{"fieldName":"'"$FIELD_NAME"'","arguments":$util.toJson($ctx.args),"identity":$util.toJson($ctx.identity)}}' \
-                --response-mapping-template '$util.toJson($ctx.result)' \
+                --api-id          "$API_ID" \
+                --type-name       "$TYPE_NAME" \
+                --field-name      "$FIELD_NAME" \
+                --kind            UNIT \
+                --data-source-name "$DS_NAME" \
+                --request-mapping-template  "$REQ" \
+                --response-mapping-template "$RES" \
                 --query "resolver.fieldName" --output text > /dev/null
-              echo "  ↺ $TYPE_NAME.$FIELD_NAME (updated)"
+              echo "  ↺ $TYPE_NAME.$FIELD_NAME"
             else
-              # Create new resolver
               aws appsync create-resolver \
-                --api-id "$API_ID" \
-                --type-name "$TYPE_NAME" \
-                --field-name "$FIELD_NAME" \
-                --kind PIPELINE \
-                --pipeline-config "functions=$FN_ID" \
-                --request-mapping-template '{"version":"2018-05-29","operation":"Invoke","payload":{"fieldName":"'"$FIELD_NAME"'","arguments":$util.toJson($ctx.args),"identity":$util.toJson($ctx.identity)}}' \
-                --response-mapping-template '$util.toJson($ctx.result)' \
+                --api-id          "$API_ID" \
+                --type-name       "$TYPE_NAME" \
+                --field-name      "$FIELD_NAME" \
+                --kind            UNIT \
+                --data-source-name "$DS_NAME" \
+                --request-mapping-template  "$REQ" \
+                --response-mapping-template "$RES" \
                 --query "resolver.fieldName" --output text > /dev/null
-              echo "  ✚ $TYPE_NAME.$FIELD_NAME (created)"
+              echo "  ✚ $TYPE_NAME.$FIELD_NAME"
             fi
           done
 
           echo ""
-          echo "AppSync resolvers synced ✓"
+          echo "Resolvers synced ✓"
 
       # -----------------------------------------------------------------------
-      # 14. Smoke test — invoke health query via AppSync API key
+      # 14. Smoke test
       # -----------------------------------------------------------------------
-      - name: Smoke test (AppSync health query)
+      - name: Smoke test
         run: |
           set -euo pipefail
 
-          # Get the GraphQL endpoint
           APPSYNC_URL=$(aws appsync get-graphql-api \
             --api-id "$APPSYNC_API_ID" \
-            --query "graphqlApi.uris.GRAPHQL" \
-            --output text)
-          echo "AppSync endpoint: $APPSYNC_URL"
+            --query  "graphqlApi.uris.GRAPHQL" --output text)
 
-          # Get the API key (used only for health check — resolvers use Cognito auth)
           API_KEY=$(aws appsync list-api-keys \
             --api-id "$APPSYNC_API_ID" \
-            --query "apiKeys[0].id" \
-            --output text 2>/dev/null || echo "")
+            --query  "apiKeys[0].id" --output text 2>/dev/null || echo "")
 
           if [ -z "$API_KEY" ] || [ "$API_KEY" = "None" ]; then
-            echo "No API key found — skipping HTTP smoke test (check AppSync console manually)"
+            echo "No API key — skipping smoke test"
           else
-            echo "Sending health query..."
             RESPONSE=$(curl -sf --max-time 30 \
               -X POST "$APPSYNC_URL" \
               -H "Content-Type: application/json" \
               -H "x-api-key: $API_KEY" \
               -d '{"query":"{ health }"}')
-            echo "Response: $RESPONSE"
 
-            # Fail if response contains GraphQL errors from Lambda crash
-            if echo "$RESPONSE" | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)
-          if 'errors' in d:
-              print('GraphQL errors:', json.dumps(d['errors'], indent=2))
-              sys.exit(1)
-          print('health =', d.get('data', {}).get('health'))
-          "; then
-              echo "Smoke test passed ✓"
-            else
-              echo "WARNING: Smoke test returned errors (see above). Check Lambda logs."
-              # Don't fail the deploy — health resolver uses NONE data source and should work
-            fi
+            echo "Response: $RESPONSE"
+            echo "$RESPONSE" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          if 'errors' in d: print('Errors:', d['errors']); sys.exit(1)
+          print('health =', d.get('data',{}).get('health'))
+          " && echo "Smoke test passed ✓" || echo "WARNING: smoke test errors (check logs)"
           fi
 
       # -----------------------------------------------------------------------
-      # 13. Summary
+      # 15. Summary
       # -----------------------------------------------------------------------
-      - name: Deployment summary
+      - name: Summary
         if: always()
         run: |
           echo ""
-          echo "╔══════════════════════════════════════════╗"
-          echo "  Deploy complete: $ENVIRONMENT environment"
-          echo "  AppSync API ID: $APPSYNC_API_ID"
+          echo "╔══════════════════════════════════════════════════════╗"
+          echo "  Deploy: $ENVIRONMENT  |  Alias: $ALIAS"
+          echo "  AppSync: $APPSYNC_API_ID"
+          echo "  Cognito: $COGNITO_POOL_ID"
           echo ""
-          echo "  Deployed functions:"
-          echo "    ✓ admin-resolver"
-          echo "    ✓ admissions-resolver"
-          echo "    ✓ audit-logs-resolver"
-          echo "    ✓ cognito-provisioner"
-          echo "    ✓ dashboard-resolver"
-          echo "    ✓ email-worker"
-          echo "    ✓ jobs-worker"
-          echo "    ✓ pre-token-generation (Cognito trigger)"
-          echo "    ✓ storage-resolver"
-          echo "    ✓ tenants-resolver"
-          echo "    ✓ users-resolver"
+          echo "  Pattern: vebgenix-{fn}${FN_SUFFIX}:$ALIAS → published version"
+          echo ""
+          echo "  Functions deployed:"
+          echo "    admin-resolver       admissions-resolver"
+          echo "    audit-logs-resolver  cognito-provisioner"
+          echo "    dashboard-resolver   email-worker"
+          echo "    jobs-worker          pre-token-generation"
+          echo "    storage-resolver     tenants-resolver"
+          echo "    users-resolver"
           echo ""
           echo "  Skipped (not yet implemented):"
-          echo "    - finance-resolver"
-          echo "    - settings-resolver"
-          echo "    - students-resolver"
-          echo ""
-          echo "  Retired (no longer deployed):"
-          echo "    - appsync-authorizer (AppSync uses Cognito auth natively)"
-          echo "╚══════════════════════════════════════════╝"
+          echo "    finance-resolver  settings-resolver  students-resolver"
+          echo "╚══════════════════════════════════════════════════════╝"

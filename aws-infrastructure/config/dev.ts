@@ -3,7 +3,7 @@ import { EnvConfig } from "./types";
 export const devConfig: EnvConfig = {
   stage: "dev",
   region: "ap-south-1",
-  account: "998105438053",
+  account: "278035644568",
 
   // Tagging
   tags: {

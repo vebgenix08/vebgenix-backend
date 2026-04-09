@@ -5,7 +5,7 @@
 
 # AWS Configuration
 aws_region     = "ap-south-1"
-aws_account_id = "998105438053"
+aws_account_id = "278035644568"
 
 # Neon PostgreSQL
 # Get your API key from: https://console.neon.tech/app/settings/api-keys
