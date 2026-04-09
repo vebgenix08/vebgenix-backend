@@ -110,6 +110,33 @@ jobs:
         run: node scripts/build-schema.mjs
 
       # -----------------------------------------------------------------------
+      # 5b. Bootstrap CDK + deploy AppSync stack (creates Lambda functions)
+      #     CDK is idempotent — safe to run on every deploy.
+      #     VebgenixAppSync-{stage} owns all Lambda functions + AppSync API.
+      # -----------------------------------------------------------------------
+      - name: Install CDK dependencies
+        working-directory: aws-infrastructure
+        run: npm ci
+
+      - name: CDK Bootstrap (idempotent)
+        run: |
+          npx cdk bootstrap \
+            aws://${{ env.AWS_ACCOUNT_ID || '278035644568' }}/ap-south-1 \
+            --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess \
+            2>/dev/null || true
+        working-directory: aws-infrastructure
+
+      - name: Deploy AppSync stack (creates Lambda functions if not exist)
+        working-directory: aws-infrastructure
+        run: |
+          npx cdk deploy VebgenixAppSync-${{ github.event.inputs.environment }} \
+            -c env=${{ github.event.inputs.environment }} \
+            --require-approval never \
+            --exclusively \
+            --outputs-file /tmp/appsync-outputs.json
+          echo "AppSync stack deployed ✓"
+
+      # -----------------------------------------------------------------------
       # 6. Generate Prisma client (arm64 binary)
       # -----------------------------------------------------------------------
       - name: Install server deps and generate Prisma client
