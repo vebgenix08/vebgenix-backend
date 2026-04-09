@@ -33,12 +33,12 @@ jobs:
     env:
       ENVIRONMENT:  ${{ github.event.inputs.environment }}
       AWS_REGION:   ap-south-1
-      ALIAS:        ${{ github.event.inputs.environment }}   # 'dev' or 'prod'
+      ALIAS:        ${{ github.event.inputs.environment }}   # alias name: 'dev' or 'prod'
       FN_PREFIX:    vebgenix
-      LAYER_NAME:   vebgenix-deps
-      # ONE function per resolver, TWO aliases:
-      #   vebgenix-tenants-resolver:dev   → dev published version
-      #   vebgenix-tenants-resolver:prod  → prod published version
+      # CDK-created function names (cannot change without CDK redeploy):
+      #   dev  → vebgenix-{fn}-dev     alias: dev
+      #   prod → vebgenix-{fn}         alias: prod
+      # FN_SUFFIX and LAYER_NAME are set per-environment in "Resolve environment variables"
 
     steps:
       # -----------------------------------------------------------------------
@@ -81,6 +81,9 @@ jobs:
           if [ "$ENVIRONMENT" = "prod" ]; then
             echo "APPSYNC_API_ID=o6cgickkk5dpxej6lirgo7bpna"  >> $GITHUB_ENV
             echo "COGNITO_POOL_ID=ap-south-1_waAjEC9Nj"        >> $GITHUB_ENV
+            # prod CDK: vebgenix-{fn}  (no suffix)
+            echo "FN_SUFFIX="                                   >> $GITHUB_ENV
+            echo "LAYER_NAME=vebgenix-deps"                     >> $GITHUB_ENV
           else
             API_ID=$(aws appsync list-graphql-apis \
               --query "graphqlApis[?name=='vebgenix-dev'].apiId | [0]" \
@@ -95,6 +98,9 @@ jobs:
 
             echo "APPSYNC_API_ID=$API_ID"               >> $GITHUB_ENV
             echo "COGNITO_POOL_ID=ap-south-1_1pLVzImKk" >> $GITHUB_ENV
+            # dev CDK: vebgenix-{fn}-dev  (-dev suffix)
+            echo "FN_SUFFIX=-dev"                        >> $GITHUB_ENV
+            echo "LAYER_NAME=vebgenix-dev-deps"          >> $GITHUB_ENV
           fi
 
       # -----------------------------------------------------------------------
@@ -224,35 +230,16 @@ jobs:
             "users-resolver"
           )
 
-          # ── Pre-flight: verify at least one function exists ──────────────────
-          # Functions are named vebgenix-{fn} (no env suffix) — alias (dev/prod)
-          # distinguishes the environment. Functions are created once by CDK prod
-          # deploy. If none exist yet, fail fast with a clear message.
-          FOUND=0
           for FN in "${FUNCTIONS[@]}"; do
-            aws lambda get-function --function-name "${FN_PREFIX}-${FN}" \
-              --query "Configuration.FunctionName" --output text > /dev/null 2>&1 \
-            && FOUND=$((FOUND+1)) || true
-          done
-
-          if [ "$FOUND" -eq 0 ]; then
-            echo ""
-            echo "ERROR: No Lambda functions found with prefix '${FN_PREFIX}-'."
-            echo "  Functions must be created first via CDK (run deploy-backend-prod.yml)."
-            echo "  Expected names: ${FN_PREFIX}-tenants-resolver, ${FN_PREFIX}-users-resolver, ..."
-            exit 1
-          fi
-          echo "Found $FOUND / ${#FUNCTIONS[@]} functions — proceeding."
-
-          for FN in "${FUNCTIONS[@]}"; do
-            FULL_NAME="${FN_PREFIX}-${FN}"
+            # dev: vebgenix-{fn}-dev   prod: vebgenix-{fn}
+            FULL_NAME="${FN_PREFIX}-${FN}${FN_SUFFIX}"
             echo ""
             echo "━━━ $FULL_NAME ━━━"
 
-            # Skip functions not yet created (e.g. cognito-provisioner, email-worker)
+            # Check function exists before attempting update
             if ! aws lambda get-function --function-name "$FULL_NAME" \
                 --query "Configuration.FunctionName" --output text > /dev/null 2>&1; then
-              echo "  SKIP: not found in AWS"
+              echo "  SKIP: $FULL_NAME not found in AWS"
               continue
             fi
 
@@ -302,7 +289,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          FN_NAME="${FN_PREFIX}-pre-token-generation"
+          FN_NAME="${FN_PREFIX}-pre-token-generation${FN_SUFFIX}"
 
           # Get alias ARN (dev or prod)
           ALIAS_ARN=$(aws lambda get-alias \
@@ -450,7 +437,7 @@ print(json.dumps(cfg))
             # Only update each data source once
             if [ -z "${UPDATED_DS[$DS_NAME]+_}" ]; then
               ALIAS_ARN=$(aws lambda get-alias \
-                --function-name "${FN_PREFIX}-${LAMBDA_NAME}" \
+                --function-name "${FN_PREFIX}-${LAMBDA_NAME}${FN_SUFFIX}" \
                 --name          "$ALIAS" \
                 --query "AliasArn" --output text 2>/dev/null || echo "")
 
@@ -569,7 +556,7 @@ print(json.dumps(cfg))
           echo "  AppSync: $APPSYNC_API_ID"
           echo "  Cognito: $COGNITO_POOL_ID"
           echo ""
-          echo "  Pattern: vebgenix-{fn}:$ALIAS → published version"
+          echo "  Pattern: vebgenix-{fn}${FN_SUFFIX}:$ALIAS → published version"
           echo ""
           echo "  Functions deployed:"
           echo "    admin-resolver       admissions-resolver"
