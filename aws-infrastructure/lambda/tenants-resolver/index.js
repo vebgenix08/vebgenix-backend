@@ -442,7 +442,10 @@ exports.handler = async (event) => {
         },
       });
 
-      // Delete tenant — cascade deletes all related data
+      // Delete dependent records that lack DB-level cascade (safety net)
+      await prisma.profile.deleteMany({ where: { tenantId } });
+
+      // Delete tenant — cascade deletes all remaining related data
       await prisma.tenant.delete({ where: { id: tenantId } });
 
       console.log(`Tenant ${tenant.name} (${tenantId}) permanently deleted by ${userId}`);

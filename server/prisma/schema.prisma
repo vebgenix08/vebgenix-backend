@@ -198,7 +198,7 @@ model Profile {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  tenant             Tenant                @relation(fields: [tenantId], references: [id])
+  tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   employee           Employee?
   campusAccess       UserCampusAccess[]
   enquiries          Enquiry[]             @relation("AssignedTo")
