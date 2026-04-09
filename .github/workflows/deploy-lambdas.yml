@@ -110,31 +110,60 @@ jobs:
         run: node scripts/build-schema.mjs
 
       # -----------------------------------------------------------------------
-      # 5b. Bootstrap CDK + deploy AppSync stack (creates Lambda functions)
-      #     CDK is idempotent — safe to run on every deploy.
-      #     VebgenixAppSync-{stage} owns all Lambda functions + AppSync API.
+      # 5b. Pre-flight: verify Lambda functions exist
+      #     Lambda functions are created by the CDK infrastructure workflow
+      #     (deploy-dev.yml / deploy-prod.yml).  If they are missing, this
+      #     step fails with clear instructions so you don't get confusing
+      #     "Function not found" errors later.
       # -----------------------------------------------------------------------
-      - name: Install CDK dependencies
-        working-directory: aws-infrastructure
-        run: npm ci
-
-      - name: CDK Bootstrap (idempotent)
+      - name: Pre-flight check (Lambda functions must exist)
         run: |
-          npx cdk bootstrap \
-            aws://${{ env.AWS_ACCOUNT_ID || '278035644568' }}/ap-south-1 \
-            --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess \
-            2>/dev/null || true
-        working-directory: aws-infrastructure
+          set -euo pipefail
 
-      - name: Deploy AppSync stack (creates Lambda functions if not exist)
-        working-directory: aws-infrastructure
-        run: |
-          npx cdk deploy VebgenixAppSync-${{ github.event.inputs.environment }} \
-            -c env=${{ github.event.inputs.environment }} \
-            --require-approval never \
-            --exclusively \
-            --outputs-file /tmp/appsync-outputs.json
-          echo "AppSync stack deployed ✓"
+          FUNCTIONS=(
+            "admin-resolver"
+            "admissions-resolver"
+            "audit-logs-resolver"
+            "cognito-provisioner"
+            "dashboard-resolver"
+            "email-worker"
+            "jobs-worker"
+            "pre-token-generation"
+            "storage-resolver"
+            "tenants-resolver"
+            "users-resolver"
+          )
+
+          MISSING=()
+          for FN in "${FUNCTIONS[@]}"; do
+            FULL_NAME="${FN_PREFIX}-${FN}${FN_SUFFIX}"
+            if ! aws lambda get-function --function-name "$FULL_NAME" \
+                --query "Configuration.FunctionName" --output text \
+                > /dev/null 2>&1; then
+              MISSING+=("$FULL_NAME")
+            fi
+          done
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo ""
+            echo "╔══════════════════════════════════════════════════════════╗"
+            echo "  ERROR: The following Lambda functions do not exist yet:"
+            echo ""
+            for fn in "${MISSING[@]}"; do
+              echo "    ✗ $fn"
+            done
+            echo ""
+            echo "  Fix: run the CDK infrastructure workflow first:"
+            echo "    GitHub → Actions → 'Deploy CDK Infrastructure'"
+            echo "    environment: $ENVIRONMENT"
+            echo ""
+            echo "  That workflow deploys the VebgenixAppSync-$ENVIRONMENT stack"
+            echo "  which creates all Lambda functions. Then re-run this workflow."
+            echo "╚══════════════════════════════════════════════════════════╝"
+            exit 1
+          fi
+
+          echo "Pre-flight check passed — all ${#FUNCTIONS[@]} functions exist ✓"
 
       # -----------------------------------------------------------------------
       # 6. Generate Prisma client (arm64 binary)
