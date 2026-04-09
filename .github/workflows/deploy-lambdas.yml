@@ -224,15 +224,35 @@ jobs:
             "users-resolver"
           )
 
+          # ── Pre-flight: verify at least one function exists ──────────────────
+          # Functions are named vebgenix-{fn} (no env suffix) — alias (dev/prod)
+          # distinguishes the environment. Functions are created once by CDK prod
+          # deploy. If none exist yet, fail fast with a clear message.
+          FOUND=0
+          for FN in "${FUNCTIONS[@]}"; do
+            aws lambda get-function --function-name "${FN_PREFIX}-${FN}" \
+              --query "Configuration.FunctionName" --output text > /dev/null 2>&1 \
+            && FOUND=$((FOUND+1)) || true
+          done
+
+          if [ "$FOUND" -eq 0 ]; then
+            echo ""
+            echo "ERROR: No Lambda functions found with prefix '${FN_PREFIX}-'."
+            echo "  Functions must be created first via CDK (run deploy-backend-prod.yml)."
+            echo "  Expected names: ${FN_PREFIX}-tenants-resolver, ${FN_PREFIX}-users-resolver, ..."
+            exit 1
+          fi
+          echo "Found $FOUND / ${#FUNCTIONS[@]} functions — proceeding."
+
           for FN in "${FUNCTIONS[@]}"; do
             FULL_NAME="${FN_PREFIX}-${FN}"
             echo ""
             echo "━━━ $FULL_NAME ━━━"
 
-            # Check function exists before attempting update
+            # Skip functions not yet created (e.g. cognito-provisioner, email-worker)
             if ! aws lambda get-function --function-name "$FULL_NAME" \
                 --query "Configuration.FunctionName" --output text > /dev/null 2>&1; then
-              echo "  SKIP: $FULL_NAME not found in AWS"
+              echo "  SKIP: not found in AWS"
               continue
             fi
 
