@@ -360,10 +360,12 @@ jobs:
             --user-pool-id "$COGNITO_POOL_ID" \
             --query "UserPool.LambdaConfig" --output json 2>/dev/null || echo "{}")
 
-          # Merge: overwrite only PreTokenGeneration, keep everything else
+          # Merge: overwrite PreTokenGeneration (V1) AND PreTokenGenerationConfig (V2)
+          # Both must point to the SAME ARN or Cognito throws InvalidParameterException.
           # jq is pre-installed on ubuntu-latest; avoids multiline python3 in YAML
           MERGED_CONFIG=$(echo "$EXISTING_CONFIG" \
-            | jq --arg arn "$ALIAS_ARN" '. + {"PreTokenGeneration": $arn}')
+            | jq --arg arn "$ALIAS_ARN" \
+              '. + {"PreTokenGeneration": $arn, "PreTokenGenerationConfig": {"LambdaVersion": "V1_0", "LambdaArn": $arn}}')
 
           aws cognito-idp update-user-pool \
             --user-pool-id  "$COGNITO_POOL_ID" \
