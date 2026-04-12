@@ -1,8 +1,9 @@
-name: Deploy Backend to dev (CDK — deprecated)
+name: Deploy Backend to dev
 
-# CDK-based deploy is disabled. Use "Deploy Lambda Functions" workflow instead.
-# Kept here for reference only.
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -61,7 +62,7 @@ jobs:
         working-directory: server
         run: |
           npm ci
-          npx prisma generate --schema=prisma/schema.prisma
+          ./node_modules/.bin/prisma generate --schema=prisma/schema.prisma
           npm run build
 
       - name: Package backend artifact
@@ -115,8 +116,8 @@ jobs:
               "cd \"$APP_DIR/server\"",
               "npm ci --omit=dev",
               "set -a && source /etc/vebgenix-rest.env && set +a",
-              "npx prisma db push --accept-data-loss --schema=prisma/schema.prisma",
-              "npx prisma generate --schema=prisma/schema.prisma",
+              "./node_modules/.bin/prisma db push --accept-data-loss --schema=prisma/schema.prisma",
+              "./node_modules/.bin/prisma generate --schema=prisma/schema.prisma",
               "npm run seed:permissions 2>/dev/null || true",
               "npm run build",
               "systemctl daemon-reload",
