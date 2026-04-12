@@ -478,7 +478,11 @@ export class AuthController {
           globalRoles: true,
           memberships: {
             where: { status: "ACTIVE" },
-            include: { tenant: true, primaryProfile: true },
+            include: {
+              tenant: true,
+              primaryProfile: true,
+              memberRoles: { include: { role: true } },
+            },
           },
         },
       });
@@ -541,10 +545,19 @@ export class AuthController {
         });
       }
 
+      // Resolve role: prefer deprecated field, then memberRoles (new system), then Cognito claim
+      const memberRoleName = membership?.memberRoles?.[0]?.role?.name ?? null;
+      const resolvedRole =
+        membership?.role ??
+        memberRoleName ??
+        profile?.role ??
+        role ??
+        null;
+
       return res.json({
         kind: "TENANT",
         email,
-        role: membership?.role ?? profile?.role ?? role,
+        role: resolvedRole,
         full_name: profile?.fullName ?? fullName,
         tenant_id: resolvedTenantId,
         tenant_slug: tenant.slug,
@@ -774,31 +787,57 @@ export class AuthController {
           : []),
       ]);
 
-      // Sync to Cognito (non-blocking — DB is source of truth, Cognito is auth layer)
+      // Sync to Cognito — MUST be awaited so user can login immediately after activation
       const userEmail: string = resetRecord.email;
       const tenantId: string | null = resetRecord.tenant_id ?? null;
-      const membershipRole: string | null = resetRecord.membership_role ?? null;
 
-      // Ensure Cognito user exists with correct tenant_id and role
-      ensureCognitoUser({
-        email: userEmail,
-        tenantId,
-        role: membershipRole,
-      }).then(async (ensureResult) => {
+      // Prefer the deprecated role field; fall back to querying MemberRole table
+      // (new invites use memberRoles relation instead of the deprecated role enum)
+      let membershipRole: string | null = resetRecord.membership_role ?? null;
+      if (!membershipRole && resetRecord.membership_id) {
+        try {
+          const memberRoleRows: any[] = await prisma.$queryRawUnsafe(`
+            SELECT rd.name
+            FROM "member_roles" mr
+            JOIN "role_definitions" rd ON mr.role_id = rd.id
+            WHERE mr.membership_id = '${resetRecord.membership_id}'
+            LIMIT 1
+          `);
+          if (memberRoleRows.length > 0) {
+            membershipRole = String(memberRoleRows[0].name).toUpperCase();
+          }
+        } catch (e) {
+          console.warn("[acceptInvite] Could not resolve memberRole:", e);
+        }
+      }
+
+      try {
+        // Step 1: ensure the Cognito user exists with proper attributes
+        const ensureResult = await ensureCognitoUser({
+          email: userEmail,
+          tenantId,
+          role: membershipRole,
+        });
         if (!ensureResult.ok) {
           console.warn(`[acceptInvite] Cognito ensureUser failed for ${userEmail}: ${ensureResult.code}`);
-          return;
-        }
-        // Set the chosen password in Cognito
-        const pwResult = await setCognitoPasswordAndVerify({ email: userEmail, newPassword });
-        if (!pwResult.ok) {
-          console.warn(`[acceptInvite] Cognito setPassword failed for ${userEmail}: ${pwResult.code}`);
+          // Still return success — DB state is correct; user can retry login later
         } else {
+          // Step 2: set the actual password in Cognito
+          const pwResult = await setCognitoPasswordAndVerify({ email: userEmail, newPassword });
+          if (!pwResult.ok) {
+            console.warn(`[acceptInvite] Cognito setPassword failed for ${userEmail}: ${pwResult.code}`);
+            // Return a specific error so the frontend can inform the user
+            return res.status(502).json({
+              message: "Account activated but login setup failed. Please try again in a moment or contact support.",
+              cognitoError: pwResult.code,
+            });
+          }
           console.log(`[acceptInvite] Cognito user ready for ${userEmail}`);
         }
-      }).catch((err) => {
-        console.error(`[acceptInvite] Cognito sync error for ${userEmail}:`, err);
-      });
+      } catch (cognitoErr) {
+        console.error(`[acceptInvite] Cognito sync error for ${userEmail}:`, cognitoErr);
+        // Don't block — DB is the source of truth
+      }
 
       return res.json({
         message: "Password set successfully. You can now log in.",
