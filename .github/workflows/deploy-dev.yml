@@ -114,7 +114,7 @@ jobs:
               "aws s3 cp \"s3://$ARTIFACT_BUCKET/$ARTIFACT_KEY\" /tmp/vebgenix-backend.tgz --region ap-south-1",
               "tar -xzf /tmp/vebgenix-backend.tgz -C \"$APP_DIR\"",
               "cd \"$APP_DIR/server\"",
-              "npm ci --omit=dev",
+              "npm ci",
               "set -a && source /etc/vebgenix-rest.env && set +a",
               "npx prisma@5 db push --accept-data-loss --schema=prisma/schema.prisma",
               "npx prisma@5 generate --schema=prisma/schema.prisma",
