@@ -20,7 +20,7 @@ jobs:
     env:
       STAGE: dev
       REGION: ap-south-1
-      ARTIFACT_BUCKET: vebgenix-documents-dev-278035644568
+      ARTIFACT_BUCKET: vebgenix-documents-prod-278035644568
 
     steps:
       - name: Checkout Code
