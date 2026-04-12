@@ -40,16 +40,17 @@ jobs:
       - name: Resolve EC2 instance ID
         run: |
           set -euo pipefail
+          # There is a single EC2 instance serving the REST API (tagged prod).
+          # Dev environment shares this instance — Lambda aliases handle dev/prod separation.
           INSTANCE_ID=$(aws ec2 describe-instances \
             --filters \
               "Name=tag:Project,Values=vebgenix" \
-              "Name=tag:Environment,Values=dev" \
               "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].InstanceId" \
             --output text)
 
           if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "ERROR: No running EC2 instance found with tag Project=vebgenix, Environment=dev"
+            echo "ERROR: No running EC2 instance found with tag Project=vebgenix"
             exit 1
           fi
 
