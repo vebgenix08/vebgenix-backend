@@ -751,13 +751,10 @@ export class AuthController {
           .json({ message: "Invalid or expired invite token" });
       }
 
-      // Reject replay only when membership is active AND password is already set.
-      if (
-        resetRecord.membership_status === "ACTIVE" &&
-        !!resetRecord.passwordHash
-      ) {
-        return res.status(409).json({ message: "Invite already accepted" });
-      }
+      // Note: used_at IS NULL is already enforced in the SQL query above,
+      // so we never reach here with a previously-consumed token.
+      // We intentionally allow re-invites even when membership is ACTIVE —
+      // re-invite tokens are valid new tokens and must not be blocked.
 
       // Hash password
       const salt = await bcrypt.genSalt(10);
