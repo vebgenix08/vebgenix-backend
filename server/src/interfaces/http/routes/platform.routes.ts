@@ -42,7 +42,7 @@ router.post("/users/:userId/resend-invite", PlatformController.resendInvite);
 // Users (nested under tenant)
 router.get("/tenants/:tenantId/users", PlatformController.listTenantUsers);
 router.post("/tenants/:tenantId/users", PlatformController.provisionTenantUser);
-// TODO: Add PATCH /tenants/:tenantId/users/:userId when updateTenantUser is implemented
+router.delete("/tenants/:tenantId/users/:userId", PlatformController.deleteTenantUser);
 
 // Audit logs
 router.get("/audit-logs", PlatformController.listAuditLogs);

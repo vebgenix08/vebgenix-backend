@@ -616,6 +616,43 @@ export class PlatformController {
   }
 
   /**
+   * DELETE /api/platform/tenants/:tenantId/users/:userId
+   * Remove a user from a tenant.
+   * If the user exists only in this tenant they are fully deleted from DB + Cognito.
+   * If they belong to other tenants only their membership/profile for this tenant is removed.
+   */
+  static async deleteTenantUser(req: Request, res: Response) {
+    try {
+      const { tenantId, userId } = req.params;
+      const actorId = (req as any).platformUser.id;
+
+      const result = await PlatformService.deleteUser(userId, tenantId);
+
+      const { AuditLogger } = await import("../../../services/AuditLogger");
+      await AuditLogger.logAction({
+        actorId,
+        action: "DELETE_TENANT_USER",
+        targetType: "user",
+        targetId: userId,
+        tenantId,
+        before: { userId, tenantId },
+        after: undefined,
+      });
+
+      return res.json({
+        message: result.fullyRemoved
+          ? "User fully deleted from DB and Cognito."
+          : "User removed from this tenant (kept in other tenants).",
+        fullyRemoved: result.fullyRemoved,
+      });
+    } catch (error: any) {
+      console.error("[PlatformController] deleteTenantUser error:", error);
+      if (error.code === "NOT_FOUND") return res.status(404).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
    * GET /api/platform/tenants/:tenantId/users
    * List users for a tenant
    */

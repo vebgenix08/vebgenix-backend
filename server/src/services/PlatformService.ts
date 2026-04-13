@@ -902,4 +902,47 @@ export class PlatformService {
 
     return { deleted: true, usersRemoved: usersToDelete.length };
   }
+
+  /**
+   * Delete a single user from a tenant.
+   *
+   * - If the user belongs ONLY to this tenant → delete from Cognito + DB entirely.
+   * - If the user belongs to other tenants too → remove only their membership +
+   *   profile for this tenant; keep AuthUser + Cognito intact.
+   */
+  static async deleteUser(
+    userId: string,
+    tenantId: string,
+  ): Promise<{ deleted: boolean; fullyRemoved: boolean }> {
+    // Find the AuthUser via the membership link (userId on TenantMembership = AuthUser.id)
+    const membership = await prisma.tenantMembership.findFirst({
+      where: { userId, tenantId },
+      include: { user: { select: { id: true, email: true } } },
+    });
+
+    if (!membership) throw Object.assign(new Error("User not found in this tenant"), { code: "NOT_FOUND" });
+
+    const authUser = membership.user;
+
+    // Check for other tenant memberships
+    const otherTenantCount = await prisma.tenantMembership.count({
+      where: { userId: authUser.id, tenantId: { not: tenantId } },
+    });
+
+    if (otherTenantCount === 0) {
+      // Fully remove: Cognito first, then DB (cascade cleans sessions, tokens, profiles, etc.)
+      const cognitoResult = await deleteCognitoUser(authUser.email);
+      if (!cognitoResult.ok) {
+        console.warn(`[PlatformService] Cognito delete failed for ${authUser.email}:`, cognitoResult.code);
+      }
+      await prisma.authUser.delete({ where: { id: authUser.id } });
+      return { deleted: true, fullyRemoved: true };
+    }
+
+    // Partial remove: only wipe this tenant's membership + profile
+    await prisma.tenantMembership.deleteMany({ where: { userId: authUser.id, tenantId } });
+    await prisma.profile.deleteMany({ where: { tenantId, linkedAuthUsers: { some: { userId: authUser.id } } } });
+
+    return { deleted: true, fullyRemoved: false };
+  }
 }
