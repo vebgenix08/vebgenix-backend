@@ -16,6 +16,7 @@ router.get("/audit-logs/:logId", PlatformController.getAuditLog);
 router.get("/tenants", PlatformController.listTenants);
 router.post("/tenants", PlatformController.createTenant);
 router.patch("/tenants/:tenantId", PlatformController.updateTenant);
+router.delete("/tenants/:tenantId", PlatformController.deleteTenant);
 
 // Campuses (nested under tenant)
 router.get("/tenants/:tenantId/campuses", PlatformController.listCampuses);

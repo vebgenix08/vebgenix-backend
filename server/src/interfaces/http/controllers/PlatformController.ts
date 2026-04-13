@@ -98,6 +98,43 @@ export class PlatformController {
   }
 
   /**
+   * DELETE /api/platform/tenants/:tenantId
+   * Permanently delete a tenant, its DB data, and all Cognito users who
+   * belong exclusively to this tenant.
+   */
+  static async deleteTenant(req: Request, res: Response) {
+    try {
+      const { tenantId } = req.params;
+      const actorId = (req as any).platformUser.id;
+
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+
+      const result = await PlatformService.deleteTenant(tenantId);
+
+      const { AuditLogger } = await import("../../../services/AuditLogger");
+      await AuditLogger.logAction({
+        actorId,
+        action: "DELETE_TENANT",
+        targetType: "tenant",
+        targetId: tenantId,
+        tenantId,
+        before: tenant,
+        after: undefined,
+      });
+
+      return res.json({
+        message: `Tenant deleted. ${result.usersRemoved} user(s) removed from DB and Cognito.`,
+      });
+    } catch (error: any) {
+      console.error("[PlatformController] deleteTenant error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
    * PATCH /api/platform/tenants/:tenantId
    * Update tenant
    */

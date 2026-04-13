@@ -3,7 +3,7 @@ import { emailService } from "./EmailService";
 import prisma from "../infrastructure/prisma/client";
 import { grantAdminDashboardPerms } from "../../scripts/grant-admin-dashboard-perms";
 import crypto from "crypto";
-import { ensureCognitoUser } from "../infrastructure/cognito/admin";
+import { ensureCognitoUser, deleteCognitoUser } from "../infrastructure/cognito/admin";
 
 /**
  * Platform
@@ -847,5 +847,59 @@ export class PlatformService {
       inviteSent,
       ...(process.env.NODE_ENV === "development" ? { inviteLink } : {}),
     };
+  }
+
+  /**
+   * Delete a tenant and clean up all associated users.
+   *
+   * Steps:
+   * 1. Collect every AuthUser linked to this tenant via TenantMembership.
+   * 2. For each AuthUser, check if they belong to any OTHER tenant.
+   *    - If yes → they stay in DB and Cognito (shared identity).
+   *    - If no  → delete from Cognito first, then delete from DB (cascade removes sessions/tokens).
+   * 3. Delete the Tenant record — DB cascades handle profiles, memberships, campuses, etc.
+   */
+  static async deleteTenant(tenantId: string): Promise<{ deleted: boolean; usersRemoved: number }> {
+    // 1. Find all AuthUsers linked to this tenant
+    const memberships = await prisma.tenantMembership.findMany({
+      where: { tenantId },
+      select: { userId: true, user: { select: { id: true, email: true } } },
+    });
+
+    const uniqueUsers = Array.from(
+      new Map(memberships.map((m) => [m.userId, m.user])).values(),
+    );
+
+    // 2. Determine which users have NO other tenant after this one is gone
+    const usersToDelete: Array<{ id: string; email: string }> = [];
+
+    for (const user of uniqueUsers) {
+      const otherMembershipCount = await prisma.tenantMembership.count({
+        where: { userId: user.id, tenantId: { not: tenantId } },
+      });
+      if (otherMembershipCount === 0) {
+        usersToDelete.push(user);
+      }
+    }
+
+    // 3. Delete solo users from Cognito (best-effort — don't block DB delete on failure)
+    for (const user of usersToDelete) {
+      const result = await deleteCognitoUser(user.email);
+      if (!result.ok) {
+        console.warn(`[PlatformService] Cognito delete failed for ${user.email}:`, result.code);
+      }
+    }
+
+    // 4. Delete solo AuthUsers from DB (cascade removes sessions, tokens, profile links, etc.)
+    if (usersToDelete.length > 0) {
+      await prisma.authUser.deleteMany({
+        where: { id: { in: usersToDelete.map((u) => u.id) } },
+      });
+    }
+
+    // 5. Delete the tenant — DB cascade removes profiles, memberships, campuses, features, etc.
+    await prisma.tenant.delete({ where: { id: tenantId } });
+
+    return { deleted: true, usersRemoved: usersToDelete.length };
   }
 }

@@ -3,6 +3,7 @@ import {
   AdminConfirmSignUpCommand,
   AdminAddUserToGroupCommand,
   AdminCreateUserCommand,
+  AdminDeleteUserCommand,
   AdminGetUserCommand,
   AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
@@ -144,6 +145,29 @@ export async function ensureCognitoUser(input: {
       return { ok: false, code: "AWS_CREDENTIALS_MISSING", errorName: name };
     }
     return { ok: false, code: "COGNITO_CREATE_USER_FAILED", errorName: name };
+  }
+}
+
+export async function deleteCognitoUser(
+  email: string,
+): Promise<{ ok: boolean; code?: string; errorName?: string }> {
+  const userPoolId = process.env.USER_POOL_ID;
+  if (!userPoolId) return { ok: false, code: "COGNITO_CONFIG_MISSING" };
+
+  const normalised = String(email).trim().toLowerCase();
+  if (!normalised) return { ok: false, code: "INVALID_EMAIL" };
+
+  const client = getClient();
+
+  try {
+    await client.send(
+      new AdminDeleteUserCommand({ UserPoolId: userPoolId, Username: normalised }),
+    );
+    return { ok: true };
+  } catch (e: any) {
+    const name = e?.name || e?.Code;
+    if (name === "UserNotFoundException") return { ok: true }; // already gone — treat as success
+    return { ok: false, code: "COGNITO_DELETE_USER_FAILED", errorName: name };
   }
 }
 
