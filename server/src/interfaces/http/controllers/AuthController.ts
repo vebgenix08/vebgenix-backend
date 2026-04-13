@@ -812,31 +812,37 @@ export class AuthController {
       }
 
       try {
-        // Step 1: ensure the Cognito user exists with proper attributes
+        // Step 1: ensure the Cognito user exists with proper attributes.
+        // Even if this fails (e.g. custom attribute not in pool schema), still
+        // attempt Step 2 — the user may already exist from createFirstAdmin's
+        // non-blocking provision, and setting the password is the critical step.
         const ensureResult = await ensureCognitoUser({
           email: userEmail,
           tenantId,
           role: membershipRole,
         });
         if (!ensureResult.ok) {
-          console.warn(`[acceptInvite] Cognito ensureUser failed for ${userEmail}: ${ensureResult.code}`);
-          // Still return success — DB state is correct; user can retry login later
+          console.warn(`[acceptInvite] Cognito ensureUser failed for ${userEmail}: ${ensureResult.code} — still attempting password set`);
         } else {
-          // Step 2: set the actual password in Cognito
-          const pwResult = await setCognitoPasswordAndVerify({ email: userEmail, newPassword });
-          if (!pwResult.ok) {
-            console.warn(`[acceptInvite] Cognito setPassword failed for ${userEmail}: ${pwResult.code}`);
-            // Return a specific error so the frontend can inform the user
-            return res.status(502).json({
-              message: "Account activated but login setup failed. Please try again in a moment or contact support.",
-              cognitoError: pwResult.code,
-            });
-          }
-          console.log(`[acceptInvite] Cognito user ready for ${userEmail}`);
+          console.log(`[acceptInvite] Cognito user ensured for ${userEmail}`);
         }
+
+        // Step 2: set the password — always attempt, regardless of Step 1 outcome.
+        // If ensureUser failed, the user may already exist from createFirstAdmin.
+        const pwResult = await setCognitoPasswordAndVerify({ email: userEmail, newPassword });
+        if (!pwResult.ok) {
+          console.error(`[acceptInvite] Cognito setPassword failed for ${userEmail}: ${pwResult.code}`);
+          return res.status(502).json({
+            message: "Account activated but login setup failed. Please try again or contact support.",
+            cognitoError: pwResult.code,
+          });
+        }
+        console.log(`[acceptInvite] Cognito user ready for ${userEmail}`);
       } catch (cognitoErr) {
         console.error(`[acceptInvite] Cognito sync error for ${userEmail}:`, cognitoErr);
-        // Don't block — DB is the source of truth
+        return res.status(502).json({
+          message: "Account activated but login setup failed. Please try again or contact support.",
+        });
       }
 
       return res.json({
