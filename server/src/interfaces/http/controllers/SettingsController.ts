@@ -84,6 +84,76 @@ export async function createProgram(req: Request, res: Response) {
   }
 }
 
+export async function updateProgram(req: Request, res: Response) {
+  try {
+    const tenantId = (req as any).auth?.tenantId;
+    if (!tenantId) return res.status(403).json({ error: "Tenant context required" });
+
+    const { programId } = req.params;
+    const existing = await prisma.program.findUnique({ where: { id: programId } });
+    if (!existing || existing.tenantId !== tenantId) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    const { name, type } = req.body;
+    const program = await prisma.program.update({
+      where: { id: programId },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(type !== undefined ? { type } : {}),
+      },
+    });
+
+    return res.json({ program });
+  } catch (err: any) {
+    console.error("[SettingsController] updateProgram:", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function deleteProgram(req: Request, res: Response) {
+  try {
+    const tenantId = (req as any).auth?.tenantId;
+    if (!tenantId) return res.status(403).json({ error: "Tenant context required" });
+
+    const { programId } = req.params;
+    const existing = await prisma.program.findUnique({ where: { id: programId } });
+    if (!existing || existing.tenantId !== tenantId) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    await prisma.program.delete({ where: { id: programId } });
+    return res.json({ deleted: true });
+  } catch (err: any) {
+    console.error("[SettingsController] deleteProgram:", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+export async function updateTemplate(req: Request, res: Response) {
+  try {
+    const tenantId = (req as any).auth?.tenantId;
+    if (!tenantId) return res.status(403).json({ error: "Tenant context required" });
+
+    const { templateId } = req.params;
+    const existing = await prisma.template.findUnique({ where: { id: templateId } });
+    if (!existing || existing.tenantId !== tenantId) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    const { name } = req.body;
+    const template = await prisma.template.update({
+      where: { id: templateId },
+      data: { ...(name !== undefined ? { name } : {}) },
+    });
+
+    return res.json({ template: { ...template, latestVersion: null, versions: [] } });
+  } catch (err: any) {
+    console.error("[SettingsController] updateTemplate:", err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Templates ──────────────────────────────────────────────────────────────
 
 export async function listTemplates(req: Request, res: Response) {

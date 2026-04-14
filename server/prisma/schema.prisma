@@ -60,6 +60,7 @@ enum ApplicationStatus {
   SUBMITTED
   UNDER_REVIEW
   INTERVIEW_SCHEDULED
+  ON_HOLD
   APPROVED
   REJECTED
   MIGRATED
@@ -378,13 +379,15 @@ model Application {
 }
 
 model ApplicationDocument {
-  id            String       @id @default(uuid()) @db.Uuid
-  applicationId String       @map("application_id") @db.Uuid
-  documentType  DocumentType @map("document_type")
-  fileUrl       String       @map("file_url")
-  isVerified    Boolean      @default(false) @map("is_verified")
-  verifiedById  String?      @map("verified_by") @db.Uuid
-  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  id               String       @id @default(uuid()) @db.Uuid
+  applicationId    String       @map("application_id") @db.Uuid
+  documentType     DocumentType @map("document_type")
+  fileUrl          String       @map("file_url")
+  isVerified       Boolean      @default(false) @map("is_verified")
+  verifiedById     String?      @map("verified_by") @db.Uuid
+  verifiedAt       DateTime?    @map("verified_at") @db.Timestamptz
+  verificationNote String?      @map("verification_note")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -432,6 +435,8 @@ model Student {
   currentGrade   String  @map("current_grade")
   currentSection String? @map("current_section")
   stream         String?
+  classId        String? @map("class_id") @db.Uuid
+  sectionId      String? @map("section_id") @db.Uuid
 
   // System
   campusType CampusType @map("campus_type")
@@ -447,7 +452,9 @@ model Student {
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   campus      Campus      @relation(fields: [campusId], references: [id])
   application Application @relation(fields: [applicationId], references: [id])
-  
+  class       Class?      @relation(fields: [classId], references: [id])
+  section     Section?    @relation(fields: [sectionId], references: [id])
+
   // New Auth Link
   authLink       StudentAuthLink?
   feeAssignments StudentFeeAssignment[]
@@ -506,6 +513,7 @@ model Tenant {
   academicYears        AcademicYear[]
   programs             Program[]
   templates            Template[]
+  subjects             Subject[]
   applicants           Applicant[]
   feeHeads             FeeHead[]
   feeStructures        FeeStructure[]
@@ -806,10 +814,11 @@ model Class {
   id        String   @id @default(uuid()) @db.Uuid
   programId String   @map("program_id") @db.Uuid
   name      String   // "Grade 10"
-  
+
   program   Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
   sections  Section[]
-  
+  students  Student[]
+
   @@unique([programId, name])
   @@map("classes")
 }
@@ -819,12 +828,28 @@ model Section {
   classId   String   @map("class_id") @db.Uuid
   campusId  String   @map("campus_id") @db.Uuid
   name      String   // "A"
-  
+
   class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   campus    Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
-  
+  students  Student[]
+
   @@unique([classId, campusId, name])
   @@map("sections")
+}
+
+model Subject {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  name        String
+  code        String?
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@map("subjects")
 }
 
 model Template {
