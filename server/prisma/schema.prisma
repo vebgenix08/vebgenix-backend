@@ -29,11 +29,38 @@ enum PersonaRole {
 
 enum StaffType {
   PRINCIPAL
+  VICE_PRINCIPAL
+  DEAN
   HOD
   TEACHER
+  LECTURER
+  LAB_FACULTY
   ACCOUNTANT
   CLERK
+  LIBRARIAN
+  RECEPTIONIST
+  OFFICE_ADMIN
+  LAB_ASSISTANT
+  HR_SUPPORT
   OTHER
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  VISITING
+}
+
+enum StaffCategory {
+  TEACHING
+  NON_TEACHING
+}
+
+enum ReportingStatus {
+  ASSIGNED
+  PENDING
+  ORPHANED
 }
 
 enum CampusType {
@@ -229,6 +256,10 @@ model Profile {
   subjectAllocations SubjectAllocation[]
   classIncharges     ClassIncharge[]
   timetableSlots     TimetableSlot[]
+
+  // Staff Reporting Hierarchy
+  reportingLines StaffReporting[] @relation("StaffReportingEmployee")
+  managedStaff   StaffReporting[] @relation("StaffReportingManager")
 
   @@index([email])
   @@map("profiles")
@@ -543,6 +574,7 @@ model Tenant {
   payments             Payment[]
   receipts             Receipt[]
   adjustments          Adjustment[]
+  staffReporting       StaffReporting[]
 
   @@map("tenants")
 }
@@ -604,6 +636,7 @@ model Campus {
   payments               Payment[]
   receipts               Receipt[]
   adjustments            Adjustment[]
+  staffReporting         StaffReporting[]
 
   @@unique([tenantId, name])
   @@map("campuses")
@@ -618,8 +651,22 @@ model Employee {
   designation  String?
   department   String?
   joinedOn     DateTime? @map("joined_on") @db.Date
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Extended staff profile fields
+  gender          Gender?
+  dateOfBirth     DateTime?       @map("date_of_birth") @db.Date
+  qualification   String?
+  experienceYears Int?            @map("experience_years")
+  employmentType  EmploymentType? @map("employment_type")
+  staffCategory   StaffCategory?  @map("staff_category")
+
+  // Head / leadership role flags
+  isHead            Boolean   @default(false) @map("is_head")
+  isActingHead      Boolean   @default(false) @map("is_acting_head")
+  headEffectiveFrom DateTime? @map("head_effective_from") @db.Date
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
@@ -628,6 +675,28 @@ model Employee {
   @@unique([tenantId, employeeCode])
   @@index([tenantId])
   @@map("employees")
+}
+
+model StaffReporting {
+  id                 String          @id @default(uuid()) @db.Uuid
+  tenantId           String          @map("tenant_id") @db.Uuid
+  profileId          String          @map("profile_id") @db.Uuid
+  reportsToProfileId String?         @map("reports_to_profile_id") @db.Uuid
+  campusId           String          @map("campus_id") @db.Uuid
+  reportingStatus    ReportingStatus @default(PENDING) @map("reporting_status")
+  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  profile   Profile  @relation("StaffReportingEmployee", fields: [profileId], references: [id])
+  reportsTo Profile? @relation("StaffReportingManager", fields: [reportsToProfileId], references: [id])
+  campus    Campus   @relation(fields: [campusId], references: [id])
+
+  @@unique([profileId, campusId])
+  @@index([tenantId])
+  @@index([reportsToProfileId])
+  @@map("staff_reporting")
 }
 
 model UserCampusAccess {

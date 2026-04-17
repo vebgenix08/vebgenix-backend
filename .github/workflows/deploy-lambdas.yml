@@ -454,6 +454,16 @@ jobs:
             "Mutation.updateUser=users-resolver"
             "Mutation.deactivateUser=users-resolver"
 
+            # ── Staff (extended onboarding & hierarchy) ──
+            "Query.listStaffProfiles=users-resolver"
+            "Query.listCandidateManagers=users-resolver"
+            "Query.getStaffProfile=users-resolver"
+            "Mutation.createTeachingStaff=users-resolver"
+            "Mutation.createNonTeachingStaff=users-resolver"
+            "Mutation.updateStaffProfile=users-resolver"
+            "Mutation.assignReportingManager=users-resolver"
+            "Mutation.bulkReassignHierarchy=users-resolver"
+
             # ── Tenants ──
             "Query.listTenants=tenants-resolver"
             "Query.getTenant=tenants-resolver"

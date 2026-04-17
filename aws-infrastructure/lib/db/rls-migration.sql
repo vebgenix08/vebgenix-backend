@@ -80,6 +80,9 @@ ALTER TABLE application_documents FORCE ROW LEVEL SECURITY;
 ALTER TABLE application_reviews   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE application_reviews   FORCE ROW LEVEL SECURITY;
 
+ALTER TABLE staff_reporting       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff_reporting       FORCE ROW LEVEL SECURITY;
+
 -- tenants: no RLS — read-only lookup allowed; mutations guarded in Lambda
 -- platform_users / platform_audit_logs: no tenant_id, no RLS
 
@@ -159,6 +162,13 @@ DO $$ BEGIN
     USING (tenant_id::text = current_setting('app.tenant_id', true)::text);
 END $$;
 
+DO $$ BEGIN
+  DROP POLICY IF EXISTS tenant_isolation ON staff_reporting;
+  CREATE POLICY tenant_isolation ON staff_reporting
+    AS RESTRICTIVE FOR ALL TO app_user
+    USING (tenant_id::text = current_setting('app.tenant_id', true)::text);
+END $$;
+
 -- application_documents: scoped via parent application
 DO $$ BEGIN
   DROP POLICY IF EXISTS tenant_isolation ON application_documents;
@@ -197,6 +207,7 @@ WHERE schemaname = 'public'
     'profiles','applications','enquiries','students',
     'employees','campuses','user_campus_access',
     'audit_logs','profile_permissions','tenant_features',
-    'application_documents','application_reviews'
+    'application_documents','application_reviews',
+    'staff_reporting'
   )
 ORDER BY tablename;

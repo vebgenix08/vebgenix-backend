@@ -68,6 +68,11 @@ type Query {
   # Academics — Section Operations
   listSectionCourses(sectionId: ID!): [SectionCourse!]!
   listSectionIncharges(sectionId: ID!): [SectionIncharge!]!
+
+  # Staff — extended profiles & hierarchy
+  listStaffProfiles(campusId: ID, staffCategory: String, staffType: String): [StaffProfile!]!
+  listCandidateManagers(campusId: ID!, staffCategory: String): [StaffProfile!]!
+  getStaffProfile(profileId: ID!): StaffProfile
 }
 
 type Mutation {
@@ -146,6 +151,13 @@ type Mutation {
 
   # Academics — Single student class assignment
   assignStudentToClass(studentId: ID!, classId: ID!, sectionId: ID!): Boolean!
+
+  # Staff — extended onboarding & hierarchy
+  createTeachingStaff(input: CreateTeachingStaffInput!): CreateStaffPayload!
+  createNonTeachingStaff(input: CreateNonTeachingStaffInput!): CreateStaffPayload!
+  updateStaffProfile(profileId: ID!, input: UpdateStaffProfileInput!): StaffProfile!
+  assignReportingManager(input: AssignReportingManagerInput!): StaffReportingInfo!
+  bulkReassignHierarchy(input: BulkReassignHierarchyInput!): Boolean!
 
   # Invites
   acceptInvite(token: String!, password: String): AcceptInvitePayload!
@@ -357,6 +369,137 @@ input UpdateUserInput {
   id: ID!
   fullName: String
   role: String
+}
+
+# --- staff.graphql ---
+
+type StaffProfile {
+  id: ID!
+  fullName: String
+  email: String!
+  phone: String
+  gender: String
+  dateOfBirth: String
+  avatarUrl: String
+  staffType: String
+  staffCategory: String
+  designation: String
+  department: String
+  employeeCode: String
+  qualification: String
+  experienceYears: Int
+  employmentType: String
+  joinedOn: String
+  isHead: Boolean!
+  isActingHead: Boolean!
+  headEffectiveFrom: String
+  allCampusesAccess: Boolean!
+  campusIds: [ID!]!
+  isActive: Boolean!
+  reporting: StaffReportingInfo
+}
+
+type StaffReportingInfo {
+  campusId: ID!
+  reportsToProfileId: ID
+  reportsToName: String
+  reportingStatus: String!
+}
+
+type CreateStaffPayload {
+  profile: StaffProfile!
+  replacedLeaderId: ID
+  replacedLeaderName: String
+}
+
+input CreateTeachingStaffInput {
+  # Identity
+  fullName: String!
+  email: String!
+  phone: String
+  gender: String
+  dateOfBirth: String
+  # Employment
+  employeeCode: String
+  joinedOn: String
+  employmentType: String
+  qualification: String
+  experienceYears: Int
+  designation: String
+  department: String
+  # Academic category
+  staffType: String!
+  primaryCampusId: ID!
+  campusIds: [ID!]!
+  allCampusesAccess: Boolean
+  # Reporting
+  reportsToProfileId: ID
+  isHead: Boolean
+  isActingHead: Boolean
+  headEffectiveFrom: String
+  # Access
+  role: String
+  sendInvite: Boolean
+}
+
+input CreateNonTeachingStaffInput {
+  # Identity
+  fullName: String!
+  email: String!
+  phone: String
+  gender: String
+  dateOfBirth: String
+  # Employment
+  employeeCode: String
+  joinedOn: String
+  employmentType: String
+  designation: String
+  department: String
+  # Operational category
+  staffType: String!
+  primaryCampusId: ID!
+  campusIds: [ID!]!
+  allCampusesAccess: Boolean
+  # Reporting
+  reportsToProfileId: ID
+  # Access
+  role: String
+  sendInvite: Boolean
+}
+
+input UpdateStaffProfileInput {
+  fullName: String
+  phone: String
+  gender: String
+  dateOfBirth: String
+  employeeCode: String
+  joinedOn: String
+  employmentType: String
+  qualification: String
+  experienceYears: Int
+  designation: String
+  department: String
+  staffType: String
+  staffCategory: String
+  isHead: Boolean
+  isActingHead: Boolean
+  headEffectiveFrom: String
+  allCampusesAccess: Boolean
+  campusIds: [ID!]
+  isActive: Boolean
+}
+
+input AssignReportingManagerInput {
+  profileId: ID!
+  campusId: ID!
+  reportsToProfileId: ID
+}
+
+input BulkReassignHierarchyInput {
+  fromProfileId: ID!
+  toProfileId: ID!
+  campusId: ID!
+  profileIds: [ID!]
 }
 
 # --- tenants.graphql ---
