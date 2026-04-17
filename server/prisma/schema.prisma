@@ -175,6 +175,16 @@ enum TemplateType {
   COMMUNICATION
 }
 
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
 // Models
 
 model Profile {
@@ -214,6 +224,11 @@ model Profile {
   linkedAuthUsers       UserProfileLink[]
   membershipPrimary     TenantMembership[]     @relation("MembershipPrimaryProfile")
   uploadedResultBatches PublishedResultBatch[] @relation("ResultBatchUploader")
+
+  // Academics
+  subjectAllocations SubjectAllocation[]
+  classIncharges     ClassIncharge[]
+  timetableSlots     TimetableSlot[]
 
   @@index([email])
   @@map("profiles")
@@ -353,6 +368,8 @@ model Application {
   approvedAt        DateTime?         @map("approved_at") @db.Timestamptz
   applicationNumber String?           @map("application_number")
   customFields      Json?             @map("custom_fields")
+  photoUrl          String?           @map("photo_url")
+  photoKey          String?           @map("photo_key")
 
   campusScope CampusScope @map("campus_scope")
   campusId    String      @map("campus_id") @db.Uuid
@@ -444,6 +461,9 @@ model Student {
 
   status         StudentStatus @default(ACTIVE)
   enrollmentDate DateTime?     @default(now()) @map("enrollment_date") @db.Date
+
+  photoUrl String? @map("photo_url")
+  photoKey String? @map("photo_key")
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -829,9 +849,12 @@ model Section {
   campusId  String   @map("campus_id") @db.Uuid
   name      String   // "A"
 
-  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  campus    Campus   @relation(fields: [campusId], references: [id], onDelete: Cascade)
-  students  Student[]
+  class          Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  campus         Campus              @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  students       Student[]
+  allocations    SubjectAllocation[]
+  incharges      ClassIncharge[]
+  timetableSlots TimetableSlot[]
 
   @@unique([classId, campusId, name])
   @@map("sections")
@@ -843,13 +866,70 @@ model Subject {
   name        String
   code        String?
   description String?
+  subjectType String?  @map("subject_type")  // "THEORY" | "LAB" | "ELECTIVE" | "PROJECT"
+  credits     Int?
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  allocations    SubjectAllocation[]
+  timetableSlots TimetableSlot[]
 
   @@unique([tenantId, name])
   @@map("subjects")
+}
+
+model SubjectAllocation {
+  id               String   @id @default(uuid()) @db.Uuid
+  sectionId        String   @map("section_id") @db.Uuid
+  subjectId        String   @map("subject_id") @db.Uuid
+  teacherProfileId String?  @map("teacher_profile_id") @db.Uuid
+  subjectType      String?  @map("subject_type")  // override: THEORY | LAB
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  section  Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject  Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher  Profile? @relation(fields: [teacherProfileId], references: [id])
+
+  @@unique([sectionId, subjectId])
+  @@map("subject_allocations")
+}
+
+model ClassIncharge {
+  id         String   @id @default(uuid()) @db.Uuid
+  sectionId  String   @map("section_id") @db.Uuid
+  profileId  String   @map("profile_id") @db.Uuid
+  role       String   // "CLASS_TEACHER" | "STUDENT_REP"
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamptz
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id])
+
+  @@unique([sectionId, role])
+  @@map("class_incharges")
+}
+
+model TimetableSlot {
+  id               String    @id @default(uuid()) @db.Uuid
+  sectionId        String    @map("section_id") @db.Uuid
+  subjectId        String?   @map("subject_id") @db.Uuid
+  teacherProfileId String?   @map("teacher_profile_id") @db.Uuid
+  dayOfWeek        DayOfWeek @map("day_of_week")
+  periodNumber     Int       @map("period_number")
+  startTime        String    @map("start_time")   // "09:00"
+  endTime          String    @map("end_time")     // "10:00"
+  room             String?
+  label            String?   // e.g. "Break", "Lunch", or subject override label
+  isBreak          Boolean   @default(false) @map("is_break")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  section Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject Subject? @relation(fields: [subjectId], references: [id])
+  teacher Profile? @relation(fields: [teacherProfileId], references: [id])
+
+  @@unique([sectionId, dayOfWeek, periodNumber])
+  @@map("timetable_slots")
 }
 
 model Template {
