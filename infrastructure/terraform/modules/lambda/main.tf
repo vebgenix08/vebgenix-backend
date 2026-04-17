@@ -66,6 +66,11 @@ locals {
       timeout     = 30
       description = "AppSync resolver for academics: classes, sections, subjects, timetable, workload"
     }
+    "attendance-resolver" = {
+      memory      = 512
+      timeout     = 30
+      description = "AppSync resolver for student attendance: mark, fetch, summary"
+    }
   }
 
   async_workers = {

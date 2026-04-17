@@ -63,6 +63,13 @@ enum ReportingStatus {
   ORPHANED
 }
 
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
 enum CampusType {
   SCHOOL
   PU
@@ -513,6 +520,7 @@ model Student {
   payments       Payment[]
   receipts       Receipt[]
   adjustments    Adjustment[]
+  attendances    Attendance[]
 
   @@unique([tenantId, campusId, registrationNumber])
   @@index([registrationNumber])
@@ -575,6 +583,7 @@ model Tenant {
   receipts             Receipt[]
   adjustments          Adjustment[]
   staffReporting       StaffReporting[]
+  attendances          Attendance[]
 
   @@map("tenants")
 }
@@ -637,6 +646,7 @@ model Campus {
   receipts               Receipt[]
   adjustments            Adjustment[]
   staffReporting         StaffReporting[]
+  attendances            Attendance[]
 
   @@unique([tenantId, name])
   @@map("campuses")
@@ -697,6 +707,32 @@ model StaffReporting {
   @@index([tenantId])
   @@index([reportsToProfileId])
   @@map("staff_reporting")
+}
+
+model Attendance {
+  id        String           @id @default(uuid()) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  studentId String           @map("student_id") @db.Uuid
+  sectionId String           @map("section_id") @db.Uuid
+  campusId  String           @map("campus_id") @db.Uuid
+  date      DateTime         @db.Date
+  status    AttendanceStatus
+  remarks   String?
+  markedBy  String?          @map("marked_by") @db.Uuid
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+  section Section @relation(fields: [sectionId], references: [id])
+  campus  Campus  @relation(fields: [campusId], references: [id])
+
+  @@unique([studentId, sectionId, date])
+  @@index([tenantId])
+  @@index([sectionId, date])
+  @@index([studentId])
+  @@map("attendance")
 }
 
 model UserCampusAccess {
@@ -924,6 +960,7 @@ model Section {
   allocations    SubjectAllocation[]
   incharges      ClassIncharge[]
   timetableSlots TimetableSlot[]
+  attendances    Attendance[]
 
   @@unique([classId, campusId, name])
   @@map("sections")

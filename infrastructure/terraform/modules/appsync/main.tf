@@ -8,17 +8,18 @@ locals {
 
   # Resolver functions — each maps to a Lambda function alias
   resolver_functions = {
-    "dashboard-resolver"  = "dashboard-resolver"
-    "students-resolver"   = "students-resolver"
-    "finance-resolver"    = "finance-resolver"
-    "admin-resolver"      = "admin-resolver"
-    "users-resolver"      = "users-resolver"
-    "tenants-resolver"    = "tenants-resolver"
-    "admissions-resolver" = "admissions-resolver"
-    "audit-logs-resolver" = "audit-logs-resolver"
-    "storage-resolver"    = "storage-resolver"
-    "settings-resolver"   = "settings-resolver"
-    "academics-resolver"  = "academics-resolver"
+    "dashboard-resolver"   = "dashboard-resolver"
+    "students-resolver"    = "students-resolver"
+    "finance-resolver"     = "finance-resolver"
+    "admin-resolver"       = "admin-resolver"
+    "users-resolver"       = "users-resolver"
+    "tenants-resolver"     = "tenants-resolver"
+    "admissions-resolver"  = "admissions-resolver"
+    "attendance-resolver"  = "attendance-resolver"
+    "audit-logs-resolver"  = "audit-logs-resolver"
+    "storage-resolver"     = "storage-resolver"
+    "settings-resolver"    = "settings-resolver"
+    "academics-resolver"   = "academics-resolver"
   }
 }
 

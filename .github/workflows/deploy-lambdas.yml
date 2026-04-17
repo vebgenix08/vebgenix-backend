@@ -124,6 +124,7 @@ jobs:
             "academics-resolver"
             "admin-resolver"
             "admissions-resolver"
+            "attendance-resolver"
             "audit-logs-resolver"
             "cognito-provisioner"
             "dashboard-resolver"
@@ -277,6 +278,7 @@ jobs:
             "academics-resolver"
             "admin-resolver"
             "admissions-resolver"
+            "attendance-resolver"
             "audit-logs-resolver"
             "cognito-provisioner"
             "dashboard-resolver"
@@ -529,6 +531,13 @@ jobs:
             # ── Academics: Teacher ──
             "Query.getTeacherTimetable=academics-resolver"
             "Query.getTeacherWorkload=academics-resolver"
+
+            # ── Attendance ──
+            "Query.listSectionStudents=attendance-resolver"
+            "Query.getClassAttendance=attendance-resolver"
+            "Query.getStudentAttendance=attendance-resolver"
+            "Query.getAttendanceSummary=attendance-resolver"
+            "Mutation.markClassAttendance=attendance-resolver"
           )
 
           REQ='{"version":"2017-02-28","operation":"Invoke","payload":$util.toJson($ctx)}'
@@ -681,11 +690,12 @@ jobs:
           echo ""
           echo "  Functions deployed:"
           echo "    academics-resolver   admin-resolver"
-          echo "    admissions-resolver  audit-logs-resolver"
-          echo "    cognito-provisioner  dashboard-resolver"
-          echo "    email-worker         jobs-worker"
-          echo "    pre-token-generation storage-resolver"
-          echo "    tenants-resolver     users-resolver"
+          echo "    admissions-resolver  attendance-resolver"
+          echo "    audit-logs-resolver  cognito-provisioner"
+          echo "    dashboard-resolver   email-worker"
+          echo "    jobs-worker          pre-token-generation"
+          echo "    storage-resolver     tenants-resolver"
+          echo "    users-resolver"
           echo ""
           echo "  Skipped (not yet implemented):"
           echo "    finance-resolver  settings-resolver  students-resolver"

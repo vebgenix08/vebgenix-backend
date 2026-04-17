@@ -7,6 +7,7 @@ type PageInfo {
 
 type Query {
   _empty: String
+  health: String @aws_api_key
   dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
   superAdminOverview(input: SuperAdminOverviewInput): SuperAdminOverview!
   
@@ -26,7 +27,9 @@ type Query {
   # Tenants
   listTenants(limit: Int, nextToken: String): TenantConnection!
   getTenant(id: ID!): Tenant
-  
+  validateSubdomain(subdomain: String!): SubdomainValidation!
+  listAvailableFeatures: [AvailableFeature!]!
+
   _studentsEmpty: String
   _feesEmpty: String
   _templatesEmpty: String
@@ -49,6 +52,17 @@ type Query {
   
   # Students
   listStudents(filter: StudentFilter, limit: Int, nextToken: String): StudentConnection!
+
+  # Academics — Timetable & Workload
+  getSectionTimetable(sectionId: ID!): SectionTimetable!
+  getTeacherTimetable(profileId: ID!): TeacherTimetable!
+  getTeacherWorkload(profileId: ID!): TeacherWorkload!
+
+  # Attendance
+  listSectionStudents(sectionId: ID!): [AttendanceStudentInfo!]!
+  getClassAttendance(sectionId: ID!, date: AWSDate!): [AttendanceRecord!]!
+  getStudentAttendance(studentId: ID!, from: AWSDate!, to: AWSDate!): [AttendanceRecord!]!
+  getAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!): AttendanceSummary!
 }
 
 type Mutation {
@@ -65,7 +79,10 @@ type Mutation {
   createTenant(input: CreateTenantInput!): Tenant!
   updateTenant(input: UpdateTenantInput!): Tenant!
   deactivateTenant(id: ID!): Boolean
-  
+  provisionTenant(input: ProvisionTenantInput!): ProvisionTenantResult!
+  requestTenantDeletion(tenantId: ID!): TenantDeletionOtpResult!
+  confirmTenantDeletion(tenantId: ID!, otp: String!): Boolean!
+
   # Admissions
   createAdmission(input: CreateAdmissionInput!): Admission!
   updateAdmission(input: UpdateAdmissionInput!): Admission!
@@ -92,7 +109,15 @@ type Mutation {
   # Finance
   createFeeHead(input: CreateFeeHeadInput!): FeeHead!
   createFeeStructure(input: CreateFeeStructureInput!): FeeStructure!
-  
+
+  # Academics — Timetable & Class Assignment
+  replaceSectionTimetable(sectionId: ID!, slots: [TimetableSlotInput!]!): SectionTimetable!
+  bulkAssignStudentsToClass(studentIds: [ID!]!, classId: ID!, sectionId: ID!): BulkAssignResult!
+  randomAssignStudentsToClass(classId: ID!, studentIds: [ID!]): RandomAssignResult!
+
+  # Attendance
+  markClassAttendance(input: BulkAttendanceInput!): [AttendanceRecord!]!
+
   # Invites
   acceptInvite(token: String!, password: String): AcceptInvitePayload!
 }
@@ -308,11 +333,19 @@ input UpdateUserInput {
 # --- tenants.graphql ---
 
 type Tenant {
-  id: ID!
-  name: String!
-  slug: String
-  isActive: Boolean!
-  createdAt: AWSDateTime!
+  id:                 ID!
+  name:               String!
+  slug:               String
+  fullDomain:         String
+  isActive:           Boolean!
+  onboardingComplete: Boolean!
+  features:           [TenantFeatureItem!]!
+  createdAt:          String!
+}
+
+type TenantFeatureItem {
+  key:     String!
+  enabled: Boolean!
 }
 
 type TenantConnection {
@@ -323,13 +356,14 @@ type TenantConnection {
 input CreateTenantInput {
   name: String!
   slug: String
-  email: String! 
+  plan: String
 }
 
 input UpdateTenantInput {
-  id: ID!
-  name: String
-  isActive: Boolean
+  id:      ID!
+  name:    String
+  slug:    String
+  logoUrl: String
 }
 
 # --- admin.graphql ---
@@ -511,4 +545,252 @@ input CreateFeeHeadInput {
 
 input CreateFeeStructureInput {
   name: String!
+}
+
+# ── Tenant provisioning ───────────────────────────────────────────────────────
+
+type AvailableFeature {
+  key:            String!
+  name:           String!
+  description:    String!
+  defaultEnabled: Boolean!
+}
+
+type SubdomainValidation {
+  available:   Boolean!
+  normalized:  String!
+  fullDomain:  String!
+  suggestion:  String
+}
+
+input ProvisionTenantInput {
+  organizationName: String!
+  subdomain:        String!
+  features:         [String!]!
+  adminName:        String!
+  adminEmail:       String!
+}
+
+type ProvisionTenantResult {
+  tenant:     Tenant!
+  adminEmail: String!
+  inviteSent: Boolean!
+}
+
+type TenantDeletionOtpResult {
+  sent:         Boolean!
+  expiresIn:    Int!     # seconds until OTP expires (300 = 5 min)
+  maskedEmail:  String!  # e.g. "su***@vebgenix.com" — where OTP was sent
+}
+
+# ── Audit log enhancements ────────────────────────────────────────────────────
+
+type AuditLogEntry {
+  id:         ID!
+  at:         String!
+  actorId:    String!
+  actorEmail: String
+  action:     String!
+  category:   String
+  severity:   String!
+  targetType: String!
+  targetId:   String
+  targetName: String
+  meta:       AWSJSON
+  ipAddress:  String
+}
+
+# ── Academics ─────────────────────────────────────────────────────────────────
+
+type TimetableSubject {
+  id: ID!
+  name: String!
+  code: String
+  subjectType: String
+}
+
+type TimetableTeacher {
+  id: ID!
+  fullName: String
+  email: String
+  avatarUrl: String
+}
+
+type TimetableCampus {
+  id: ID!
+  name: String!
+}
+
+type TimetableClass {
+  id: ID!
+  name: String!
+}
+
+type TimetableSectionRef {
+  id: ID!
+  name: String!
+  class: TimetableClass
+  campus: TimetableCampus
+}
+
+type TimetableSlot {
+  id: ID!
+  sectionId: ID!
+  subjectId: ID
+  teacherProfileId: ID
+  dayOfWeek: String!
+  periodNumber: Int!
+  startTime: String!
+  endTime: String!
+  room: String
+  label: String
+  isBreak: Boolean!
+  subject: TimetableSubject
+  teacher: TimetableTeacher
+}
+
+type TimetableSlotWithSection {
+  id: ID!
+  sectionId: ID!
+  subjectId: ID
+  teacherProfileId: ID
+  dayOfWeek: String!
+  periodNumber: Int!
+  startTime: String!
+  endTime: String!
+  room: String
+  label: String
+  isBreak: Boolean!
+  subject: TimetableSubject
+  teacher: TimetableTeacher
+  section: TimetableSectionRef
+}
+
+type SectionTimetable {
+  sectionId: ID!
+  slots: [TimetableSlot!]!
+}
+
+type ClassTeacherRole {
+  id: ID!
+  role: String!
+  section: TimetableSectionRef!
+}
+
+type TeacherTimetable {
+  slots: [TimetableSlotWithSection!]!
+  incharges: [ClassTeacherRole!]!
+}
+
+type SubjectAllocationItem {
+  id: ID!
+  subjectType: String
+  subject: TimetableSubject!
+  section: TimetableSectionRef!
+}
+
+type WorkloadProfile {
+  id: ID!
+  fullName: String
+  email: String
+}
+
+type WorkloadSummary {
+  totalSubjects: Int!
+  totalSections: Int!
+  classTeacherOf: Int!
+  totalPeriodsPerWeek: Int!
+}
+
+type TeacherWorkload {
+  profile: WorkloadProfile!
+  allocations: [SubjectAllocationItem!]!
+  incharges: [ClassTeacherRole!]!
+  timetableSlots: [TimetableSlotWithSection!]!
+  summary: WorkloadSummary!
+}
+
+type BulkAssignResult {
+  updated: Int!
+}
+
+type StudentSectionAssignment {
+  studentId: ID!
+  sectionId: ID!
+  sectionName: String!
+}
+
+type RandomAssignResult {
+  updated: Int!
+  assignments: [StudentSectionAssignment!]!
+}
+
+input TimetableSlotInput {
+  subjectId: ID
+  teacherProfileId: ID
+  dayOfWeek: String!
+  periodNumber: Int!
+  startTime: String!
+  endTime: String!
+  room: String
+  label: String
+  isBreak: Boolean
+}
+
+# ─── Attendance ──────────────────────────────────────────────────────────────
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+type AttendanceRecord {
+  id: ID!
+  studentId: ID!
+  student: AttendanceStudentInfo!
+  sectionId: ID!
+  campusId: ID!
+  date: AWSDate!
+  status: AttendanceStatus!
+  remarks: String
+  markedBy: ID
+}
+
+type AttendanceStudentInfo {
+  id: ID!
+  fullName: String!
+  admissionNumber: String
+}
+
+type AttendanceSummary {
+  sectionId: ID!
+  from: AWSDate!
+  to: AWSDate!
+  totalDays: Int!
+  records: [StudentAttendanceSummary!]!
+}
+
+type StudentAttendanceSummary {
+  studentId: ID!
+  student: AttendanceStudentInfo!
+  present: Int!
+  absent: Int!
+  late: Int!
+  excused: Int!
+  attendancePercentage: Float!
+}
+
+input BulkAttendanceInput {
+  sectionId: ID!
+  campusId: ID!
+  date: AWSDate!
+  records: [AttendanceRecordInput!]!
+}
+
+input AttendanceRecordInput {
+  studentId: ID!
+  status: AttendanceStatus!
+  remarks: String
 }
