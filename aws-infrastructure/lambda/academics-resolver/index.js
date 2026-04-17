@@ -14,7 +14,9 @@ const { withTenant } = require('lambda-shared/withTenant');
  * All DB queries use withTenant() to activate RLS.
  */
 exports.handler = async (event) => {
-  const { fieldName, arguments: args, identity } = event;
+  const fieldName = event.fieldName ?? event.info?.fieldName;
+  const args = event.arguments ?? {};
+  const identity = event.identity ?? null;
 
   const tenantId = identity?.claims?.['custom:tenant_id'];
   const userId   = identity?.claims?.sub;
@@ -265,14 +267,12 @@ exports.handler = async (event) => {
         throw new Error('No sections found for this class');
       }
 
-      // Fetch students to assign
-      const whereClause = {
-        tenantId,
-        classId,
-        ...(studentIds && studentIds.length > 0
-          ? { id: { in: studentIds } }
-          : { sectionId: null }),
-      };
+      // Fetch students to assign.
+      // Do NOT filter by classId here — students in the queue have classId = null
+      // (they haven't been assigned yet). classId is the TARGET, not a search filter.
+      const whereClause = studentIds && studentIds.length > 0
+        ? { tenantId, id: { in: studentIds } }
+        : { tenantId, sectionId: null };
 
       const students = await withTenant(prisma, tenantId, userId, (tx) =>
         tx.student.findMany({
@@ -327,7 +327,10 @@ exports.handler = async (event) => {
       const { programId } = args;
       const classes = await withTenant(prisma, tenantId, userId, (tx) =>
         tx.class.findMany({
-          where: { ...(programId ? { programId } : {}) },
+          where: {
+            program: { tenantId },  // classes have no tenantId column; scope via program
+            ...(programId ? { programId } : {}),
+          },
           include: {
             program: { select: { id: true, name: true } },
             sections: { select: { id: true, name: true, campusId: true } },
@@ -474,6 +477,7 @@ exports.handler = async (event) => {
     case 'listSubjects': {
       const subjects = await withTenant(prisma, tenantId, userId, (tx) =>
         tx.subject.findMany({
+          where: { tenantId },
           orderBy: { name: 'asc' },
         })
       );
@@ -485,7 +489,7 @@ exports.handler = async (event) => {
       const { name, code, description, subjectType, credits } = args.input;
       const subject = await withTenant(prisma, tenantId, userId, (tx) =>
         tx.subject.create({
-          data: { name, code: code || null, description: description || null, subjectType: subjectType || null, credits: credits || null },
+          data: { tenantId, name, code: code || null, description: description || null, subjectType: subjectType || null, credits: credits || null },
         })
       );
       return mapSubject(subject);
@@ -603,10 +607,11 @@ exports.handler = async (event) => {
     case 'assignSectionIncharge': {
       const { sectionId } = args;
       const { profileId, role } = args.input;
-      // Upsert: replace existing incharge for this role
+      // Upsert: replace existing incharge for this role.
+      // ClassIncharge unique key is @@unique([sectionId, role]) → Prisma key: sectionId_role
       const incharge = await withTenant(prisma, tenantId, userId, (tx) =>
         tx.classIncharge.upsert({
-          where: { sectionId_role_academicYearId: { sectionId, role, academicYearId: null } },
+          where: { sectionId_role: { sectionId, role } },
           update: { profileId },
           create: { sectionId, profileId, role },
           include: {
@@ -741,3 +746,5 @@ function mapInchargeDetail(i) {
     profile:   i.profile ? { id: i.profile.id, fullName: i.profile.fullName, email: i.profile.email } : null,
   };
 }
+
+
