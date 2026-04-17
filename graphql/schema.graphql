@@ -58,6 +58,12 @@ type Query {
   getTeacherTimetable(profileId: ID!): TeacherTimetable!
   getTeacherWorkload(profileId: ID!): TeacherWorkload!
 
+  # Attendance
+  listSectionStudents(sectionId: ID!): [AttendanceStudentInfo!]!
+  getClassAttendance(sectionId: ID!, date: AWSDate!): [AttendanceRecord!]!
+  getStudentAttendance(studentId: ID!, from: AWSDate!, to: AWSDate!): [AttendanceRecord!]!
+  getAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!): AttendanceSummary!
+
   # Academics — Classes, Sections, Subjects
   listClasses(programId: ID): [AcademicsClass!]!
   listSections(classId: ID!): [AcademicsSection!]!
@@ -158,6 +164,9 @@ type Mutation {
   updateStaffProfile(profileId: ID!, input: UpdateStaffProfileInput!): StaffProfile!
   assignReportingManager(input: AssignReportingManagerInput!): StaffReportingInfo!
   bulkReassignHierarchy(input: BulkReassignHierarchyInput!): Boolean!
+
+  # Attendance
+  markClassAttendance(input: BulkAttendanceInput!): [AttendanceRecord!]!
 
   # Invites
   acceptInvite(token: String!, password: String): AcceptInvitePayload!
@@ -1025,4 +1034,62 @@ input UpdateCourseInput {
 input AssignInchargeInput {
   profileId: ID!
   role: String!
+}
+
+# ─── Attendance ───────────────────────────────────────────────────────────────
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+type AttendanceStudentInfo {
+  id: ID!
+  fullName: String!
+  admissionNumber: String
+}
+
+type AttendanceRecord {
+  id: ID!
+  studentId: ID!
+  student: AttendanceStudentInfo!
+  sectionId: ID!
+  campusId: ID!
+  date: AWSDate!
+  status: AttendanceStatus!
+  remarks: String
+  markedBy: ID
+}
+
+type AttendanceSummary {
+  sectionId: ID!
+  from: AWSDate!
+  to: AWSDate!
+  totalDays: Int!
+  records: [StudentAttendanceSummary!]!
+}
+
+type StudentAttendanceSummary {
+  studentId: ID!
+  student: AttendanceStudentInfo!
+  present: Int!
+  absent: Int!
+  late: Int!
+  excused: Int!
+  attendancePercentage: Float!
+}
+
+input BulkAttendanceInput {
+  sectionId: ID!
+  campusId: ID!
+  date: AWSDate!
+  records: [AttendanceRecordInput!]!
+}
+
+input AttendanceRecordInput {
+  studentId: ID!
+  status: AttendanceStatus!
+  remarks: String
 }
