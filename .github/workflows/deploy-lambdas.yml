@@ -154,12 +154,12 @@ jobs:
               echo "    ✗ $fn"
             done
             echo ""
-            echo "  Fix: run the CDK infrastructure workflow first:"
-            echo "    GitHub → Actions → 'Deploy CDK Infrastructure'"
-            echo "    environment: $ENVIRONMENT"
+            echo "  Fix: run the Terraform workflow first:"
+            echo "    GitHub → Actions → 'Terraform Infrastructure'"
+            echo "    environment: $ENVIRONMENT  |  action: apply"
             echo ""
-            echo "  That workflow deploys the VebgenixAppSync-$ENVIRONMENT stack"
-            echo "  which creates all Lambda functions. Then re-run this workflow."
+            echo "  That creates all Lambda functions, log groups, and AppSync"
+            echo "  datasources via Terraform. Then re-run this workflow."
             echo "╚══════════════════════════════════════════════════════════╝"
             exit 1
           fi
