@@ -114,7 +114,7 @@ exports.handler = async (event) => {
             section: {
               include: {
                 class: { select: { id: true, name: true } },
-                campus: { select: { id: true, name: true } },
+                campus: { select: { id: true, name: true, campusType: true } },
               },
             },
           },
@@ -127,7 +127,7 @@ exports.handler = async (event) => {
             section: {
               include: {
                 class: { select: { id: true, name: true } },
-                campus: { select: { id: true, name: true } },
+                campus: { select: { id: true, name: true, campusType: true } },
               },
             },
           },
@@ -163,7 +163,7 @@ exports.handler = async (event) => {
               section: {
                 include: {
                   class: { select: { id: true, name: true } },
-                  campus: { select: { id: true, name: true } },
+                  campus: { select: { id: true, name: true, campusType: true } },
                 },
               },
             },
@@ -175,7 +175,7 @@ exports.handler = async (event) => {
               section: {
                 include: {
                   class: { select: { id: true, name: true } },
-                  campus: { select: { id: true, name: true } },
+                  campus: { select: { id: true, name: true, campusType: true } },
                 },
               },
             },
@@ -381,7 +381,7 @@ exports.handler = async (event) => {
           where: { classId },
           include: {
             class: { include: { program: { select: { id: true, name: true } } } },
-            campus: { select: { id: true, name: true } },
+            campus: { select: { id: true, name: true, campusType: true } },
             _count: { select: { students: true, allocations: true } },
           },
           orderBy: { name: 'asc' },
@@ -401,7 +401,7 @@ exports.handler = async (event) => {
           },
           include: {
             class: { include: { program: { select: { id: true, name: true } } } },
-            campus: { select: { id: true, name: true } },
+            campus: { select: { id: true, name: true, campusType: true } },
             _count: { select: { students: true, allocations: true } },
           },
           orderBy: [{ class: { name: 'asc' } }, { name: 'asc' }],
@@ -418,7 +418,7 @@ exports.handler = async (event) => {
           where: { id: sectionId },
           include: {
             class: { include: { program: { select: { id: true, name: true } } } },
-            campus: { select: { id: true, name: true } },
+            campus: { select: { id: true, name: true, campusType: true } },
             _count: { select: { students: true, allocations: true } },
           },
         })
@@ -435,7 +435,7 @@ exports.handler = async (event) => {
           data: { name, classId, campusId },
           include: {
             class: { include: { program: { select: { id: true, name: true } } } },
-            campus: { select: { id: true, name: true } },
+            campus: { select: { id: true, name: true, campusType: true } },
             _count: { select: { students: true, allocations: true } },
           },
         })
@@ -453,7 +453,7 @@ exports.handler = async (event) => {
           data: { ...(name ? { name } : {}), ...(campusId ? { campusId } : {}) },
           include: {
             class: { include: { program: { select: { id: true, name: true } } } },
-            campus: { select: { id: true, name: true } },
+            campus: { select: { id: true, name: true, campusType: true } },
             _count: { select: { students: true, allocations: true } },
           },
         })
@@ -668,7 +668,7 @@ function mapSectionRef(sec) {
     id:     sec.id,
     name:   sec.name,
     class:  sec.class  ? { id: sec.class.id,  name: sec.class.name  } : null,
-    campus: sec.campus ? { id: sec.campus.id, name: sec.campus.name } : null,
+    campus: sec.campus ? { id: sec.campus.id, name: sec.campus.name, campusType: sec.campus.campusType ?? null } : null,
   };
 }
 
@@ -704,7 +704,7 @@ function mapSection(s) {
     classId:  s.classId,
     campusId: s.campusId,
     class:    s.class  ? mapClass(s.class)  : null,
-    campus:   s.campus ? { id: s.campus.id, name: s.campus.name } : null,
+    campus:   s.campus ? { id: s.campus.id, name: s.campus.name, campusType: s.campus.campusType ?? null } : null,
     _count:   s._count ? { students: s._count.students, allocations: s._count.allocations } : null,
   };
 }

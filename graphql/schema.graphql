@@ -648,6 +648,7 @@ type TimetableTeacher {
 type TimetableCampus {
   id: ID!
   name: String!
+  campusType: String
 }
 
 type TimetableClass {
