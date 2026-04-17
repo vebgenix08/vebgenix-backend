@@ -43,17 +43,18 @@ output "appsync_resolver_dev_arns" {
     for k, v in aws_lambda_alias.dev :
     k => v.arn
     if contains(keys({
-      "dashboard-resolver"  = true
-      "students-resolver"   = true
-      "finance-resolver"    = true
-      "admin-resolver"      = true
-      "users-resolver"      = true
-      "tenants-resolver"    = true
-      "admissions-resolver" = true
-      "audit-logs-resolver" = true
-      "storage-resolver"    = true
-      "settings-resolver"   = true
-      "academics-resolver"  = true
+      "dashboard-resolver"   = true
+      "students-resolver"    = true
+      "finance-resolver"     = true
+      "admin-resolver"       = true
+      "users-resolver"       = true
+      "tenants-resolver"     = true
+      "admissions-resolver"  = true
+      "attendance-resolver"  = true
+      "audit-logs-resolver"  = true
+      "storage-resolver"     = true
+      "settings-resolver"    = true
+      "academics-resolver"   = true
     }), k)
   }
 }
@@ -64,17 +65,18 @@ output "appsync_resolver_prod_arns" {
     for k, v in aws_lambda_alias.prod :
     k => v.arn
     if contains(keys({
-      "dashboard-resolver"  = true
-      "students-resolver"   = true
-      "finance-resolver"    = true
-      "admin-resolver"      = true
-      "users-resolver"      = true
-      "tenants-resolver"    = true
-      "admissions-resolver" = true
-      "audit-logs-resolver" = true
-      "storage-resolver"    = true
-      "settings-resolver"   = true
-      "academics-resolver"  = true
+      "dashboard-resolver"   = true
+      "students-resolver"    = true
+      "finance-resolver"     = true
+      "admin-resolver"       = true
+      "users-resolver"       = true
+      "tenants-resolver"     = true
+      "admissions-resolver"  = true
+      "attendance-resolver"  = true
+      "audit-logs-resolver"  = true
+      "storage-resolver"     = true
+      "settings-resolver"    = true
+      "academics-resolver"   = true
     }), k)
   }
 }
