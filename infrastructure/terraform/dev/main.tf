@@ -63,6 +63,7 @@ locals {
     "vebgenix-dev-audit-logs-resolver",
     "vebgenix-dev-storage-resolver",
     "vebgenix-dev-settings-resolver",
+    "vebgenix-dev-academics-resolver",
     "vebgenix-dev-email-worker",
     "vebgenix-dev-jobs-worker",
     "vebgenix-dev-cognito-provisioner",
@@ -104,7 +105,7 @@ module "storage" {
 }
 
 # ---------------------------------------------------------------------------
-# Lambda (13 functions, dev + prod aliases)
+# Lambda (14 functions, dev + prod aliases)
 # ---------------------------------------------------------------------------
 module "lambda" {
   source = "../modules/lambda"

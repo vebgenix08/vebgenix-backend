@@ -53,6 +53,7 @@ output "appsync_resolver_dev_arns" {
       "audit-logs-resolver" = true
       "storage-resolver"    = true
       "settings-resolver"   = true
+      "academics-resolver"  = true
     }), k)
   }
 }
@@ -73,6 +74,7 @@ output "appsync_resolver_prod_arns" {
       "audit-logs-resolver" = true
       "storage-resolver"    = true
       "settings-resolver"   = true
+      "academics-resolver"  = true
     }), k)
   }
 }

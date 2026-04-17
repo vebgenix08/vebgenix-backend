@@ -121,6 +121,7 @@ jobs:
           set -euo pipefail
 
           FUNCTIONS=(
+            "academics-resolver"
             "admin-resolver"
             "admissions-resolver"
             "audit-logs-resolver"
@@ -273,6 +274,7 @@ jobs:
           set -euo pipefail
 
           FUNCTIONS=(
+            "academics-resolver"
             "admin-resolver"
             "admissions-resolver"
             "audit-logs-resolver"
@@ -467,6 +469,50 @@ jobs:
 
             # ── Admin ──
             "Query.platformStats=admin-resolver"
+
+            # ── Academics: Classes ──
+            "Query.listClasses=academics-resolver"
+            "Mutation.createClass=academics-resolver"
+            "Mutation.updateClass=academics-resolver"
+            "Mutation.deleteClass=academics-resolver"
+
+            # ── Academics: Sections ──
+            "Query.listSections=academics-resolver"
+            "Query.listAllSections=academics-resolver"
+            "Query.getSection=academics-resolver"
+            "Mutation.createSection=academics-resolver"
+            "Mutation.updateSection=academics-resolver"
+            "Mutation.deleteSection=academics-resolver"
+
+            # ── Academics: Subjects ──
+            "Query.listSubjects=academics-resolver"
+            "Mutation.createSubject=academics-resolver"
+            "Mutation.updateSubject=academics-resolver"
+            "Mutation.deleteSubject=academics-resolver"
+
+            # ── Academics: Section Courses (allocations) ──
+            "Query.listSectionCourses=academics-resolver"
+            "Mutation.assignSectionCourse=academics-resolver"
+            "Mutation.updateSectionCourse=academics-resolver"
+            "Mutation.removeSectionCourse=academics-resolver"
+
+            # ── Academics: Section Incharges ──
+            "Query.listSectionIncharges=academics-resolver"
+            "Mutation.assignSectionIncharge=academics-resolver"
+            "Mutation.removeSectionIncharge=academics-resolver"
+
+            # ── Academics: Student Assignment ──
+            "Mutation.assignStudentToClass=academics-resolver"
+            "Mutation.bulkAssignStudentsToClass=academics-resolver"
+            "Mutation.randomAssignStudentsToClass=academics-resolver"
+
+            # ── Academics: Timetable ──
+            "Query.getSectionTimetable=academics-resolver"
+            "Mutation.replaceSectionTimetable=academics-resolver"
+
+            # ── Academics: Teacher ──
+            "Query.getTeacherTimetable=academics-resolver"
+            "Query.getTeacherWorkload=academics-resolver"
           )
 
           REQ='{"version":"2017-02-28","operation":"Invoke","payload":$util.toJson($ctx)}'
@@ -618,12 +664,12 @@ jobs:
           echo "  Pattern: ${FN_PREFIX}-{fn}:$ALIAS → published version"
           echo ""
           echo "  Functions deployed:"
-          echo "    admin-resolver       admissions-resolver"
-          echo "    audit-logs-resolver  cognito-provisioner"
-          echo "    dashboard-resolver   email-worker"
-          echo "    jobs-worker          pre-token-generation"
-          echo "    storage-resolver     tenants-resolver"
-          echo "    users-resolver"
+          echo "    academics-resolver   admin-resolver"
+          echo "    admissions-resolver  audit-logs-resolver"
+          echo "    cognito-provisioner  dashboard-resolver"
+          echo "    email-worker         jobs-worker"
+          echo "    pre-token-generation storage-resolver"
+          echo "    tenants-resolver     users-resolver"
           echo ""
           echo "  Skipped (not yet implemented):"
           echo "    finance-resolver  settings-resolver  students-resolver"

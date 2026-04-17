@@ -52,6 +52,22 @@ type Query {
   
   # Students
   listStudents(filter: StudentFilter, limit: Int, nextToken: String): StudentConnection!
+
+  # Academics — Timetable & Workload
+  getSectionTimetable(sectionId: ID!): SectionTimetable!
+  getTeacherTimetable(profileId: ID!): TeacherTimetable!
+  getTeacherWorkload(profileId: ID!): TeacherWorkload!
+
+  # Academics — Classes, Sections, Subjects
+  listClasses(programId: ID): [AcademicsClass!]!
+  listSections(classId: ID!): [AcademicsSection!]!
+  listAllSections(campusId: ID, programId: ID): [AcademicsSection!]!
+  getSection(sectionId: ID!): AcademicsSection!
+  listSubjects: [AcademicsSubject!]!
+
+  # Academics — Section Operations
+  listSectionCourses(sectionId: ID!): [SectionCourse!]!
+  listSectionIncharges(sectionId: ID!): [SectionIncharge!]!
 }
 
 type Mutation {
@@ -98,7 +114,39 @@ type Mutation {
   # Finance
   createFeeHead(input: CreateFeeHeadInput!): FeeHead!
   createFeeStructure(input: CreateFeeStructureInput!): FeeStructure!
-  
+
+  # Academics — Timetable & Class Assignment
+  replaceSectionTimetable(sectionId: ID!, slots: [TimetableSlotInput!]!): SectionTimetable!
+  bulkAssignStudentsToClass(studentIds: [ID!]!, classId: ID!, sectionId: ID!): BulkAssignResult!
+  randomAssignStudentsToClass(classId: ID!, studentIds: [ID!]): RandomAssignResult!
+
+  # Academics — Classes CRUD
+  createClass(input: CreateClassInput!): AcademicsClass!
+  updateClass(classId: ID!, input: UpdateClassInput!): AcademicsClass!
+  deleteClass(classId: ID!): Boolean!
+
+  # Academics — Sections CRUD
+  createSection(classId: ID!, input: CreateSectionInput!): AcademicsSection!
+  updateSection(classId: ID!, sectionId: ID!, input: UpdateSectionInput!): AcademicsSection!
+  deleteSection(classId: ID!, sectionId: ID!): Boolean!
+
+  # Academics — Subjects CRUD
+  createSubject(input: CreateSubjectInput!): AcademicsSubject!
+  updateSubject(subjectId: ID!, input: UpdateSubjectInput!): AcademicsSubject!
+  deleteSubject(subjectId: ID!): Boolean!
+
+  # Academics — Section Courses (Subject Allocations)
+  assignSectionCourse(sectionId: ID!, input: AssignCourseInput!): SectionCourse!
+  updateSectionCourse(sectionId: ID!, allocationId: ID!, input: UpdateCourseInput!): SectionCourse!
+  removeSectionCourse(sectionId: ID!, allocationId: ID!): Boolean!
+
+  # Academics — Section Incharges
+  assignSectionIncharge(sectionId: ID!, input: AssignInchargeInput!): SectionIncharge!
+  removeSectionIncharge(sectionId: ID!, inchargeId: ID!): Boolean!
+
+  # Academics — Single student class assignment
+  assignStudentToClass(studentId: ID!, classId: ID!, sectionId: ID!): Boolean!
+
   # Invites
   acceptInvite(token: String!, password: String): AcceptInvitePayload!
 }
@@ -579,4 +627,258 @@ type AuditLogEntry {
   targetName: String
   meta:       AWSJSON
   ipAddress:  String
+}
+
+# ── Academics ─────────────────────────────────────────────────────────────────
+
+type TimetableSubject {
+  id: ID!
+  name: String!
+  code: String
+  subjectType: String
+}
+
+type TimetableTeacher {
+  id: ID!
+  fullName: String
+  email: String
+  avatarUrl: String
+}
+
+type TimetableCampus {
+  id: ID!
+  name: String!
+}
+
+type TimetableClass {
+  id: ID!
+  name: String!
+}
+
+type TimetableSectionRef {
+  id: ID!
+  name: String!
+  class: TimetableClass
+  campus: TimetableCampus
+}
+
+type TimetableSlot {
+  id: ID!
+  sectionId: ID!
+  subjectId: ID
+  teacherProfileId: ID
+  dayOfWeek: String!
+  periodNumber: Int!
+  startTime: String!
+  endTime: String!
+  room: String
+  label: String
+  isBreak: Boolean!
+  subject: TimetableSubject
+  teacher: TimetableTeacher
+}
+
+type TimetableSlotWithSection {
+  id: ID!
+  sectionId: ID!
+  subjectId: ID
+  teacherProfileId: ID
+  dayOfWeek: String!
+  periodNumber: Int!
+  startTime: String!
+  endTime: String!
+  room: String
+  label: String
+  isBreak: Boolean!
+  subject: TimetableSubject
+  teacher: TimetableTeacher
+  section: TimetableSectionRef
+}
+
+type SectionTimetable {
+  sectionId: ID!
+  slots: [TimetableSlot!]!
+}
+
+type ClassTeacherRole {
+  id: ID!
+  role: String!
+  section: TimetableSectionRef!
+}
+
+type TeacherTimetable {
+  slots: [TimetableSlotWithSection!]!
+  incharges: [ClassTeacherRole!]!
+}
+
+type SubjectAllocationItem {
+  id: ID!
+  subjectType: String
+  subject: TimetableSubject!
+  section: TimetableSectionRef!
+}
+
+type WorkloadProfile {
+  id: ID!
+  fullName: String
+  email: String
+}
+
+type WorkloadSummary {
+  totalSubjects: Int!
+  totalSections: Int!
+  classTeacherOf: Int!
+  totalPeriodsPerWeek: Int!
+}
+
+type TeacherWorkload {
+  profile: WorkloadProfile!
+  allocations: [SubjectAllocationItem!]!
+  incharges: [ClassTeacherRole!]!
+  timetableSlots: [TimetableSlotWithSection!]!
+  summary: WorkloadSummary!
+}
+
+type BulkAssignResult {
+  updated: Int!
+}
+
+type StudentSectionAssignment {
+  studentId: ID!
+  sectionId: ID!
+  sectionName: String!
+}
+
+type RandomAssignResult {
+  updated: Int!
+  assignments: [StudentSectionAssignment!]!
+}
+
+input TimetableSlotInput {
+  subjectId: ID
+  teacherProfileId: ID
+  dayOfWeek: String!
+  periodNumber: Int!
+  startTime: String!
+  endTime: String!
+  room: String
+  label: String
+  isBreak: Boolean
+}
+
+# ── Academics — Classes / Sections / Subjects ─────────────────────────────────
+
+type AcademicsProgram {
+  id: ID!
+  name: String!
+}
+
+type AcademicsClass {
+  id: ID!
+  name: String!
+  programId: ID!
+  program: AcademicsProgram
+  sections: [AcademicsSection!]
+}
+
+type SectionCounts {
+  students: Int!
+  allocations: Int!
+}
+
+type AcademicsSection {
+  id: ID!
+  name: String!
+  classId: ID!
+  campusId: ID!
+  class: AcademicsClass
+  campus: TimetableCampus
+  _count: SectionCounts
+}
+
+type AcademicsSubject {
+  id: ID!
+  name: String!
+  code: String
+  description: String
+  subjectType: String
+  credits: Int
+}
+
+type SectionCourse {
+  id: ID!
+  sectionId: ID!
+  subjectId: ID!
+  teacherProfileId: ID
+  subjectType: String
+  subject: AcademicsSubject!
+  teacher: TimetableTeacher
+}
+
+type SectionInchargeProfile {
+  id: ID!
+  fullName: String
+  email: String
+}
+
+type SectionIncharge {
+  id: ID!
+  sectionId: ID!
+  profileId: ID!
+  role: String!
+  profile: SectionInchargeProfile!
+}
+
+# ── Academics inputs ──────────────────────────────────────────────────────────
+
+input CreateClassInput {
+  name: String!
+  programId: ID!
+}
+
+input UpdateClassInput {
+  name: String
+  programId: ID
+}
+
+input CreateSectionInput {
+  name: String!
+  campusId: ID!
+}
+
+input UpdateSectionInput {
+  name: String
+  campusId: ID
+}
+
+input CreateSubjectInput {
+  name: String!
+  code: String
+  description: String
+  subjectType: String
+  credits: Int
+}
+
+input UpdateSubjectInput {
+  name: String
+  code: String
+  description: String
+  subjectType: String
+  credits: Int
+}
+
+input AssignCourseInput {
+  subjectId: ID!
+  teacherProfileId: ID
+  subjectType: String
+}
+
+input UpdateCourseInput {
+  teacherProfileId: ID
+  subjectType: String
+}
+
+input AssignInchargeInput {
+  profileId: ID!
+  role: String!
 }

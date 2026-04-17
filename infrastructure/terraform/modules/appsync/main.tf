@@ -18,6 +18,7 @@ locals {
     "audit-logs-resolver" = "audit-logs-resolver"
     "storage-resolver"    = "storage-resolver"
     "settings-resolver"   = "settings-resolver"
+    "academics-resolver"  = "academics-resolver"
   }
 }
 
