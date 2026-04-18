@@ -207,6 +207,7 @@ enum TemplateType {
   FEE_STRUCTURE
   DOC_CHECKLIST
   COMMUNICATION
+  STAFF_ONBOARDING
 }
 
 enum DayOfWeek {
