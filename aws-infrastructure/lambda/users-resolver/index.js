@@ -11,7 +11,12 @@ const { extractIdentity } = require("lambda-shared/identity");
  * All queries use withTenant() which enables RLS via SET LOCAL app.tenant_id
  */
 exports.handler = async (event) => {
-  const { fieldName, arguments: args, identity } = event;
+  // Support both AppSync event shapes:
+  //   Old/custom template: { fieldName, arguments, identity, ... }
+  //   VTL $util.toJson($ctx): { info: { fieldName }, arguments, identity, ... }
+  const fieldName = event.fieldName ?? event.info?.fieldName;
+  const args = event.arguments;
+  const identity = event.identity;
 
   // Extract context (supports both Cognito and Lambda auth)
   const { tenantId, userId, email, globalRoles } = extractIdentity(identity);
