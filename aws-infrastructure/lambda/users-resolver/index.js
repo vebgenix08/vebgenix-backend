@@ -709,19 +709,25 @@ exports.handler = async (event) => {
  */
 async function writeAuditLog(prisma, { actorId, actorEmail, tenantId, action, category, targetType, targetId, targetName, before, after }) {
   try {
-    await prisma.platformAuditLog.create({
-      data: {
-        actorId: actorId || "00000000-0000-0000-0000-000000000000",
-        actorEmail: actorEmail || null,
-        action,
-        category: category || null,
-        severity: "INFO",
-        targetType,
-        targetId: targetId || null,
-        targetName: targetName || null,
-        meta: { tenantId: tenantId || null, before: before || {}, after: after || {} },
-      },
-    });
+    // Write to tenant-scoped audit_logs table (shown in admin audit log page)
+    if (tenantId && actorId) {
+      await prisma.auditLog.create({
+        data: {
+          tenantId,
+          userId: actorId,
+          action,
+          entityType: targetType || category || "Staff",
+          entityId: targetId || actorId,
+          details: {
+            email: actorEmail || null,
+            name: targetName || null,
+            module: category || null,
+            before: before || {},
+            after: after || {},
+          },
+        },
+      });
+    }
   } catch (err) {
     console.error("[AuditLog] Failed to write audit log:", err?.message || err);
   }

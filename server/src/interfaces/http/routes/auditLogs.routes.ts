@@ -18,77 +18,66 @@ router.use(requireRole(["ADMIN", "STAFF"]));
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function mapLog(log: any, profileMap: Map<string, any>): any {
-  const meta = (log.meta ?? {}) as Record<string, any>;
-  const before = (meta.before ?? {}) as Record<string, any>;
-  const after = (meta.after ?? {}) as Record<string, any>;
+  const details = (log.details ?? {}) as Record<string, any>;
+  const profile = profileMap.get(log.userId);
 
-  // Build changeDetails from before/after diff
-  const changeDetails: Array<{ fieldName: string; oldValue: any; newValue: any }> = [];
-  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
-  for (const key of allKeys) {
-    if (before[key] !== after[key]) {
-      changeDetails.push({ fieldName: key, oldValue: before[key], newValue: after[key] });
+  // Build changeDetails from details.before / details.after if available
+  let changeDetails: Array<{ fieldName: string; oldValue: any; newValue: any }> | undefined;
+  if (details.before || details.after) {
+    const before = (details.before ?? {}) as Record<string, any>;
+    const after  = (details.after  ?? {}) as Record<string, any>;
+    const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+    const diffs: Array<{ fieldName: string; oldValue: any; newValue: any }> = [];
+    for (const key of allKeys) {
+      if (before[key] !== after[key]) {
+        diffs.push({ fieldName: key, oldValue: before[key], newValue: after[key] });
+      }
     }
+    if (diffs.length > 0) changeDetails = diffs;
   }
-
-  const profile = profileMap.get(log.actorId);
 
   return {
     _id: log.id,
-    userId: log.actorId,
-    email: log.actorEmail ?? profile?.email ?? "—",
-    userName: profile?.fullName ?? log.actorEmail ?? "—",
+    userId: log.userId,
+    email: profile?.email ?? details.email ?? "—",
+    userName: profile?.fullName ?? details.fullName ?? profile?.email ?? "—",
     userRole: profile?.role ?? "—",
     action: log.action,
-    module: log.category ?? meta.module ?? "—",
-    status: log.severity === "INFO" ? "success" : "failure",
-    reason: log.severity !== "INFO" ? (meta.reason ?? log.action) : undefined,
-    ipAddress: log.ipAddress ?? meta.ipAddress,
-    targetEntityType: log.targetType,
-    targetEntityId: log.targetId,
-    targetEntityName: log.targetName ?? meta.name ?? null,
-    changeDetails: changeDetails.length > 0 ? changeDetails : undefined,
-    createdAt: log.at,
+    module: log.entityType ?? details.module ?? "—",
+    status: (details.status === "failure" || details.error) ? "failure" : "success",
+    reason: details.error ?? details.reason ?? undefined,
+    ipAddress: log.ipAddress ?? details.ipAddress ?? undefined,
+    targetEntityType: log.entityType,
+    targetEntityId: log.entityId,
+    targetEntityName: details.name ?? details.fullName ?? details.studentName ?? null,
+    changeDetails,
+    createdAt: log.createdAt,
   };
 }
 
-// ── Build Prisma where clause from query params ──────────────────────────────
+// ── Build Prisma where clause ────────────────────────────────────────────────
 
 function buildWhere(query: Record<string, any>, tenantId: string): any {
-  // Always scope to tenant via JSON path — put everything inside AND[] for clean composition
-  const andClauses: any[] = [
-    { meta: { path: ["tenantId"], equals: tenantId } },
-  ];
+  const where: any = { tenantId };
 
   if (query.module && query.module !== "all" && query.module !== "") {
-    andClauses.push({ category: query.module });
+    where.entityType = query.module;
   }
 
   if (query.action && query.action !== "") {
-    andClauses.push({ action: { contains: query.action as string, mode: "insensitive" } });
+    where.action = { contains: query.action as string, mode: "insensitive" };
   }
 
   if (query.userId && query.userId !== "") {
-    andClauses.push({ actorId: query.userId as string });
-  }
-
-  if (query.status && query.status !== "" && query.status !== "all") {
-    if (query.status === "success") {
-      andClauses.push({ severity: "INFO" });
-    } else {
-      andClauses.push({ severity: { in: ["ERROR", "WARN"] } });
-    }
+    where.userId = query.userId as string;
   }
 
   if (query.search && query.search !== "") {
     const s = query.search as string;
-    andClauses.push({
-      OR: [
-        { action: { contains: s, mode: "insensitive" } },
-        { actorEmail: { contains: s, mode: "insensitive" } },
-        { targetName: { contains: s, mode: "insensitive" } },
-      ],
-    });
+    where.OR = [
+      { action: { contains: s, mode: "insensitive" } },
+      { entityType: { contains: s, mode: "insensitive" } },
+    ];
   }
 
   if (query.startDate || query.endDate) {
@@ -99,17 +88,28 @@ function buildWhere(query: Record<string, any>, tenantId: string): any {
       end.setHours(23, 59, 59, 999);
       atFilter.lte = end;
     }
-    andClauses.push({ at: atFilter });
+    where.createdAt = atFilter;
   }
 
-  return { AND: andClauses };
+  return where;
+}
+
+// ── Hydrate profiles ─────────────────────────────────────────────────────────
+
+async function hydrateProfiles(logs: any[]) {
+  const userIds = [...new Set(logs.map((l) => l.userId).filter(Boolean))] as string[];
+  if (!userIds.length) return new Map<string, any>();
+  const profiles = await prisma.profile.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, email: true, fullName: true, role: true },
+  });
+  return new Map(profiles.map((p) => [p.id, p]));
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 /**
  * GET /api/audit-logs
- * List audit logs for the current tenant with pagination & filters.
  */
 router.get("/", async (req: Request, res: Response) => {
   try {
@@ -123,24 +123,11 @@ router.get("/", async (req: Request, res: Response) => {
     const where = buildWhere(req.query as Record<string, any>, tenantId);
 
     const [logs, total] = await Promise.all([
-      prisma.platformAuditLog.findMany({
-        where,
-        orderBy: [{ at: "desc" }, { id: "desc" }],
-        skip,
-        take: limit,
-      }),
-      prisma.platformAuditLog.count({ where }),
+      prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: limit }),
+      prisma.auditLog.count({ where }),
     ]);
 
-    // Hydrate actor names from Profile
-    const actorIds = [...new Set(logs.map((l) => l.actorId).filter(Boolean))];
-    const profiles = actorIds.length
-      ? await prisma.profile.findMany({
-          where: { id: { in: actorIds } },
-          select: { id: true, email: true, fullName: true, role: true },
-        })
-      : [];
-    const profileMap = new Map(profiles.map((p) => [p.id, p]));
+    const profileMap = await hydrateProfiles(logs);
 
     return res.json({
       success: true,
@@ -155,26 +142,24 @@ router.get("/", async (req: Request, res: Response) => {
 
 /**
  * GET /api/audit-logs/stats/summary
- * Return aggregate counts for the dashboard.
  */
 router.get("/stats/summary", async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).auth?.tenantId;
     if (!tenantId) return res.status(403).json({ error: "Tenant context required" });
 
-    const where: any = { meta: { path: ["tenantId"], equals: tenantId } };
-    if (req.query.startDate) where.at = { gte: new Date(req.query.startDate as string) };
+    const where: any = { tenantId };
+    if (req.query.startDate) where.createdAt = { gte: new Date(req.query.startDate as string) };
     if (req.query.endDate) {
       const end = new Date(req.query.endDate as string);
       end.setHours(23, 59, 59, 999);
-      where.at = { ...(where.at ?? {}), lte: end };
+      where.createdAt = { ...(where.createdAt ?? {}), lte: end };
     }
 
-    const [total, failures, byCategory] = await Promise.all([
-      prisma.platformAuditLog.count({ where }),
-      prisma.platformAuditLog.count({ where: { ...where, severity: { in: ["ERROR", "WARN"] } } }),
-      prisma.platformAuditLog.groupBy({
-        by: ["category"],
+    const [total, byEntityType] = await Promise.all([
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.groupBy({
+        by: ["entityType"],
         where,
         _count: { id: true },
         orderBy: { _count: { id: "desc" } },
@@ -186,9 +171,9 @@ router.get("/stats/summary", async (req: Request, res: Response) => {
       success: true,
       data: {
         total,
-        success: total - failures,
-        failure: failures,
-        byModule: byCategory.map((b) => ({ module: b.category ?? "Other", count: b._count.id })),
+        success: total,   // AuditLog doesn't track failures separately
+        failure: 0,
+        byModule: byEntityType.map((b) => ({ module: b.entityType ?? "Other", count: b._count.id })),
       },
     });
   } catch (err: any) {
@@ -199,7 +184,6 @@ router.get("/stats/summary", async (req: Request, res: Response) => {
 
 /**
  * GET /api/audit-logs/export/csv
- * Export filtered logs as CSV blob.
  */
 router.get("/export/csv", async (req: Request, res: Response) => {
   try {
@@ -207,21 +191,8 @@ router.get("/export/csv", async (req: Request, res: Response) => {
     if (!tenantId) return res.status(403).json({ error: "Tenant context required" });
 
     const where = buildWhere(req.query as Record<string, any>, tenantId);
-
-    const logs = await prisma.platformAuditLog.findMany({
-      where,
-      orderBy: [{ at: "desc" }, { id: "desc" }],
-      take: 5000,
-    });
-
-    const actorIds = [...new Set(logs.map((l) => l.actorId).filter(Boolean))];
-    const profiles = actorIds.length
-      ? await prisma.profile.findMany({
-          where: { id: { in: actorIds } },
-          select: { id: true, email: true, fullName: true, role: true },
-        })
-      : [];
-    const profileMap = new Map(profiles.map((p) => [p.id, p]));
+    const logs = await prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, take: 5000 });
+    const profileMap = await hydrateProfiles(logs);
 
     const escape = (v: unknown) => {
       const s = v == null ? "" : String(v);
@@ -230,17 +201,16 @@ router.get("/export/csv", async (req: Request, res: Response) => {
         : s;
     };
 
-    const header = ["Date", "User", "Email", "Action", "Module", "Status", "Target Type", "Target Name", "IP Address"];
+    const header = ["Date", "User", "Email", "Action", "Module", "Target ID", "Target Name", "IP Address"];
     const rows = logs.map((log) => {
       const m = mapLog(log, profileMap);
       return [
-        new Date(log.at).toLocaleString(),
+        new Date(log.createdAt).toLocaleString(),
         m.userName,
         m.email,
         m.action,
         m.module,
-        m.status,
-        m.targetEntityType ?? "",
+        m.targetEntityId ?? "",
         m.targetEntityName ?? "",
         m.ipAddress ?? "",
       ].map(escape).join(",");
@@ -258,7 +228,6 @@ router.get("/export/csv", async (req: Request, res: Response) => {
 
 /**
  * GET /api/audit-logs/user/:userId
- * Get activity for a specific user.
  */
 router.get("/user/:userId", async (req: Request, res: Response) => {
   try {
@@ -269,27 +238,13 @@ router.get("/user/:userId", async (req: Request, res: Response) => {
     const limit = Math.min(Math.max(parseInt((req.query.limit as string) || "20", 10), 1), 100);
     const skip  = (page - 1) * limit;
 
-    const where: any = {
-      actorId: req.params.userId,
-      meta: { path: ["tenantId"], equals: tenantId },
-    };
-
+    const where = { tenantId, userId: req.params.userId };
     const [logs, total] = await Promise.all([
-      prisma.platformAuditLog.findMany({
-        where,
-        orderBy: [{ at: "desc" }],
-        skip,
-        take: limit,
-      }),
-      prisma.platformAuditLog.count({ where }),
+      prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: limit }),
+      prisma.auditLog.count({ where }),
     ]);
 
-    const profile = await prisma.profile.findUnique({
-      where: { id: req.params.userId },
-      select: { id: true, email: true, fullName: true, role: true },
-    });
-    const profileMap = new Map(profile ? [[profile.id, profile]] : []);
-
+    const profileMap = await hydrateProfiles(logs);
     return res.json({
       success: true,
       data: logs.map((log) => mapLog(log, profileMap)),
@@ -303,28 +258,17 @@ router.get("/user/:userId", async (req: Request, res: Response) => {
 
 /**
  * GET /api/audit-logs/:id
- * Get single audit log detail.
  */
 router.get("/:id", async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).auth?.tenantId;
     if (!tenantId) return res.status(403).json({ error: "Tenant context required" });
 
-    const log = await prisma.platformAuditLog.findUnique({ where: { id: req.params.id } });
+    const log = await prisma.auditLog.findUnique({ where: { id: req.params.id } });
     if (!log) return res.status(404).json({ error: "Audit log not found" });
+    if (log.tenantId !== tenantId) return res.status(403).json({ error: "Access denied" });
 
-    // Verify this log belongs to the requester's tenant
-    const meta = (log.meta ?? {}) as Record<string, any>;
-    if (meta.tenantId && meta.tenantId !== tenantId) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    const profile = await prisma.profile.findUnique({
-      where: { id: log.actorId },
-      select: { id: true, email: true, fullName: true, role: true },
-    });
-    const profileMap = new Map(profile ? [[profile.id, profile]] : []);
-
+    const profileMap = await hydrateProfiles([log]);
     return res.json({ success: true, data: mapLog(log, profileMap) });
   } catch (err: any) {
     console.error("[AuditLogs] detail error:", err);
@@ -334,7 +278,6 @@ router.get("/:id", async (req: Request, res: Response) => {
 
 /**
  * DELETE /api/audit-logs/clear/old
- * Delete logs older than N days.
  */
 router.delete("/clear/old", requireRole(["ADMIN"]), async (req: Request, res: Response) => {
   try {
@@ -343,13 +286,7 @@ router.delete("/clear/old", requireRole(["ADMIN"]), async (req: Request, res: Re
 
     const daysOld = Math.max(parseInt((req.query.daysOld as string) || "365", 10), 30);
     const cutoff  = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
-
-    const result = await prisma.platformAuditLog.deleteMany({
-      where: {
-        at: { lt: cutoff },
-        meta: { path: ["tenantId"], equals: tenantId },
-      },
-    });
+    const result  = await prisma.auditLog.deleteMany({ where: { tenantId, createdAt: { lt: cutoff } } });
 
     return res.json({ success: true, deleted: result.count });
   } catch (err: any) {
