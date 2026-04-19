@@ -79,6 +79,11 @@ type Query {
   listStaffProfiles(campusId: ID, staffCategory: String, staffType: String): [StaffProfile!]!
   listCandidateManagers(campusId: ID!, staffCategory: String): [StaffProfile!]!
   getStaffProfile(profileId: ID!): StaffProfile
+
+  # Finance
+  listFeeHeads: [FeeHead!]!
+  listFeeStructures: [FeeStructure!]!
+  listPrograms: [FinanceProgram!]!
 }
 
 type Mutation {
@@ -122,9 +127,14 @@ type Mutation {
   enableStudentPortal(studentId: ID!, email: String!): PortalEnablementPayload!
   enableGuardianPortal(input: EnableGuardianPortalInput!): PortalEnablementPayload!
   
-  # Finance
+  # Finance — Fee Heads
   createFeeHead(input: CreateFeeHeadInput!): FeeHead!
+  updateFeeHead(id: ID!, input: CreateFeeHeadInput!): FeeHead!
+  deleteFeeHead(id: ID!): Boolean!
+
+  # Finance — Fee Structures
   createFeeStructure(input: CreateFeeStructureInput!): FeeStructure!
+  deleteFeeStructure(id: ID!): Boolean!
 
   # Academics — Timetable & Class Assignment
   replaceSectionTimetable(sectionId: ID!, slots: [TimetableSlotInput!]!): SectionTimetable!
@@ -712,20 +722,55 @@ type FeeHead {
   id: ID!
   name: String!
   type: String!
+  description: String
+  isActive: Boolean!
+  createdAt: String
+}
+
+type FeeStructureComponent {
+  feeHead: FeeHead!
+  amount: Float!
+  dueDate: String
+  isOptional: Boolean!
 }
 
 type FeeStructure {
   id: ID!
   name: String!
+  totalAmount: Float!
+  isActive: Boolean!
+  createdAt: String
+  academicYear: AcademicYear
+  program: FinanceProgram
+  components: [FeeStructureComponent!]!
+}
+
+type FinanceProgram {
+  id: ID!
+  name: String!
+  type: String
+  level: String
+  isActive: Boolean
 }
 
 input CreateFeeHeadInput {
   name: String!
   type: String!
+  description: String
+}
+
+input FeeComponentInput {
+  feeHeadId: ID!
+  amount: Float!
+  dueDate: String
+  isOptional: Boolean
 }
 
 input CreateFeeStructureInput {
   name: String!
+  academicYearId: ID
+  programId: ID
+  components: [FeeComponentInput!]!
 }
 
 # ── Tenant provisioning ───────────────────────────────────────────────────────

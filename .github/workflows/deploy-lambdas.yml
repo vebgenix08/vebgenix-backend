@@ -129,6 +129,7 @@ jobs:
             "cognito-provisioner"
             "dashboard-resolver"
             "email-worker"
+            "finance-resolver"
             "jobs-worker"
             "pre-token-generation"
             "storage-resolver"
@@ -283,6 +284,7 @@ jobs:
             "cognito-provisioner"
             "dashboard-resolver"
             "email-worker"
+            "finance-resolver"
             "jobs-worker"
             "pre-token-generation"
             "storage-resolver"
@@ -538,6 +540,16 @@ jobs:
             "Query.getStudentAttendance=attendance-resolver"
             "Query.getAttendanceSummary=attendance-resolver"
             "Mutation.markClassAttendance=attendance-resolver"
+
+            # ── Finance ──
+            "Query.listFeeHeads=finance-resolver"
+            "Query.listFeeStructures=finance-resolver"
+            "Query.listPrograms=finance-resolver"
+            "Mutation.createFeeHead=finance-resolver"
+            "Mutation.updateFeeHead=finance-resolver"
+            "Mutation.deleteFeeHead=finance-resolver"
+            "Mutation.createFeeStructure=finance-resolver"
+            "Mutation.deleteFeeStructure=finance-resolver"
           )
 
           REQ='{"version":"2017-02-28","operation":"Invoke","payload":$util.toJson($ctx)}'
@@ -693,10 +705,10 @@ jobs:
           echo "    admissions-resolver  attendance-resolver"
           echo "    audit-logs-resolver  cognito-provisioner"
           echo "    dashboard-resolver   email-worker"
-          echo "    jobs-worker          pre-token-generation"
-          echo "    storage-resolver     tenants-resolver"
-          echo "    users-resolver"
+          echo "    finance-resolver     jobs-worker"
+          echo "    pre-token-generation storage-resolver"
+          echo "    tenants-resolver     users-resolver"
           echo ""
           echo "  Skipped (not yet implemented):"
-          echo "    finance-resolver  settings-resolver  students-resolver"
+          echo "    settings-resolver  students-resolver"
           echo "╚══════════════════════════════════════════════════════╝"
