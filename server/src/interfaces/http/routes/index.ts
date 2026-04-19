@@ -9,6 +9,8 @@ import dashboardRoutes from "./dashboard.routes";
 import resultsRoutes from "./results.routes";
 import financeRoutes from "./finance.routes";
 import profileRoutes from "./profileRoutes";
+import adminCleanupRoutes from "./adminCleanup.routes";
+import { auditLogsRouter } from "./auditLogs.routes";
 import { resolveTenant } from "../middleware/resolveTenant";
 import { requireAuth } from "../middleware/requireAuth";
 import { requireCampusContext } from "../middleware/requireCampusContext";
@@ -49,5 +51,7 @@ router.use("/admin/dashboard", dashboardRoutes);
 router.use("/results", resultsRoutes);
 router.use("/admin/finance", financeRoutes);
 router.use("/profile", profileRoutes);
+router.use("/admin/cleanup", adminCleanupRoutes);
+router.use("/audit-logs", auditLogsRouter);
 
 export default router;

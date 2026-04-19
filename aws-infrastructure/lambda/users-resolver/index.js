@@ -523,8 +523,23 @@ exports.handler = async (event) => {
         return { profile: fullProfile, replacedLeader };
       });
 
+      const mappedStaff = mapStaffProfile(result.profile);
+
+      // Fire-and-forget audit log
+      writeAuditLog(prisma, {
+        actorId: userId,
+        actorEmail: email,
+        tenantId,
+        action: isTeaching ? "TEACHING_STAFF_CREATED" : "NON_TEACHING_STAFF_CREATED",
+        category: isTeaching ? "Teachers" : "Staff",
+        targetType: "Profile",
+        targetId: result.profile?.id,
+        targetName: fullName,
+        after: { fullName, email, staffType, staffCategory: isTeaching ? "TEACHING" : "NON_TEACHING", designation, department },
+      });
+
       return {
-        profile: mapStaffProfile(result.profile),
+        profile: mappedStaff,
         replacedLeaderId: result.replacedLeader?.id ?? null,
         replacedLeaderName: result.replacedLeader?.fullName ?? null,
       };
@@ -616,7 +631,22 @@ exports.handler = async (event) => {
         });
       });
 
-      return mapStaffProfile(profile);
+      const mappedProfile = mapStaffProfile(profile);
+
+      // Fire-and-forget audit log
+      writeAuditLog(prisma, {
+        actorId: userId,
+        actorEmail: email,
+        tenantId,
+        action: "STAFF_PROFILE_UPDATED",
+        category: "Staff",
+        targetType: "Profile",
+        targetId: profileId,
+        targetName: mappedProfile.fullName,
+        after: { fullName: mappedProfile.fullName, designation: mappedProfile.designation, department: mappedProfile.department },
+      });
+
+      return mappedProfile;
     }
 
     // ── Mutation.assignReportingManager ──────────────────────────────────────
@@ -670,6 +700,32 @@ exports.handler = async (event) => {
       throw new Error(`UsersLambda: unknown field "${fieldName}"`);
   }
 };
+
+// ── Audit Log Helper ──────────────────────────────────────────────────────────
+
+/**
+ * Fire-and-forget audit log write.
+ * Never throws — logs errors to CloudWatch instead.
+ */
+async function writeAuditLog(prisma, { actorId, actorEmail, tenantId, action, category, targetType, targetId, targetName, before, after }) {
+  try {
+    await prisma.platformAuditLog.create({
+      data: {
+        actorId: actorId || "00000000-0000-0000-0000-000000000000",
+        actorEmail: actorEmail || null,
+        action,
+        category: category || null,
+        severity: "INFO",
+        targetType,
+        targetId: targetId || null,
+        targetName: targetName || null,
+        meta: { tenantId: tenantId || null, before: before || {}, after: after || {} },
+      },
+    });
+  } catch (err) {
+    console.error("[AuditLog] Failed to write audit log:", err?.message || err);
+  }
+}
 
 // ── Mappers ───────────────────────────────────────────────────────────────────
 
