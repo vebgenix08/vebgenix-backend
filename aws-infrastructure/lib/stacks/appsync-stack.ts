@@ -18,8 +18,11 @@ const REPO_ROOT = path.resolve(__dirname, '../../../');
 interface AppSyncStackProps extends cdk.StackProps {
   config: EnvConfig;
   userPool: cognito.IUserPool;
-  vpc: ec2.Vpc;
-  sgLambda: ec2.SecurityGroup;
+  /** Only required when enableNat is true — Lambdas are placed in private subnets
+   *  only when there is a NAT Gateway to reach MongoDB Atlas and other external services.
+   *  When undefined, Lambdas run outside the VPC and reach everything over the internet. */
+  vpc?: ec2.Vpc;
+  sgLambda?: ec2.SecurityGroup;
   eventBus: events.EventBus;
   documentsBucket: s3.Bucket;
 }
@@ -39,8 +42,6 @@ export class AppSyncStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AppSyncStackProps) {
     super(scope, id, props);
     const { config, userPool, vpc, sgLambda, eventBus, documentsBucket } = props;
-
-    const privateSubnets = { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS };
 
     // ── AppSync GraphQL API ─────────────────────────────────────────────────
     this.api = new appsync.GraphqlApi(this, 'Api', {
@@ -133,9 +134,14 @@ export class AppSyncStack extends cdk.Stack {
         handler:        'handler',
         timeout:        cdk.Duration.seconds(30),
         memorySize:     512,
-        vpc,
-        vpcSubnets:     privateSubnets,
-        securityGroups: [sgLambda],
+        // Place in private subnets only when NAT is available (enableNat: true).
+        // Without NAT, Lambdas run outside the VPC and reach Atlas + AWS services
+        // directly over the internet — no VPC, no NAT cost.
+        ...(vpc && sgLambda ? {
+          vpc,
+          vpcSubnets:     { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+          securityGroups: [sgLambda],
+        } : {}),
         environment:    { ...sharedEnv, ...(extraEnv ?? {}) },
         tracing:        lambda.Tracing.ACTIVE,
         bundling: {

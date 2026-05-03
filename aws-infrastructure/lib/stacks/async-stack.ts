@@ -15,8 +15,9 @@ const REPO_ROOT = path.resolve(__dirname, '../../../');
 
 interface AsyncStackProps extends cdk.StackProps {
   config: EnvConfig;
-  vpc: ec2.Vpc;
-  sgLambda: ec2.SecurityGroup;
+  /** Only required when enableNat is true — see AppSyncStack comment. */
+  vpc?: ec2.Vpc;
+  sgLambda?: ec2.SecurityGroup;
 }
 
 export class AsyncStack extends cdk.Stack {
@@ -27,7 +28,9 @@ export class AsyncStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AsyncStackProps) {
     super(scope, id, props);
     const { config, vpc, sgLambda } = props;
-    const privateSubnets = { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS };
+    const vpcConfig = vpc && sgLambda
+      ? { vpc, vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }, securityGroups: [sgLambda] }
+      : {};
 
     // ── EventBridge Custom Bus ───────────────────────────────────────────
     this.eventBus = new events.EventBus(this, 'AppEventBus', {
@@ -124,9 +127,7 @@ export class AsyncStack extends cdk.Stack {
       handler:      'handler',
       timeout:      cdk.Duration.seconds(60),
       memorySize:   256,
-      vpc,
-      vpcSubnets:   privateSubnets,
-      securityGroups: [sgLambda],
+      ...vpcConfig,
       environment: {
         ...workerEnv,
         SMTP_HOST:     `{{resolve:secretsmanager:vebgenix/${config.stage}/smtp:SecretString:host}}`,
@@ -165,9 +166,7 @@ export class AsyncStack extends cdk.Stack {
       handler:      'handler',
       timeout:      cdk.Duration.seconds(120),
       memorySize:   256,
-      vpc,
-      vpcSubnets:   privateSubnets,
-      securityGroups: [sgLambda],
+      ...vpcConfig,
       environment:  workerEnv,
       tracing:      lambda.Tracing.ACTIVE,
       bundling: {

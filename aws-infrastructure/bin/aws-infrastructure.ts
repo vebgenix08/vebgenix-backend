@@ -37,11 +37,11 @@ const networkStack = new NetworkStack(app, `VebgenixNetwork-${config.stage}`, {
 });
 
 // 2. Auth: Cognito User Pool + PostConfirmation trigger Lambda
+// vpc/sgLambda only passed when NAT is enabled — otherwise Lambda runs outside VPC
 const authStack = new AuthStack(app, `VebgenixAuth-${config.stage}`, {
   env,
   config,
-  vpc:      networkStack.vpc,
-  sgLambda: networkStack.sgLambda,
+  ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
 });
 authStack.addDependency(networkStack);
 
@@ -71,8 +71,7 @@ if (config.enableEc2Postgres) {
 const asyncStack = new AsyncStack(app, `VebgenixAsync-${config.stage}`, {
   env,
   config,
-  vpc:      networkStack.vpc,
-  sgLambda: networkStack.sgLambda,
+  ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
 });
 asyncStack.addDependency(networkStack);
 
@@ -88,8 +87,7 @@ const appSyncStack = new AppSyncStack(app, `VebgenixAppSync-${config.stage}`, {
   env,
   config,
   userPool:        authStack.userPool,
-  vpc:             networkStack.vpc,
-  sgLambda:        networkStack.sgLambda,
+  ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
   eventBus:        asyncStack.eventBus,
   documentsBucket: storageStack.bucket,
 });

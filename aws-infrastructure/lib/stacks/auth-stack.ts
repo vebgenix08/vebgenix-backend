@@ -11,8 +11,9 @@ const REPO_ROOT = path.resolve(__dirname, '../../../');
 
 interface AuthStackProps extends cdk.StackProps {
   config: EnvConfig;
-  vpc: ec2.Vpc;
-  sgLambda: ec2.SecurityGroup;
+  /** Only required when enableNat is true — see AppSyncStack comment. */
+  vpc?: ec2.Vpc;
+  sgLambda?: ec2.SecurityGroup;
 }
 
 export class AuthStack extends cdk.Stack {
@@ -24,6 +25,9 @@ export class AuthStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AuthStackProps) {
     super(scope, id, props);
     const { config, vpc, sgLambda } = props;
+    const vpcConfig = vpc && sgLambda
+      ? { vpc, vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }, securityGroups: [sgLambda] }
+      : {};
 
     // ── Cognito PostConfirmation trigger ─────────────────────────────────
     // Runs after a user confirms sign-up or accepts an admin invite.
@@ -36,9 +40,7 @@ export class AuthStack extends cdk.Stack {
       handler:      'handler',
       timeout:      cdk.Duration.seconds(10),
       memorySize:   256,
-      vpc,
-      vpcSubnets:   { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [sgLambda],
+      ...vpcConfig,
       environment: {
         STAGE:       config.stage,
         MONGODB_URI: `{{resolve:secretsmanager:vebgenix/${config.stage}/mongodb:SecretString:uri}}`,
