@@ -272,7 +272,7 @@ EOF`,
         ? { subnets: [restSubnet] }
         : { subnetType: ec2.SubnetType.PUBLIC },
       securityGroup: restSecurityGroup,
-      instanceType: new ec2.InstanceType(config.restApiInstanceClass),
+      instanceType: new ec2.InstanceType(config.restApiInstanceClass ?? 't4g.small'),
       machineImage: ec2.MachineImage.latestAmazonLinux2023({
         cpuType: ec2.AmazonLinuxCpuType.ARM_64,
       }),
@@ -282,7 +282,7 @@ EOF`,
       blockDevices: [
         {
           deviceName: "/dev/xvda",
-          volume: ec2.BlockDeviceVolume.ebs(config.restApiVolumeSizeGb, {
+          volume: ec2.BlockDeviceVolume.ebs(config.restApiVolumeSizeGb ?? 20, {
             encrypted: true,
             volumeType: ec2.EbsDeviceVolumeType.GP3,
           }),

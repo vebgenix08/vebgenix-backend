@@ -13,23 +13,18 @@ export const prodConfig: EnvConfig = {
   },
 
   // Network
-  // Keep false until Razorpay/Fast2SMS outbound calls go live.
-  // When enabling: add 1 NAT Gateway (cost-optimized, single AZ, acceptable HA tradeoff for MVP).
+  // NAT: keep false until Razorpay/Fast2SMS outbound calls go live.
+  // When enabling: add 1 NAT Gateway (cost-optimised, single AZ).
   enableNat: false,
-  enableEc2RestApi: true,
-  enableEc2Postgres: true,
 
-  // Database
+  // EC2 REST API + EC2 Postgres: disabled — backend is Lambda + MongoDB Atlas.
+  // These flags gate VebgenixEc2Database-prod and VebgenixRestApi-prod stacks.
+  // Re-enable only if a dedicated REST gateway is ever needed alongside AppSync.
+  enableEc2RestApi: false,
+  enableEc2Postgres: false,
+
+  // RDS: disabled — using MongoDB Atlas.
   enableDatabase: false,
-  dbInstanceClass: "t3.small",
-  dbMultiAz: true,
-  dbBackupRetentionDays: 30,
-  dbDeletionProtection: true,
-  dbStorageEncrypted: true,
-  restApiInstanceClass: "t4g.small",
-  restApiVolumeSizeGb: 20,
-  ec2DbInstanceClass: "t4g.medium",
-  ec2DbVolumeSizeGb: 100,
 
   // AppSync
   enableWaf: true,

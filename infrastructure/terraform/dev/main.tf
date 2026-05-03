@@ -1,7 +1,11 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.7"
 
   required_providers {
+    mongodbatlas = {
+      source  = "mongodb/mongodbatlas"
+      version = "~> 1.15"
+    }
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
@@ -9,164 +13,81 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "vebgenix-terraform-state-278035644568"
+    bucket         = "vebgenix-tf-state-278035644568"
     key            = "dev/terraform.tfstate"
     region         = "ap-south-1"
-    dynamodb_table = "vebgenix-terraform-locks"
+    dynamodb_table = "vebgenix-tf-locks"
     encrypt        = true
   }
 }
 
 provider "aws" {
   region = var.aws_region
+}
 
-  default_tags {
-    tags = {
-      Project     = "vebgenix"
-      ManagedBy   = "terraform"
-      Environment = "dev"
-    }
+provider "mongodbatlas" {
+  public_key  = var.mongodb_atlas_public_key
+  private_key = var.mongodb_atlas_private_key
+}
+
+# ── MongoDB Atlas ─────────────────────────────────────────────────────────────
+
+resource "mongodbatlas_project" "dev" {
+  name   = "vebgenix-dev"
+  org_id = var.mongodb_atlas_org_id
+}
+
+resource "mongodbatlas_cluster" "dev" {
+  project_id = mongodbatlas_project.dev.id
+  name       = "vebgenix-dev"
+
+  provider_name               = "TENANT"
+  backing_provider_name       = "AWS"
+  provider_region_name        = "AP_SOUTH_1"
+  provider_instance_size_name = "M0" # Free tier for dev
+
+  auto_scaling_disk_gb_enabled = false
+
+  labels {
+    key   = "environment"
+    value = "dev"
   }
 }
 
-# us-east-1 provider — required for ACM certificates used by CloudFront
-# (Not used in dev since CloudFront/DNS are skipped, but declared for completeness)
-provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
+resource "mongodbatlas_database_user" "app" {
+  username           = "ags"
+  password           = var.mongodb_app_password
+  project_id         = mongodbatlas_project.dev.id
+  auth_database_name = "admin"
 
-  default_tags {
-    tags = {
-      Project     = "vebgenix"
-      ManagedBy   = "terraform"
-      Environment = "dev"
-    }
+  roles {
+    role_name     = "readWrite"
+    database_name = "vebgenix_dev"
+  }
+
+  scopes {
+    name = mongodbatlas_cluster.dev.name
+    type = "CLUSTER"
   }
 }
 
-
-# ---------------------------------------------------------------------------
-# Locals
-# ---------------------------------------------------------------------------
-locals {
-  stage = "dev"
-
-  # Dev functions are named vebgenix-dev-* (separate from prod vebgenix-*)
-  all_lambda_function_names = [
-    "vebgenix-dev-dashboard-resolver",
-    "vebgenix-dev-students-resolver",
-    "vebgenix-dev-finance-resolver",
-    "vebgenix-dev-admin-resolver",
-    "vebgenix-dev-users-resolver",
-    "vebgenix-dev-tenants-resolver",
-    "vebgenix-dev-admissions-resolver",
-    "vebgenix-dev-audit-logs-resolver",
-    "vebgenix-dev-storage-resolver",
-    "vebgenix-dev-settings-resolver",
-    "vebgenix-dev-academics-resolver",
-    "vebgenix-dev-email-worker",
-    "vebgenix-dev-jobs-worker",
-    "vebgenix-dev-cognito-provisioner",
-  ]
+# Allow all IPs (Lambda/EC2 IPs are dynamic) — restrict in prod via VPC Peering
+resource "mongodbatlas_project_ip_access_list" "all" {
+  project_id = mongodbatlas_project.dev.id
+  cidr_block = "0.0.0.0/0"
+  comment    = "Dev: all IPs (Lambda IPs are dynamic)"
 }
 
-# ---------------------------------------------------------------------------
-# Cognito
-# ---------------------------------------------------------------------------
-module "cognito" {
-  source = "../modules/cognito"
+# ── AWS SSM: Write Atlas connection string so CDK stacks can read it ──────────
 
-  stage        = local.stage
-  aws_region   = var.aws_region
-  frontend_url = var.frontend_url
+resource "aws_ssm_parameter" "mongodb_uri" {
+  name        = "/vebgenix/dev/MONGODB_URI"
+  type        = "SecureString"
+  description = "MongoDB Atlas connection string for dev"
+  value       = "mongodb+srv://${mongodbatlas_database_user.app.username}:${var.mongodb_app_password}@${replace(mongodbatlas_cluster.dev.connection_strings[0].standard_srv, "mongodb+srv://", "")}/${var.mongodb_db_name}?retryWrites=true&w=majority"
 
-  additional_callback_urls = [
-    "http://localhost:3000/auth/callback",
-    "http://localhost:5173/auth/callback",
-  ]
-  additional_logout_urls = [
-    "http://localhost:3000/auth/logout",
-    "http://localhost:5173/auth/logout",
-  ]
-}
-
-# ---------------------------------------------------------------------------
-# Storage (no frontend bucket in dev)
-# ---------------------------------------------------------------------------
-module "storage" {
-  source = "../modules/storage"
-
-  stage                  = local.stage
-  aws_account_id         = var.aws_account_id
-  aws_region             = var.aws_region
-  frontend_url           = var.frontend_url
-  create_frontend_bucket = false
-  force_destroy          = true # Allow cleanup in dev
-}
-
-# ---------------------------------------------------------------------------
-# Lambda (14 functions, dev + prod aliases)
-# ---------------------------------------------------------------------------
-module "lambda" {
-  source = "../modules/lambda"
-
-  stage                 = local.stage
-  aws_region            = var.aws_region
-  neon_database_url     = var.neon_database_url
-  cognito_user_pool_id  = module.cognito.user_pool_id
-  cognito_client_id     = module.cognito.backend_client_id
-  cognito_client_secret = module.cognito.backend_client_secret
-  documents_bucket_name = module.storage.documents_bucket_name
-  prod_lambda_version   = var.prod_lambda_version
-  log_retention_days    = 7 # Short retention for dev
-
-  depends_on = [
-    module.cognito,
-    module.storage,
-  ]
-}
-
-# ---------------------------------------------------------------------------
-# AppSync
-# ---------------------------------------------------------------------------
-module "appsync" {
-  source = "../modules/appsync"
-
-  stage                     = local.stage
-  aws_region                = var.aws_region
-  cognito_user_pool_id      = module.cognito.user_pool_id
-  cognito_user_pool_arn     = module.cognito.user_pool_arn
-  lambda_execution_role_arn = module.lambda.execution_role_arn
-
-  # Use dev aliases for dev environment
-  lambda_alias_arns = module.lambda.appsync_resolver_dev_arns
-
-  log_field_level = "ALL" # Verbose logging in dev
-  xray_enabled    = true
-
-  depends_on = [
-    module.cognito,
-    module.lambda,
-  ]
-}
-
-# ---------------------------------------------------------------------------
-# Dev-only: Update AppSync permission to reference correct API ID
-# ---------------------------------------------------------------------------
-# Note: Lambda permissions for AppSync are managed in the lambda module.
-# After appsync is created, re-run apply to propagate the api_id.
-
-# ---------------------------------------------------------------------------
-# Monitoring (minimal for dev)
-# ---------------------------------------------------------------------------
-module "monitoring" {
-  source = "../modules/monitoring"
-
-  stage                 = local.stage
-  aws_region            = var.aws_region
-  alert_email           = var.alert_email
-  lambda_function_names = local.all_lambda_function_names
-  log_retention_days    = 7
-
-  depends_on = [module.lambda]
+  tags = {
+    Environment = "dev"
+    ManagedBy   = "terraform"
+  }
 }

@@ -55,7 +55,7 @@ export class DatabaseStack extends cdk.Stack {
         version: rds.PostgresEngineVersion.of("16.6", "16"),
       }),
       instanceIdentifier: `vebgenix-${config.stage}`,
-      instanceType: new ec2.InstanceType(config.dbInstanceClass),
+      instanceType: new ec2.InstanceType(config.dbInstanceClass ?? 't4g.micro'),
       port: 5432,
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
@@ -67,7 +67,7 @@ export class DatabaseStack extends cdk.Stack {
       storageType: rds.StorageType.GP3,
       allocatedStorage: 20,
       maxAllocatedStorage: 100,
-      backupRetention: cdk.Duration.days(config.dbBackupRetentionDays),
+      backupRetention: cdk.Duration.days(config.dbBackupRetentionDays ?? 1),
       deletionProtection: config.dbDeletionProtection,
       removalPolicy:
         config.stage === "prod"

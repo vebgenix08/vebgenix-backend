@@ -1,17 +1,19 @@
-import * as cdk from "aws-cdk-lib";
-import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as iam from "aws-cdk-lib/aws-iam";
-import * as appsync from "aws-cdk-lib/aws-appsync";
-import * as events from "aws-cdk-lib/aws-events";
-import * as s3 from "aws-cdk-lib/aws-s3";
-import * as cognito from "aws-cdk-lib/aws-cognito";
-import * as logs from "aws-cdk-lib/aws-logs";
-import * as nodejs from "aws-cdk-lib/aws-lambda-nodejs";
+import * as cdk from 'aws-cdk-lib';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as appsync from 'aws-cdk-lib/aws-appsync';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as logs from 'aws-cdk-lib/aws-logs';
+import { Construct } from 'constructs';
+import { EnvConfig } from '../../config/types';
+import * as path from 'path';
 
-import { Construct } from "constructs";
-import { EnvConfig } from "../../config/types";
-import * as path from "path";
+// Root of the monorepo (two levels above aws-infrastructure/)
+const REPO_ROOT = path.resolve(__dirname, '../../../');
 
 interface AppSyncStackProps extends cdk.StackProps {
   config: EnvConfig;
@@ -20,16 +22,14 @@ interface AppSyncStackProps extends cdk.StackProps {
   sgLambda: ec2.SecurityGroup;
   eventBus: events.EventBus;
   documentsBucket: s3.Bucket;
-  dbProxyEndpoint: string;
-  dbSecretArn: string;
 }
 
 /**
- * AppSyncStack: GraphQL API + 5 domain Lambda resolvers in a SINGLE stack.
+ * AppSyncStack — GraphQL API + all domain Lambda resolvers.
  *
- * Reason for co-location: separating API + Lambdas causes CDK cross-stack
- * cyclic references (Lambda.Arn CfnExport → AppSync datasource cycle).
- * Standard CDK pattern: keep tightly coupled AppSync + datasource Lambdas together.
+ * Each Lambda is built from monorepo apps/ TypeScript source via
+ * NodejsFunction (esbuild) — no separate build step needed.
+ * MongoDB URI is injected via CloudFormation dynamic reference from Secrets Manager.
  */
 export class AppSyncStack extends cdk.Stack {
   public readonly api: appsync.GraphqlApi;
@@ -38,27 +38,15 @@ export class AppSyncStack extends cdk.Stack {
 
   constructor(scope: Construct, id: string, props: AppSyncStackProps) {
     super(scope, id, props);
-    const {
-      config,
-      userPool,
-      vpc,
-      sgLambda,
-      eventBus,
-      documentsBucket,
-      dbProxyEndpoint,
-      dbSecretArn,
-    } = props;
+    const { config, userPool, vpc, sgLambda, eventBus, documentsBucket } = props;
 
     const privateSubnets = { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS };
-    const dbSecretsEnabled = dbSecretArn.startsWith("arn:");
 
-    // ---------------------------------------------------------------
-    // AppSync GraphQL API
-    // ---------------------------------------------------------------
-    this.api = new appsync.GraphqlApi(this, "Api", {
+    // ── AppSync GraphQL API ─────────────────────────────────────────────────
+    this.api = new appsync.GraphqlApi(this, 'Api', {
       name: `vebgenix-${config.stage}`,
       definition: appsync.Definition.fromFile(
-        path.join(__dirname, "../schema/schema.graphql"),
+        path.join(__dirname, '../schema/schema.graphql'),
       ),
       authorizationConfig: {
         defaultAuthorization: {
@@ -73,346 +61,469 @@ export class AppSyncStack extends cdk.Stack {
         ],
       },
       logConfig: {
-        fieldLogLevel:
-          config.stage === "prod"
-            ? appsync.FieldLogLevel.ERROR
-            : appsync.FieldLogLevel.ALL,
-        retention:
-          config.stage === "prod"
-            ? logs.RetentionDays.THREE_MONTHS
-            : logs.RetentionDays.ONE_WEEK,
+        fieldLogLevel: config.stage === 'prod'
+          ? appsync.FieldLogLevel.ERROR
+          : appsync.FieldLogLevel.ALL,
+        retention: config.stage === 'prod'
+          ? logs.RetentionDays.THREE_MONTHS
+          : logs.RetentionDays.ONE_WEEK,
       },
       xrayEnabled: true,
     });
 
     this.apiUrl = this.api.graphqlUrl;
-    this.apiId = this.api.apiId;
+    this.apiId  = this.api.apiId;
 
-    // Explicitly extract the CfnSchema so resolvers can DependsOn it.
-    // This prevents a race condition where CloudFormation tries to create
-    // resolvers before AppSync has fully processed the schema update.
-    const cfnSchema = this.api.schema?.bind(this.api) as any;
-    const schemaNode = this.api.node.findChild("Schema");
+    const schemaNode = this.api.node.findChild('Schema');
     const cfnSchemaResource = schemaNode
-      ? (schemaNode as any).node.defaultChild
+      ? (schemaNode as import('constructs').IConstruct).node.defaultChild as cdk.CfnResource | null
       : null;
 
-    // ---------------------------------------------------------------
-    // Shared Lambda env + IAM
-    // ---------------------------------------------------------------
-    const sharedEnv = {
-      STAGE: config.stage,
-      DB_PROXY_ENDPOINT: dbProxyEndpoint,
-      DB_SECRET_ARN: dbSecretArn,
-      DB_NAME: "vebgenix",
-      DATABASE_URL: dbSecretsEnabled
-        ? `postgresql://postgres:${dbSecretArn}@${dbProxyEndpoint}:5432/vebgenix`
-        : "",
-      EVENT_BUS_NAME: eventBus.eventBusName,
-      DOCUMENTS_BUCKET: documentsBucket.bucketName,
-      USER_POOL_ID: userPool.userPoolId,
-      NODE_OPTIONS: "--enable-source-maps",
+    // ── Shared Lambda environment ───────────────────────────────────────────
+    const sharedEnv: Record<string, string> = {
+      STAGE:               config.stage,
+      MONGODB_URI:         `{{resolve:secretsmanager:vebgenix/${config.stage}/mongodb:SecretString:uri}}`,
+      EVENT_BUS_NAME:      eventBus.eventBusName,
+      DOCUMENTS_BUCKET:    documentsBucket.bucketName,
+      COGNITO_USER_POOL_ID: userPool.userPoolId,
+      COGNITO_CLIENT_ID:   config.cognitoClientId ?? '',
+      COGNITO_REGION:      config.region,
+      APP_NAME:            'Vebgenix',
+      APP_BASE_URL:        config.appBaseUrl ?? '',
+      NODE_OPTIONS:        '--enable-source-maps',
     };
 
-    const dbPolicy = dbSecretsEnabled
-      ? new iam.PolicyStatement({
-          actions: [
-            "secretsmanager:GetSecretValue",
-            "secretsmanager:DescribeSecret",
-          ],
-          resources: [
-            dbSecretArn,
-            `${dbSecretArn}-*`,
-            `arn:aws:secretsmanager:${config.region}:${config.account}:secret:vebgenix/${config.stage}/db-master*`,
-          ],
-        })
-      : undefined;
+    // ── IAM statements ──────────────────────────────────────────────────────
+    const cognitoAdminPolicy = new iam.PolicyStatement({
+      actions: [
+        'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminUpdateUserAttributes',
+        'cognito-idp:AdminDisableUser',
+        'cognito-idp:AdminEnableUser',
+        'cognito-idp:AdminGetUser',
+        'cognito-idp:AdminInitiateAuth',
+        'cognito-idp:ListUsersInGroup',
+        'cognito-idp:AdminAddUserToGroup',
+      ],
+      resources: [`arn:aws:cognito-idp:${config.region}:${config.account}:userpool/*`],
+    });
 
-    // ---------------------------------------------------------------
-    // Helper: create domain Lambda + AppSync datasource
-    // ---------------------------------------------------------------
-    const makeLambda = (logicalId: string, fnName: string, handler: string) => {
-      const fn = new lambda.Function(this, logicalId, {
-        functionName: `vebgenix-${fnName}-${config.stage}`,
-        runtime: lambda.Runtime.NODEJS_20_X,
-        handler,
-        // Entire lambda/ folder packaged so shared/ utilities are always available
-        code: lambda.Code.fromAsset(path.resolve(__dirname, "../../lambda")),
-        timeout: cdk.Duration.seconds(30),
-        memorySize: 256,
-        vpc,
-        vpcSubnets: privateSubnets,
-        securityGroups: [sgLambda],
-        environment: sharedEnv,
-        tracing: lambda.Tracing.ACTIVE,
-      });
+    const eventBusPolicy = new iam.PolicyStatement({
+      actions:   ['events:PutEvents'],
+      resources: [eventBus.eventBusArn],
+    });
 
-      if (dbPolicy) {
-        fn.addToRolePolicy(dbPolicy);
-      }
-      return fn;
-    };
+    const s3ReadWritePolicy = new iam.PolicyStatement({
+      actions:   ['s3:PutObject', 's3:GetObject', 's3:DeleteObject'],
+      resources: [`${documentsBucket.bucketArn}/*`],
+    });
 
-    const makeDomainLambda = (logicalId: string, fnName: string, entryPath: string) => {
+    // ── Lambda factory ──────────────────────────────────────────────────────
+    const makeServiceLambda = (
+      logicalId: string,
+      fnName: string,
+      entryRelPath: string,
+      extraEnv?: Record<string, string>,
+      extraPolicies?: iam.PolicyStatement[],
+    ): nodejs.NodejsFunction => {
       const fn = new nodejs.NodejsFunction(this, logicalId, {
-        functionName: `vebgenix-${fnName}-${config.stage}`,
-        runtime: lambda.Runtime.NODEJS_20_X,
-        entry: path.resolve(__dirname, '../../../server/src/interfaces/graphql', entryPath),
-        handler: 'handler',
-        timeout: cdk.Duration.seconds(30),
-        memorySize: 512,
+        functionName:   `vebgenix-${fnName}-${config.stage}`,
+        runtime:        lambda.Runtime.NODEJS_20_X,
+        entry:          path.join(REPO_ROOT, entryRelPath),
+        handler:        'handler',
+        timeout:        cdk.Duration.seconds(30),
+        memorySize:     512,
         vpc,
-        vpcSubnets: privateSubnets,
+        vpcSubnets:     privateSubnets,
         securityGroups: [sgLambda],
-        environment: sharedEnv,
-        tracing: lambda.Tracing.ACTIVE,
+        environment:    { ...sharedEnv, ...(extraEnv ?? {}) },
+        tracing:        lambda.Tracing.ACTIVE,
         bundling: {
           forceDockerBundling: false,
-          minify: true,
-          externalModules: ['@aws-sdk/*'], 
-          sourceMap: true,
+          minify:    config.stage === 'prod',
+          sourceMap: config.stage !== 'prod',
+          externalModules: ['@aws-sdk/*'],
         },
       });
-
-      if (dbPolicy) {
-        fn.addToRolePolicy(dbPolicy);
-      }
+      (extraPolicies ?? []).forEach(p => fn.addToRolePolicy(p));
       return fn;
     };
 
-    // ---------------------------------------------------------------
-    // 1. Users Lambda
-    // ---------------------------------------------------------------
-    const usersLambda = makeLambda(
-      "UsersLambda",
-      "users-resolver",
-      "users-resolver/index.handler",
-    );
-    usersLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: [
-          "cognito-idp:AdminCreateUser",
-          "cognito-idp:AdminUpdateUserAttributes",
-          "cognito-idp:AdminDisableUser",
-          "cognito-idp:AdminGetUser",
-          "cognito-idp:ListUsersInGroup",
-        ],
-        resources: [
-          `arn:aws:cognito-idp:${config.region}:${config.account}:userpool/*`,
-        ],
-      }),
+    // ── 1. Identity service ─────────────────────────────────────────────────
+    const usersLambda = makeServiceLambda(
+      'UsersLambda', 'users-resolver',
+      'apps/identity-service/src/handler.ts',
+      {},
+      [cognitoAdminPolicy],
     );
 
-    // ---------------------------------------------------------------
-    // 2. Admissions Lambda
-    // ---------------------------------------------------------------
-    const admissionsLambda = makeLambda(
-      "AdmissionsLambda",
-      "admissions-resolver",
-      "admissions-resolver/index.handler",
-    );
-    admissionsLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["events:PutEvents"],
-        resources: [eventBus.eventBusArn],
-      }),
+    // ── 2. Admissions service ───────────────────────────────────────────────
+    const admissionsLambda = makeServiceLambda(
+      'AdmissionsLambda', 'admissions-resolver',
+      'apps/admissions-service/src/handler.ts',
+      {},
+      [eventBusPolicy],
     );
 
-    // ---------------------------------------------------------------
-    // 3. Tenants Lambda (SUPER_ADMIN only)
-    // ---------------------------------------------------------------
-    const tenantsLambda = makeLambda(
-      "TenantsLambda",
-      "tenants-resolver",
-      "tenants-resolver/index.handler",
-    );
-    tenantsLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["cognito-idp:AdminCreateUser", "cognito-idp:ListUsers"],
-        resources: [
-          `arn:aws:cognito-idp:${config.region}:${config.account}:userpool/*`,
-        ],
-      }),
+    // ── 3. Finance service ──────────────────────────────────────────────────
+    const financeLambda = makeServiceLambda(
+      'FinanceLambda', 'finance-resolver',
+      'apps/finance-service/src/handler.ts',
+      {
+        RAZORPAY_KEY_ID:         `{{resolve:secretsmanager:vebgenix/${config.stage}/razorpay:SecretString:keyId}}`,
+        RAZORPAY_KEY_SECRET:     `{{resolve:secretsmanager:vebgenix/${config.stage}/razorpay:SecretString:keySecret}}`,
+        RAZORPAY_WEBHOOK_SECRET: `{{resolve:secretsmanager:vebgenix/${config.stage}/razorpay:SecretString:webhookSecret}}`,
+      },
     );
 
-    // ---------------------------------------------------------------
-    // 4. Storage Lambda (presigned upload URLs)
-    // ---------------------------------------------------------------
-    const storageLambda = makeLambda(
-      "StorageLambda",
-      "storage-resolver",
-      "storage-resolver/index.handler",
+    // ── 4. Academics service (classes, sections, subjects, students, exams, attendance) ──
+    const academicsLambda = makeServiceLambda(
+      'AcademicsLambda', 'academics-resolver',
+      'apps/academics-service/src/handler.ts',
+    );
+
+    // ── 5. Settings service (tenants, campuses, programs, academic years, templates, features, dashboard, audit) ──
+    // settingsLambda — general settings, dashboard stats, audit logs (no Cognito)
+    // tenantsLambda  — platform tenant management (needs Cognito AdminCreateUser)
+    const settingsLambda = makeServiceLambda(
+      'SettingsLambda', 'settings-resolver',
+      'apps/settings-service/src/handler.ts',
+    );
+    const tenantsLambda = makeServiceLambda(
+      'TenantsLambda', 'tenants-resolver',
+      'apps/settings-service/src/handler.ts',
+      {},
+      [cognitoAdminPolicy],
+    );
+
+    // ── 6. Storage service (presigned S3 URLs) ──────────────────────────────
+    const storageLambda = makeServiceLambda(
+      'StorageLambda', 'storage-resolver',
+      'apps/storage-service/src/handler.ts',
+      {},
+      [s3ReadWritePolicy],
     );
     documentsBucket.grantPut(storageLambda);
     documentsBucket.grantRead(storageLambda);
 
-    // ---------------------------------------------------------------
-    // 5. Admin Lambda (platform stats, SUPER_ADMIN)
-    // ---------------------------------------------------------------
-    const adminLambda = makeLambda(
-      "AdminLambda",
-      "admin-resolver",
-      "admin-resolver/index.handler",
+    // ── 7. Comms service (announcements, events, leave) ─────────────────────
+    const commsLambda = makeServiceLambda(
+      'CommsLambda', 'comms-resolver',
+      'apps/comms-service/src/handler.ts',
+      {},
+      [eventBusPolicy],
     );
 
-    // ---------------------------------------------------------------
-    // 6. Dashboard Lambda (superAdminOverview + dashboardOverview)
-    // ---------------------------------------------------------------
-    const dashboardLambda = makeLambda(
-      "DashboardLambda",
-      "dashboard-resolver",
-      "dashboard-resolver/index.handler",
+    // ── 8. Results service (published result batches, public lookup) ─────────
+    const resultsLambda = makeServiceLambda(
+      'ResultsLambda', 'results-resolver',
+      'apps/results-service/src/handler.ts',
     );
 
-    // ---------------------------------------------------------------
-    // 7. Audit Logs Lambda (SUPER_ADMIN only)
-    // ---------------------------------------------------------------
-    const auditLogsLambda = makeLambda(
-      "AuditLogsLambda",
-      "audit-logs-resolver",
-      "audit-logs-resolver/index.handler",
+    // ── 9. Admin cleanup (dedup report, merge, cleanup) ───────────────────────
+    const cleanupLambda = makeServiceLambda(
+      'CleanupLambda', 'cleanup-resolver',
+      'apps/admin-cleanup-service/src/handler.ts',
     );
 
-    // ---------------------------------------------------------------
-    // 8. Settings Lambda (Academic & Templates)
-    // ---------------------------------------------------------------
-    const settingsLambda = makeLambda(
-      "SettingsLambda",
-      "settings-resolver",
-      "settings-resolver/index.handler",
-    );
+    // ── AppSync Datasources ─────────────────────────────────────────────────
+    const usersDs      = this.api.addLambdaDataSource('UsersDs',      usersLambda);
+    const admissionsDs = this.api.addLambdaDataSource('AdmissionsDs', admissionsLambda);
+    const financeDs    = this.api.addLambdaDataSource('FinanceDs',    financeLambda);
+    const academicsDs  = this.api.addLambdaDataSource('AcademicsDs',  academicsLambda);
+    const settingsDs   = this.api.addLambdaDataSource('SettingsDs',   settingsLambda);
+    const tenantsDs    = this.api.addLambdaDataSource('TenantsDs',    tenantsLambda);
+    const storageDs    = this.api.addLambdaDataSource('StorageDs',    storageLambda);
+    const commsDs      = this.api.addLambdaDataSource('CommsDs',      commsLambda);
+    const resultsDs    = this.api.addLambdaDataSource('ResultsDs',    resultsLambda);
+    const cleanupDs    = this.api.addLambdaDataSource('CleanupDs',    cleanupLambda);
 
-    // ---------------------------------------------------------------
-    // 9. Students Lambda
-    // ---------------------------------------------------------------
-    const studentsLambda = makeLambda(
-      "StudentsLambda",
-      "students-resolver",
-      "students-resolver/index.handler",
-    );
+    // ── Resolver factory ────────────────────────────────────────────────────
+    const R = (ds: appsync.LambdaDataSource) => (typeName: string, fieldName: string) => {
+      const resolver = ds.createResolver(`${typeName}${fieldName}Resolver`, {
+        typeName,
+        fieldName,
+        requestMappingTemplate:  appsync.MappingTemplate.lambdaRequest(),
+        responseMappingTemplate: appsync.MappingTemplate.lambdaResult(),
+      });
+      if (cfnSchemaResource) {
+        (resolver.node.defaultChild as cdk.CfnResource | undefined)
+          ?.addDependency(cfnSchemaResource);
+      }
+      return resolver;
+    };
 
-    // ---------------------------------------------------------------
-    // 10. Finance Lambda
-    // ---------------------------------------------------------------
-    const financeLambda = makeLambda(
-      "FinanceLambda",
-      "finance-resolver",
-      "finance-resolver/index.handler",
-    );
-
-    // ---------------------------------------------------------------
-    // AppSync Datasources
-    // ---------------------------------------------------------------
-    const usersDs = this.api.addLambdaDataSource("UsersDs", usersLambda);
-    const admissionsDs = this.api.addLambdaDataSource(
-      "AdmissionsDs",
-      admissionsLambda,
-    );
-    const tenantsDs = this.api.addLambdaDataSource("TenantsDs", tenantsLambda);
-    const storageDs = this.api.addLambdaDataSource("StorageDs", storageLambda);
-    const adminDs = this.api.addLambdaDataSource("AdminDs", adminLambda);
-    const dashboardDs = this.api.addLambdaDataSource(
-      "DashboardDs",
-      dashboardLambda,
-    );
-    const auditLogsDs = this.api.addLambdaDataSource(
-      "AuditLogsDs",
-      auditLogsLambda,
-    );
-    const settingsDs = this.api.addLambdaDataSource(
-      "SettingsDs",
-      settingsLambda,
-    );
-    const studentsDs = this.api.addLambdaDataSource(
-      "StudentsDs",
-      studentsLambda,
-    );
-    const financeDs = this.api.addLambdaDataSource(
-      "FinanceDs",
-      financeLambda,
-    );
-
-    // ---------------------------------------------------------------
-    // Resolvers
-    // ---------------------------------------------------------------
-    // Helper: create resolver and explicitly depend on schema resource
-    const R =
-      (ds: appsync.LambdaDataSource) =>
-      (typeName: string, fieldName: string) => {
-        const resolver = ds.createResolver(`${typeName}${fieldName}`, {
-          typeName,
-          fieldName,
-          requestMappingTemplate: appsync.MappingTemplate.lambdaRequest(),
-          responseMappingTemplate: appsync.MappingTemplate.lambdaResult(),
-        });
-        // Ensure resolver waits for schema to be fully applied
-        if (cfnSchemaResource) {
-          resolver.node.defaultChild &&
-            (resolver.node.defaultChild as any).addDependency(
-              cfnSchemaResource,
-            );
-        }
-        return resolver;
-      };
-
+    // ── Identity resolvers ──────────────────────────────────────────────────
     const users = R(usersDs);
-    users("Query", "me");
-    users("Query", "listUsers");
-    users("Query", "getUser");
-    users("Mutation", "createUser");
-    users("Mutation", "updateUser");
-    users("Mutation", "deactivateUser");
-    users("Mutation", "inviteStaff");
+    users('Query',    'me');
+    users('Query',    'listUsers');
+    users('Query',    'getUser');
+    users('Query',    'listStaff');
+    users('Query',    'getStaffMember');
+    users('Query',    'listEmployees');
+    users('Query',    'getEmployee');
+    users('Query',    'listCampusAccess');
+    users('Mutation', 'createUser');
+    users('Mutation', 'updateUser');
+    users('Mutation', 'deactivateUser');
+    users('Mutation', 'reactivateUser');
+    users('Mutation', 'inviteStaff');
+    users('Mutation', 'updateEmployee');
+    users('Mutation', 'addCampusAccess');
+    users('Mutation', 'removeCampusAccess');
+    users('Mutation', 'assignRole');
+    users('Mutation', 'removeRole');
+    users('Mutation', 'bulkDeactivateUsers');
+    users('Mutation', 'impersonateUser');
 
-    const settings = R(settingsDs);
-    settings("Mutation", "createAcademicYear");
-    settings("Query", "listAcademicYears");
-    settings("Mutation", "createTemplate");
-    settings("Mutation", "publishTemplateVersion");
-    settings("Query", "listTemplates");
-
-    const students = R(studentsDs);
-    students("Query", "listStudents");
-    students("Mutation", "convertApplicationToStudent");
-
-    const finance = R(financeDs);
-    finance("Mutation", "createFeeHead");
-    finance("Mutation", "createFeeStructure");
-
+    // ── Admissions resolvers ────────────────────────────────────────────────
     const admissions = R(admissionsDs);
-    admissions("Query", "listAdmissions");
-    admissions("Query", "getAdmission");
-    admissions("Mutation", "createAdmission");
-    admissions("Mutation", "updateAdmission");
-    admissions("Mutation", "submitAdmission");
-    admissions("Mutation", "reviewAdmission");
-    admissions("Mutation", "withdrawAdmission");
+    admissions('Query',    'listEnquiries');
+    admissions('Query',    'getEnquiry');
+    admissions('Query',    'listApplications');
+    admissions('Query',    'getApplication');
+    admissions('Query',    'getApprovalQueue');
+    admissions('Query',    'getApplicationReviews');
+    admissions('Query',    'admissionsStats');
+    admissions('Mutation', 'createPublicEnquiry');
+    admissions('Mutation', 'createEnquiry');
+    admissions('Mutation', 'updateEnquiry');
+    admissions('Mutation', 'deleteEnquiry');
+    admissions('Mutation', 'checkDuplicate');
+    admissions('Mutation', 'createApplication');
+    admissions('Mutation', 'submitApplication');
+    admissions('Mutation', 'reviewApplication');
+    admissions('Mutation', 'withdrawApplication');
+    admissions('Mutation', 'approveApplication');
+    admissions('Mutation', 'rejectApplication');
+    admissions('Mutation', 'verifyDocument');
+    admissions('Mutation', 'getUploadUrl');
 
+    // ── Finance resolvers ───────────────────────────────────────────────────
+    const finance = R(financeDs);
+    finance('Query',    'listFeeHeads');
+    finance('Query',    'listFeeStructures');
+    finance('Query',    'getFeeStructure');
+    finance('Query',    'listFeeAssignments');
+    finance('Query',    'getFeeAssignment');
+    finance('Query',    'getStudentFeeAssignment');
+    finance('Query',    'listFeeSchedules');
+    finance('Query',    'listInstallmentPlans');
+    finance('Query',    'listInvoices');
+    finance('Query',    'getInvoice');
+    finance('Query',    'getStudentInvoices');
+    finance('Query',    'listPayments');
+    finance('Query',    'getPayment');
+    finance('Query',    'getFeeRevisions');
+    finance('Query',    'dayBookReport');
+    finance('Query',    'feeCollectionAnalytics');
+    finance('Query',    'classFeeStats');
+    finance('Query',    'studentFinancialSummary');
+    finance('Mutation', 'createFeeHead');
+    finance('Mutation', 'updateFeeHead');
+    finance('Mutation', 'deleteFeeHead');
+    finance('Mutation', 'createFeeStructure');
+    finance('Mutation', 'updateFeeStructure');
+    finance('Mutation', 'deleteFeeStructure');
+    finance('Mutation', 'createFeeAssignment');
+    finance('Mutation', 'bulkAssignFeeStructure');
+    finance('Mutation', 'createFeeSchedule');
+    finance('Mutation', 'updateFeeSchedule');
+    finance('Mutation', 'deleteFeeSchedule');
+    finance('Mutation', 'createInstallmentPlan');
+    finance('Mutation', 'deleteInstallmentPlan');
+    finance('Mutation', 'createInvoice');
+    finance('Mutation', 'updateInvoice');
+    finance('Mutation', 'cancelInvoice');
+    finance('Mutation', 'reviseInvoice');
+    finance('Mutation', 'recordPayment');
+    finance('Mutation', 'createPaymentOrder');
+    finance('Mutation', 'verifyPaymentSignature');
+
+    // ── Academics resolvers ─────────────────────────────────────────────────
+    const academics = R(academicsDs);
+    academics('Query',    'listClasses');
+    academics('Query',    'getClass');
+    academics('Query',    'listAllSections');
+    academics('Query',    'getSection');
+    academics('Query',    'listSectionStudents');
+    academics('Query',    'listSubjects');
+    academics('Query',    'getSubject');
+    academics('Query',    'listSectionCourses');
+    academics('Query',    'listStudents');
+    academics('Query',    'getStudent');
+    academics('Query',    'listAttendance');
+    academics('Query',    'getSectionAttendance');
+    academics('Query',    'getSectionAttendanceSummary');
+    academics('Query',    'listExams');
+    academics('Query',    'getExam');
+    academics('Query',    'listResults');
+    academics('Query',    'getExamResults');
+    academics('Query',    'getSectionTimetable');
+    academics('Query',    'getTeacherTimetable');
+    academics('Query',    'getTeacherWorkload');
+    academics('Query',    'listCertificates');
+    academics('Mutation', 'createClass');
+    academics('Mutation', 'updateClass');
+    academics('Mutation', 'deleteClass');
+    academics('Mutation', 'createSection');
+    academics('Mutation', 'updateSection');
+    academics('Mutation', 'deleteSection');
+    academics('Mutation', 'setSectionIncharge');
+    academics('Mutation', 'assignSectionCourse');
+    academics('Mutation', 'removeSectionCourse');
+    academics('Mutation', 'createSubject');
+    academics('Mutation', 'updateSubject');
+    academics('Mutation', 'deleteSubject');
+    academics('Mutation', 'enrollStudent');
+    academics('Mutation', 'updateStudent');
+    academics('Mutation', 'updateStudentStatus');
+    academics('Mutation', 'assignStudentClass');
+    academics('Mutation', 'bulkAssignStudentsToClass');
+    academics('Mutation', 'randomAssignStudentsToClass');
+    academics('Mutation', 'convertApplicationToStudent');
+    academics('Mutation', 'markSectionAttendance');
+    academics('Mutation', 'createExam');
+    academics('Mutation', 'updateExam');
+    academics('Mutation', 'deleteExam');
+    academics('Mutation', 'enterMarks');
+    academics('Mutation', 'publishResults');
+    academics('Mutation', 'replaceSectionTimetable');
+    academics('Mutation', 'issueCertificate');
+    academics('Mutation', 'approveCertificate');
+
+    // ── Settings resolvers ──────────────────────────────────────────────────
+    const settings = R(settingsDs);
+    settings('Query',    'listAcademicYears');
+    settings('Query',    'getAcademicYear');
+    settings('Query',    'listCampuses');
+    settings('Query',    'getCampus');
+    settings('Query',    'listPrograms');
+    settings('Query',    'getProgram');
+    settings('Query',    'listTemplates');
+    settings('Query',    'getTemplate');
+    settings('Query',    'getTenantFeatures');
+    settings('Mutation', 'createAcademicYear');
+    settings('Mutation', 'updateAcademicYear');
+    settings('Mutation', 'setActiveAcademicYear');
+    settings('Mutation', 'createCampus');
+    settings('Mutation', 'updateCampus');
+    settings('Mutation', 'deactivateCampus');
+    settings('Mutation', 'createProgram');
+    settings('Mutation', 'updateProgram');
+    settings('Mutation', 'deleteProgram');
+    settings('Mutation', 'createTemplate');
+    settings('Mutation', 'updateTemplate');
+    settings('Mutation', 'publishTemplateVersion');
+    settings('Mutation', 'deleteTemplate');
+    settings('Mutation', 'updateTenant');
+    settings('Mutation', 'updateTenantFeatures');
+
+    // ── Tenants (SUPER_ADMIN) resolvers ─────────────────────────────────────
     const tenants = R(tenantsDs);
-    tenants("Query", "listTenants");
-    tenants("Query", "getTenant");
-    tenants("Mutation", "createTenant");
-    tenants("Mutation", "updateTenant");
-    tenants("Mutation", "deactivateTenant");
+    tenants('Query',    'listTenants');
+    tenants('Query',    'getTenant');
+    tenants('Mutation', 'createTenant');
+    tenants('Mutation', 'deactivateTenant');
 
-    R(storageDs)("Mutation", "generateUploadUrl");
-    R(adminDs)("Query", "platformStats");
+    // ── Dashboard resolvers ─────────────────────────────────────────────────
+    const dashboard = R(settingsDs);
+    dashboard('Query', 'dashboardOverview');
+    dashboard('Query', 'superAdminOverview');
+    dashboard('Query', 'platformStats');
 
-    // Dashboard resolvers
-    const dashboard = R(dashboardDs);
-    dashboard("Query", "dashboardOverview");
-    dashboard("Query", "superAdminOverview");
+    // ── Audit logs resolvers ────────────────────────────────────────────────
+    const auditLogs = R(settingsDs);
+    auditLogs('Query', 'listAuditLogs');
+    auditLogs('Query', 'listPlatformAuditLogs');
+    auditLogs('Query', 'getPlatformAuditLog');
 
-    // Audit Logs resolvers (SUPER_ADMIN)
-    const auditLogs = R(auditLogsDs);
-    auditLogs("Query", "listPlatformAuditLogs");
-    auditLogs("Query", "getPlatformAuditLog");
+    // ── Storage resolvers ───────────────────────────────────────────────────
+    R(storageDs)('Mutation', 'generateUploadUrl');
+    R(storageDs)('Query',    'generateDownloadUrl');
 
-    // ---------------------------------------------------------------
-    // Outputs
-    // ---------------------------------------------------------------
-    new cdk.CfnOutput(this, "ApiUrl", { value: this.apiUrl });
-    new cdk.CfnOutput(this, "ApiId", { value: this.apiId });
-    new cdk.CfnOutput(this, "ApiArn", { value: this.api.arn });
+    // ── Comms resolvers ─────────────────────────────────────────────────────
+    const comms = R(commsDs);
+    comms('Query',    'listAnnouncements');
+    comms('Query',    'getAnnouncement');
+    comms('Query',    'listEvents');
+    comms('Query',    'getEvent');
+    comms('Query',    'listLeaveRequests');
+    comms('Query',    'getLeaveRequest');
+    comms('Mutation', 'createAnnouncement');
+    comms('Mutation', 'updateAnnouncement');
+    comms('Mutation', 'publishAnnouncement');
+    comms('Mutation', 'archiveAnnouncement');
+    comms('Mutation', 'deleteAnnouncement');
+    comms('Mutation', 'createEvent');
+    comms('Mutation', 'updateEvent');
+    comms('Mutation', 'deleteEvent');
+    comms('Mutation', 'createLeaveRequest');
+    comms('Mutation', 'updateLeaveRequest');
+    comms('Mutation', 'approveLeave');
+    comms('Mutation', 'rejectLeave');
+    comms('Mutation', 'cancelLeave');
+    comms('Mutation', 'deleteLeaveRequest');
+
+    // ── Results resolvers ───────────────────────────────────────────────────
+    const results = R(resultsDs);
+    results('Query',    'listResultBatches');
+    results('Query',    'getResultBatch');
+    results('Query',    'getPublicResult');
+    results('Query',    'getResultPublicToken');
+    results('Mutation', 'createResultBatch');
+    results('Mutation', 'updateResultBatch');
+    results('Mutation', 'publishResultBatch');
+    results('Mutation', 'archiveResultBatch');
+    results('Mutation', 'deleteResultBatch');
+
+    // ── Identity extra resolvers ────────────────────────────────────────────
+    users('Mutation', 'updateMyProfile');
+    users('Mutation', 'uploadAvatar');
+    users('Mutation', 'uploadTenantLogo');
+    users('Mutation', 'resendInvite');
+
+    // ── Finance extra resolvers ─────────────────────────────────────────────
+    finance('Mutation', 'createOneOffCharge');
+    finance('Mutation', 'bulkCreateCharge');
+    finance('Mutation', 'collectPaymentByStudent');
+    finance('Mutation', 'generatePaymentLink');
+    finance('Mutation', 'updateInstallmentPlan');
+    finance('Mutation', 'addScheduleSlot');
+    finance('Mutation', 'deleteScheduleSlot');
+    finance('Query',    'listReceipts');
+    finance('Query',    'getReceipt');
+    finance('Query',    'getFeeAssignmentQueue');
+    finance('Query',    'getAssignableFeeStructures');
+    finance('Query',    'getStudentDues');
+
+    // ── Academics extra resolvers ───────────────────────────────────────────
+    academics('Query',    'getExamStats');
+    academics('Query',    'getMarksStatus');
+    academics('Mutation', 'enablePortalAccess');
+
+    // ── Settings extra resolvers ────────────────────────────────────────────
+    settings('Mutation', 'createFirstAdmin');
+    settings('Mutation', 'finalizeOnboarding');
+    settings('Mutation', 'finalizeTenant');
+    settings('Mutation', 'resendTenantInvite');
+    settings('Mutation', 'provisionTenantUser');
+    settings('Mutation', 'deleteTenantUser');
+    settings('Query',    'listTenantUsers');
+
+    // ── Admin cleanup resolvers ─────────────────────────────────────────────
+    const cleanup = R(cleanupDs);
+    cleanup('Query',    'getDuplicateReport');
+    cleanup('Query',    'getDuplicateEnquiryReport');
+    cleanup('Query',    'getDuplicateStudentReport');
+    cleanup('Mutation', 'runDeduplication');
+    cleanup('Mutation', 'mergeEnquiries');
+    cleanup('Mutation', 'mergeStudents');
+    cleanup('Mutation', 'bulkDeleteInactiveEnquiries');
+
+    // ── Outputs ─────────────────────────────────────────────────────────────
+    new cdk.CfnOutput(this, 'ApiUrl', { value: this.apiUrl });
+    new cdk.CfnOutput(this, 'ApiId',  { value: this.apiId });
+    new cdk.CfnOutput(this, 'ApiArn', { value: this.api.arn });
   }
 }

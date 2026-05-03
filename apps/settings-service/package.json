@@ -1,0 +1,23 @@
+{
+  "name": "@vebgenix/settings-service",
+  "version": "1.0.0",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('fs').rmSync('dist', {recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@vebgenix/auth": "*",
+    "@vebgenix/db": "*",
+    "@vebgenix/errors": "*",
+    "@vebgenix/permissions": "*",
+    "@vebgenix/audit": "*",
+    "@vebgenix/tenant": "*"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.2.2"
+  }
+}

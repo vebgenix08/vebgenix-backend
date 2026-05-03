@@ -1,185 +1,138 @@
-# --- common.graphql ---
+# ─── Shared ──────────────────────────────────────────────────────────────────
 
 type PageInfo {
   nextCursor: String
   hasNextPage: Boolean!
 }
 
-type Query {
-  _empty: String
-  health: String @aws_api_key
-  dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
-  superAdminOverview(input: SuperAdminOverviewInput): SuperAdminOverview!
-  
-  # Admissions
-  listAdmissions(
-    filter: AdmissionFilter
-    limit: Int = 25
-    cursor: String
-  ): AdmissionsConnection!
-  getAdmission(id: ID!): Admission
-  
-  # Users (Staff & Access)
-  me: User!
-  listUsers(limit: Int, nextToken: String, filter: UserFilter): UserConnection!
-  getUser(id: ID!): User
-  
-  # Tenants
-  listTenants(limit: Int, nextToken: String): TenantConnection!
-  getTenant(id: ID!): Tenant
-  validateSubdomain(subdomain: String!): SubdomainValidation!
-  listAvailableFeatures: [AvailableFeature!]!
+# ─── Identity ─────────────────────────────────────────────────────────────────
 
-  _studentsEmpty: String
-  _feesEmpty: String
-  _templatesEmpty: String
-  
-  # Audit
-  listPlatformAuditLogs(
-    input: ListPlatformAuditLogsInput!
-  ): PlatformAuditLogsConnection!
-  getPlatformAuditLog(id: ID!): PlatformAuditLogDetail!
-  
-  # Admin
-  platformStats: PlatformStats!
-  
-  # Settings & Master Data
-  listAcademicYears: [AcademicYear!]!
-  listTemplates(type: String): [Template!]!
-  
-  listCampuses: [Campus!]!
-  getCampus(id: ID!): Campus
-  
-  # Students
-  listStudents(filter: StudentFilter, limit: Int, nextToken: String): StudentConnection!
-
-  # Academics — Timetable & Workload
-  getSectionTimetable(sectionId: ID!): SectionTimetable!
-  getTeacherTimetable(profileId: ID!): TeacherTimetable!
-  getTeacherWorkload(profileId: ID!): TeacherWorkload!
-
-  # Attendance
-  listSectionStudents(sectionId: ID!): [AttendanceStudentInfo!]!
-  getClassAttendance(sectionId: ID!, date: AWSDate!): [AttendanceRecord!]!
-  getStudentAttendance(studentId: ID!, from: AWSDate!, to: AWSDate!): [AttendanceRecord!]!
-  getAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!): AttendanceSummary!
-
-  # Academics — Classes, Sections, Subjects
-  listClasses(programId: ID): [AcademicsClass!]!
-  listSections(classId: ID!): [AcademicsSection!]!
-  listAllSections(campusId: ID, programId: ID): [AcademicsSection!]!
-  getSection(sectionId: ID!): AcademicsSection!
-  listSubjects: [AcademicsSubject!]!
-
-  # Academics — Section Operations
-  listSectionCourses(sectionId: ID!): [SectionCourse!]!
-  listSectionIncharges(sectionId: ID!): [SectionIncharge!]!
-
-  # Staff — extended profiles & hierarchy
-  listStaffProfiles(campusId: ID, staffCategory: String, staffType: String): [StaffProfile!]!
-  listCandidateManagers(campusId: ID!, staffCategory: String): [StaffProfile!]!
-  getStaffProfile(profileId: ID!): StaffProfile
-
-  # Finance
-  listFeeHeads: [FeeHead!]!
-  listFeeStructures: [FeeStructure!]!
-  listPrograms: [FinanceProgram!]!
+type User {
+  id: ID!
+  email: String!
+  fullName: String
+  firstName: String
+  lastName: String
+  permissions: [String!]!
+  roles: [String!]!
+  tenantId: String
+  campusScope: String
+  staffType: String
+  isPrimaryOwner: Boolean
+  isPlatformAdmin: Boolean
+  phone: String
+  status: String
+  joinedAt: AWSDateTime
 }
 
-type Mutation {
-  _empty: String
-  updateAdmissionStatus(id: ID!, status: String!): Admission!
-  
-  # Users
-  createUser(input: CreateUserInput!): User! # Legacy/Dev
-  updateUser(input: UpdateUserInput!): User!
-  deactivateUser(id: ID!): Boolean
-  inviteStaff(input: InviteStaffInput!): InviteStaffPayload!
-  
-  # Tenants
-  createTenant(input: CreateTenantInput!): Tenant!
-  updateTenant(input: UpdateTenantInput!): Tenant!
-  deactivateTenant(id: ID!): Boolean
-  provisionTenant(input: ProvisionTenantInput!): ProvisionTenantResult!
-  requestTenantDeletion(tenantId: ID!): TenantDeletionOtpResult!
-  confirmTenantDeletion(tenantId: ID!, otp: String!): Boolean!
+type UserEdge {
+  cursor: String!
+  node: User!
+}
 
-  # Admissions
-  createAdmission(input: CreateAdmissionInput!): Admission!
-  updateAdmission(input: UpdateAdmissionInput!): Admission!
-  submitAdmission(id: ID!): Admission!
-  reviewAdmission(id: ID!, input: ReviewAdmissionInput!): Admission!
-  withdrawAdmission(id: ID!): Admission!
-  
-  # Storage
-  generateUploadUrl(contentType: String!, filename: String!): UploadUrlPayload!
-  
-  # Settings & Master Data
-  createAcademicYear(input: CreateAcademicYearInput!): AcademicYear!
-  createTemplate(input: CreateTemplateInput!): Template!
-  publishTemplateVersion(input: PublishTemplateVersionInput!): TemplateVersion!
-  
-  createCampus(input: CreateCampusInput!): Campus!
-  updateCampus(id: ID!, input: CreateCampusInput!): Campus!
-  
-  # Students
-  convertApplicationToStudent(applicationId: ID!): Student!
-  enableStudentPortal(studentId: ID!, email: String!): PortalEnablementPayload!
-  enableGuardianPortal(input: EnableGuardianPortalInput!): PortalEnablementPayload!
-  
-  # Finance — Fee Heads
-  createFeeHead(input: CreateFeeHeadInput!): FeeHead!
-  updateFeeHead(id: ID!, input: CreateFeeHeadInput!): FeeHead!
-  deleteFeeHead(id: ID!): Boolean!
+type UserConnection {
+  edges: [UserEdge!]!
+  pageInfo: PageInfo!
+}
 
-  # Finance — Fee Structures
-  createFeeStructure(input: CreateFeeStructureInput!): FeeStructure!
-  deleteFeeStructure(id: ID!): Boolean!
+input UserFilter {
+  search: String
+  campusId: ID
+}
 
-  # Academics — Timetable & Class Assignment
-  replaceSectionTimetable(sectionId: ID!, slots: [TimetableSlotInput!]!): SectionTimetable!
-  bulkAssignStudentsToClass(studentIds: [ID!]!, classId: ID!, sectionId: ID!): BulkAssignResult!
-  randomAssignStudentsToClass(classId: ID!, studentIds: [ID!]): RandomAssignResult!
+input InviteStaffInput {
+  email: String!
+  fullName: String!
+  roleIds: [ID!]!
+  campusIds: [ID!]
+  allCampuses: Boolean
+}
 
-  # Academics — Classes CRUD
-  createClass(input: CreateClassInput!): AcademicsClass!
-  updateClass(classId: ID!, input: UpdateClassInput!): AcademicsClass!
-  deleteClass(classId: ID!): Boolean!
+type InviteStaffPayload {
+  success: Boolean!
+  membershipId: ID
+}
 
-  # Academics — Sections CRUD
-  createSection(classId: ID!, input: CreateSectionInput!): AcademicsSection!
-  updateSection(classId: ID!, sectionId: ID!, input: UpdateSectionInput!): AcademicsSection!
-  deleteSection(classId: ID!, sectionId: ID!): Boolean!
+input CreateUserInput {
+  email: String!
+  fullName: String!
+  role: String
+}
 
-  # Academics — Subjects CRUD
-  createSubject(input: CreateSubjectInput!): AcademicsSubject!
-  updateSubject(subjectId: ID!, input: UpdateSubjectInput!): AcademicsSubject!
-  deleteSubject(subjectId: ID!): Boolean!
+input UpdateUserInput {
+  id: ID!
+  fullName: String
+  role: String
+}
 
-  # Academics — Section Courses (Subject Allocations)
-  assignSectionCourse(sectionId: ID!, input: AssignCourseInput!): SectionCourse!
-  updateSectionCourse(sectionId: ID!, allocationId: ID!, input: UpdateCourseInput!): SectionCourse!
-  removeSectionCourse(sectionId: ID!, allocationId: ID!): Boolean!
+# ─── Tenants ──────────────────────────────────────────────────────────────────
 
-  # Academics — Section Incharges
-  assignSectionIncharge(sectionId: ID!, input: AssignInchargeInput!): SectionIncharge!
-  removeSectionIncharge(sectionId: ID!, inchargeId: ID!): Boolean!
+type Tenant {
+  id:                 ID!
+  name:               String!
+  slug:               String
+  fullDomain:         String
+  isActive:           Boolean!
+  onboardingComplete: Boolean!
+  features:           [TenantFeatureItem!]!
+  createdAt:          String!
+}
 
-  # Academics — Single student class assignment
-  assignStudentToClass(studentId: ID!, classId: ID!, sectionId: ID!): Boolean!
+type TenantFeatureItem {
+  key:     String!
+  enabled: Boolean!
+}
 
-  # Staff — extended onboarding & hierarchy
-  createTeachingStaff(input: CreateTeachingStaffInput!): CreateStaffPayload!
-  createNonTeachingStaff(input: CreateNonTeachingStaffInput!): CreateStaffPayload!
-  updateStaffProfile(profileId: ID!, input: UpdateStaffProfileInput!): StaffProfile!
-  assignReportingManager(input: AssignReportingManagerInput!): StaffReportingInfo!
-  bulkReassignHierarchy(input: BulkReassignHierarchyInput!): Boolean!
+type TenantConnection {
+  items: [Tenant!]!
+  nextToken: String
+}
 
-  # Attendance
-  markClassAttendance(input: BulkAttendanceInput!): [AttendanceRecord!]!
+input CreateTenantInput {
+  name: String!
+  slug: String
+  plan: String
+}
 
-  # Invites
-  acceptInvite(token: String!, password: String): AcceptInvitePayload!
+input UpdateTenantInput {
+  id:      ID!
+  name:    String
+  slug:    String
+  logoUrl: String
+}
+
+type AvailableFeature {
+  key:            String!
+  name:           String!
+  description:    String!
+  defaultEnabled: Boolean!
+}
+
+type SubdomainValidation {
+  available:   Boolean!
+  normalized:  String!
+  fullDomain:  String!
+  suggestion:  String
+}
+
+input ProvisionTenantInput {
+  organizationName: String!
+  subdomain:        String!
+  features:         [String!]!
+  adminName:        String!
+  adminEmail:       String!
+}
+
+type ProvisionTenantResult {
+  tenant:     Tenant!
+  adminEmail: String!
+  inviteSent: Boolean!
+}
+
+type TenantDeletionOtpResult {
+  sent:         Boolean!
+  expiresIn:    Int!
+  maskedEmail:  String!
 }
 
 type AcceptInvitePayload {
@@ -188,7 +141,168 @@ type AcceptInvitePayload {
   isExistingUser: Boolean
 }
 
-# --- dashboard.graphql ---
+# ─── Storage ──────────────────────────────────────────────────────────────────
+
+type UploadUrlPayload {
+  uploadUrl: String!
+  key: String!
+}
+
+# ─── Settings ─────────────────────────────────────────────────────────────────
+
+type AcademicYear {
+  id: ID!
+  name: String!
+  startDate: String!
+  endDate: String!
+  isActive: Boolean!
+}
+
+input CreateAcademicYearInput {
+  name: String!
+  startDate: String!
+  endDate: String!
+}
+
+type Campus {
+  id: ID!
+  name: String!
+  type: String!
+  address: String
+  phone: String
+  email: String
+  isActive: Boolean!
+}
+
+input CreateCampusInput {
+  name: String!
+  type: String!
+  address: String
+  phone: String
+  email: String
+}
+
+# ─── Templates ────────────────────────────────────────────────────────────────
+
+type Template {
+  id: ID!
+  type: String!
+  name: String!
+}
+
+type TemplateVersion {
+  id: ID!
+  version: Int!
+  content: AWSJSON!
+  isPublished: Boolean!
+}
+
+input CreateTemplateInput {
+  type: String!
+  name: String!
+}
+
+input PublishTemplateVersionInput {
+  templateId: ID!
+  content: AWSJSON!
+}
+
+# ─── Finance ──────────────────────────────────────────────────────────────────
+
+type FeeHead {
+  id: ID!
+  name: String!
+  type: String!
+}
+
+type FeeStructure {
+  id: ID!
+  name: String!
+}
+
+input CreateFeeHeadInput {
+  name: String!
+  type: String!
+}
+
+input CreateFeeStructureInput {
+  name: String!
+}
+
+# ─── Students ─────────────────────────────────────────────────────────────────
+
+type Student {
+  id: ID!
+  fullName: String!
+  registrationNumber: String
+  status: String!
+  currentGrade: String
+}
+
+type StudentConnection {
+  items: [Student!]!
+  nextToken: String
+}
+
+input StudentFilter {
+  search: String
+}
+
+type PortalEnablementPayload {
+  success: Boolean!
+  message: String
+}
+
+input EnableGuardianPortalInput {
+  studentId: ID!
+  guardianName: String!
+  relationship: String!
+  email: String!
+  phone: String!
+}
+
+# ─── Admissions (legacy) ──────────────────────────────────────────────────────
+
+type Admission {
+  id: ID!
+  studentName: String!
+  status: String!
+  createdAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+}
+
+type AdmissionEdge {
+  cursor: String!
+  node: Admission!
+}
+
+type AdmissionsConnection {
+  edges: [AdmissionEdge!]!
+  pageInfo: PageInfo!
+}
+
+input AdmissionFilter {
+  status: String
+  search: String
+}
+
+input CreateAdmissionInput {
+  studentName: String!
+  phone: String!
+}
+
+input UpdateAdmissionInput {
+  id: ID!
+  studentName: String
+  status: String
+}
+
+input ReviewAdmissionInput {
+  decision: String!
+  comments: String
+}
+
+# ─── Dashboard ────────────────────────────────────────────────────────────────
 
 enum DateRangePreset {
   TODAY
@@ -222,7 +336,7 @@ type DashboardTotals {
   enquiriesToday: Int!
   applicationsToday: Int!
   approvalsPending: Int!
-  attendanceToday: Float # Percentage
+  attendanceToday: Float
 }
 
 type StatusCount {
@@ -288,290 +402,12 @@ type SuperAdminOverview {
   totals: SuperAdminTotals!
 }
 
-
-# --- admissions.graphql ---
-
-type Admission {
-  id: ID!
-  studentName: String!
-  status: String!
-  createdAt: AWSDateTime!
-  updatedAt: AWSDateTime!
-}
-
-type AdmissionEdge {
-  cursor: String!
-  node: Admission!
-}
-
-type AdmissionsConnection {
-  edges: [AdmissionEdge!]!
-  pageInfo: PageInfo!
-}
-
-input AdmissionFilter {
-  status: String
-  search: String
-}
-
-input CreateAdmissionInput {
-  studentName: String!
-  phone: String!
-}
-
-input UpdateAdmissionInput {
-  id: ID!
-  studentName: String
-  status: String
-}
-
-input ReviewAdmissionInput {
-  decision: String!
-  comments: String
-}
-
-# --- users.graphql ---
-
-type User {
-  id: ID!
-  email: String!
-  fullName: String
-  firstName: String
-  lastName: String
-  permissions: [String!]!
-  roles: [String!]!
-  tenantId: String
-  campusScope: String
-  staffType: String
-  isPrimaryOwner: Boolean
-  isPlatformAdmin: Boolean
-  phone: String
-  status: String
-  joinedAt: AWSDateTime
-}
-
-type UserEdge {
-  cursor: String!
-  node: User!
-}
-
-type UserConnection {
-  edges: [UserEdge!]!
-  pageInfo: PageInfo!
-}
-
-input UserFilter {
-  search: String
-  campusId: ID
-}
-
-input InviteStaffInput {
-  email: String!
-  fullName: String!
-  roleIds: [ID!]!
-  campusIds: [ID!]
-  allCampuses: Boolean
-}
-
-type InviteStaffPayload {
-  success: Boolean!
-  membershipId: ID
-}
-
-input CreateUserInput {
-  email: String!
-  fullName: String!
-  role: String
-}
-
-input UpdateUserInput {
-  id: ID!
-  fullName: String
-  role: String
-}
-
-# --- staff.graphql ---
-
-type StaffProfile {
-  id: ID!
-  fullName: String
-  email: String!
-  phone: String
-  gender: String
-  dateOfBirth: String
-  avatarUrl: String
-  staffType: String
-  staffCategory: String
-  designation: String
-  department: String
-  employeeCode: String
-  qualification: String
-  experienceYears: Int
-  employmentType: String
-  joinedOn: String
-  isHead: Boolean!
-  isActingHead: Boolean!
-  headEffectiveFrom: String
-  allCampusesAccess: Boolean!
-  campusIds: [ID!]!
-  isActive: Boolean!
-  reporting: StaffReportingInfo
-}
-
-type StaffReportingInfo {
-  campusId: ID!
-  reportsToProfileId: ID
-  reportsToName: String
-  reportingStatus: String!
-}
-
-type CreateStaffPayload {
-  profile: StaffProfile!
-  replacedLeaderId: ID
-  replacedLeaderName: String
-}
-
-input CreateTeachingStaffInput {
-  # Identity
-  fullName: String!
-  email: String!
-  phone: String
-  gender: String
-  dateOfBirth: String
-  # Employment
-  employeeCode: String
-  joinedOn: String
-  employmentType: String
-  qualification: String
-  experienceYears: Int
-  designation: String
-  department: String
-  # Academic category
-  staffType: String!
-  primaryCampusId: ID!
-  campusIds: [ID!]!
-  allCampusesAccess: Boolean
-  # Reporting
-  reportsToProfileId: ID
-  isHead: Boolean
-  isActingHead: Boolean
-  headEffectiveFrom: String
-  # Access
-  role: String
-  sendInvite: Boolean
-}
-
-input CreateNonTeachingStaffInput {
-  # Identity
-  fullName: String!
-  email: String!
-  phone: String
-  gender: String
-  dateOfBirth: String
-  # Employment
-  employeeCode: String
-  joinedOn: String
-  employmentType: String
-  designation: String
-  department: String
-  # Operational category
-  staffType: String!
-  primaryCampusId: ID!
-  campusIds: [ID!]!
-  allCampusesAccess: Boolean
-  # Reporting
-  reportsToProfileId: ID
-  # Access
-  role: String
-  sendInvite: Boolean
-}
-
-input UpdateStaffProfileInput {
-  fullName: String
-  phone: String
-  gender: String
-  dateOfBirth: String
-  employeeCode: String
-  joinedOn: String
-  employmentType: String
-  qualification: String
-  experienceYears: Int
-  designation: String
-  department: String
-  staffType: String
-  staffCategory: String
-  isHead: Boolean
-  isActingHead: Boolean
-  headEffectiveFrom: String
-  allCampusesAccess: Boolean
-  campusIds: [ID!]
-  isActive: Boolean
-}
-
-input AssignReportingManagerInput {
-  profileId: ID!
-  campusId: ID!
-  reportsToProfileId: ID
-}
-
-input BulkReassignHierarchyInput {
-  fromProfileId: ID!
-  toProfileId: ID!
-  campusId: ID!
-  profileIds: [ID!]
-}
-
-# --- tenants.graphql ---
-
-type Tenant {
-  id:                 ID!
-  name:               String!
-  slug:               String
-  fullDomain:         String
-  isActive:           Boolean!
-  onboardingComplete: Boolean!
-  features:           [TenantFeatureItem!]!
-  createdAt:          String!
-}
-
-type TenantFeatureItem {
-  key:     String!
-  enabled: Boolean!
-}
-
-type TenantConnection {
-  items: [Tenant!]!
-  nextToken: String
-}
-
-input CreateTenantInput {
-  name: String!
-  slug: String
-  plan: String
-}
-
-input UpdateTenantInput {
-  id:      ID!
-  name:    String
-  slug:    String
-  logoUrl: String
-}
-
-# --- admin.graphql ---
-
 type PlatformStats {
   totalTenants: Int!
   activeTenants: Int!
 }
 
-# --- storage.graphql ---
-
-type UploadUrlPayload {
-  uploadUrl: String!
-  key: String!
-}
-
-# --- auditLogs.graphql ---
+# ─── Audit Logs ───────────────────────────────────────────────────────────────
 
 enum PlatformAuditTargetType {
   TENANT
@@ -625,192 +461,6 @@ input ListPlatformAuditLogsInput {
   cursor: String
 }
 
-# --- templates.graphql ---
-
-type Template {
-  id: ID!
-  type: String!
-  name: String!
-}
-
-type TemplateVersion {
-  id: ID!
-  version: Int!
-  content: AWSJSON!
-  isPublished: Boolean!
-}
-
-input CreateTemplateInput {
-  type: String!
-  name: String!
-}
-
-input PublishTemplateVersionInput {
-  templateId: ID!
-  content: AWSJSON!
-}
-
-# --- settings.graphql ---
-
-type AcademicYear {
-  id: ID!
-  name: String!
-  startDate: String!
-  endDate: String!
-  isActive: Boolean!
-}
-
-type Campus {
-  id: ID!
-  name: String!
-  type: String! # SCHOOL | PU
-  address: String
-  phone: String
-  email: String
-  isActive: Boolean!
-}
-
-input CreateCampusInput {
-  name: String!
-  type: String!
-  address: String
-  phone: String
-  email: String
-}
-
-input CreateAcademicYearInput {
-  name: String!
-  startDate: String!
-  endDate: String!
-}
-
-# --- students.graphql ---
-
-type Student {
-  id: ID!
-  fullName: String!
-  registrationNumber: String
-  status: String!
-  currentGrade: String
-}
-
-type StudentConnection {
-  items: [Student!]!
-  nextToken: String
-}
-
-input StudentFilter {
-  search: String
-}
-
-input EnableGuardianPortalInput {
-  studentId: ID!
-  guardianName: String!
-  relationship: String!
-  email: String!
-  phone: String!
-}
-
-type PortalEnablementPayload {
-  success: Boolean!
-  message: String
-}
-
-# --- fees.graphql ---
-
-type FeeHead {
-  id: ID!
-  name: String!
-  type: String!
-  description: String
-  isActive: Boolean!
-  createdAt: String
-}
-
-type FeeStructureComponent {
-  feeHead: FeeHead!
-  amount: Float!
-  dueDate: String
-  isOptional: Boolean!
-}
-
-type FeeStructure {
-  id: ID!
-  name: String!
-  totalAmount: Float!
-  isActive: Boolean!
-  createdAt: String
-  academicYear: AcademicYear
-  program: FinanceProgram
-  components: [FeeStructureComponent!]!
-}
-
-type FinanceProgram {
-  id: ID!
-  name: String!
-  type: String
-  level: String
-  isActive: Boolean
-}
-
-input CreateFeeHeadInput {
-  name: String!
-  type: String!
-  description: String
-}
-
-input FeeComponentInput {
-  feeHeadId: ID!
-  amount: Float!
-  dueDate: String
-  isOptional: Boolean
-}
-
-input CreateFeeStructureInput {
-  name: String!
-  academicYearId: ID
-  programId: ID
-  components: [FeeComponentInput!]!
-}
-
-# ── Tenant provisioning ───────────────────────────────────────────────────────
-
-type AvailableFeature {
-  key:            String!
-  name:           String!
-  description:    String!
-  defaultEnabled: Boolean!
-}
-
-type SubdomainValidation {
-  available:   Boolean!
-  normalized:  String!
-  fullDomain:  String!
-  suggestion:  String
-}
-
-input ProvisionTenantInput {
-  organizationName: String!
-  subdomain:        String!
-  features:         [String!]!
-  adminName:        String!
-  adminEmail:       String!
-}
-
-type ProvisionTenantResult {
-  tenant:     Tenant!
-  adminEmail: String!
-  inviteSent: Boolean!
-}
-
-type TenantDeletionOtpResult {
-  sent:         Boolean!
-  expiresIn:    Int!     # seconds until OTP expires (300 = 5 min)
-  maskedEmail:  String!  # e.g. "su***@vebgenix.com" — where OTP was sent
-}
-
-# ── Audit log enhancements ────────────────────────────────────────────────────
-
 type AuditLogEntry {
   id:         ID!
   at:         String!
@@ -826,7 +476,7 @@ type AuditLogEntry {
   ipAddress:  String
 }
 
-# ── Academics ─────────────────────────────────────────────────────────────────
+# ─── Timetable & Academics ────────────────────────────────────────────────────
 
 type TimetableSubject {
   id: ID!
@@ -845,7 +495,6 @@ type TimetableTeacher {
 type TimetableCampus {
   id: ID!
   name: String!
-  campusType: String
 }
 
 type TimetableClass {
@@ -964,123 +613,6 @@ input TimetableSlotInput {
   isBreak: Boolean
 }
 
-# ── Academics — Classes / Sections / Subjects ─────────────────────────────────
-
-type AcademicsProgram {
-  id: ID!
-  name: String!
-}
-
-type AcademicsClass {
-  id: ID!
-  name: String!
-  programId: ID!
-  program: AcademicsProgram
-  sections: [AcademicsSection!]
-}
-
-type SectionCounts {
-  students: Int!
-  allocations: Int!
-}
-
-type AcademicsSection {
-  id: ID!
-  name: String!
-  classId: ID!
-  campusId: ID!
-  class: AcademicsClass
-  campus: TimetableCampus
-  _count: SectionCounts
-}
-
-type AcademicsSubject {
-  id: ID!
-  name: String!
-  code: String
-  description: String
-  subjectType: String
-  credits: Int
-}
-
-type SectionCourse {
-  id: ID!
-  sectionId: ID!
-  subjectId: ID!
-  teacherProfileId: ID
-  subjectType: String
-  subject: AcademicsSubject!
-  teacher: TimetableTeacher
-}
-
-type SectionInchargeProfile {
-  id: ID!
-  fullName: String
-  email: String
-}
-
-type SectionIncharge {
-  id: ID!
-  sectionId: ID!
-  profileId: ID!
-  role: String!
-  profile: SectionInchargeProfile!
-}
-
-# ── Academics inputs ──────────────────────────────────────────────────────────
-
-input CreateClassInput {
-  name: String!
-  programId: ID!
-}
-
-input UpdateClassInput {
-  name: String
-  programId: ID
-}
-
-input CreateSectionInput {
-  name: String!
-  campusId: ID!
-}
-
-input UpdateSectionInput {
-  name: String
-  campusId: ID
-}
-
-input CreateSubjectInput {
-  name: String!
-  code: String
-  description: String
-  subjectType: String
-  credits: Int
-}
-
-input UpdateSubjectInput {
-  name: String
-  code: String
-  description: String
-  subjectType: String
-  credits: Int
-}
-
-input AssignCourseInput {
-  subjectId: ID!
-  teacherProfileId: ID
-  subjectType: String
-}
-
-input UpdateCourseInput {
-  teacherProfileId: ID
-  subjectType: String
-}
-
-input AssignInchargeInput {
-  profileId: ID!
-  role: String!
-}
-
 # ─── Attendance ───────────────────────────────────────────────────────────────
 
 enum AttendanceStatus {
@@ -1088,12 +620,6 @@ enum AttendanceStatus {
   ABSENT
   LATE
   EXCUSED
-}
-
-type AttendanceStudentInfo {
-  id: ID!
-  fullName: String!
-  admissionNumber: String
 }
 
 type AttendanceRecord {
@@ -1106,6 +632,12 @@ type AttendanceRecord {
   status: AttendanceStatus!
   remarks: String
   markedBy: ID
+}
+
+type AttendanceStudentInfo {
+  id: ID!
+  fullName: String!
+  admissionNumber: String
 }
 
 type AttendanceSummary {
@@ -1137,4 +669,339 @@ input AttendanceRecordInput {
   studentId: ID!
   status: AttendanceStatus!
   remarks: String
+}
+
+# ─── Query ────────────────────────────────────────────────────────────────────
+
+type Query {
+  _empty: String
+  health: String @aws_api_key
+
+  # Dashboard
+  dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
+  superAdminOverview(input: SuperAdminOverviewInput): SuperAdminOverview!
+  platformStats: PlatformStats!
+
+  # Identity
+  me: User!
+  listUsers(limit: Int, nextToken: String, filter: UserFilter): UserConnection!
+  getUser(id: ID!): User
+  listStaff(campusId: ID, limit: Int, nextToken: String): AWSJSON
+  getStaffMember(id: ID!): AWSJSON
+  listEmployees(campusId: ID, limit: Int, nextToken: String, filter: AWSJSON): AWSJSON
+  getEmployee(id: ID!): AWSJSON
+  listCampusAccess(userId: ID!): AWSJSON
+
+  # Tenants (super-admin)
+  listTenants(limit: Int, nextToken: String): TenantConnection!
+  getTenant(id: ID!): Tenant
+  validateSubdomain(subdomain: String!): SubdomainValidation!
+  listAvailableFeatures: [AvailableFeature!]!
+  listTenantUsers(tenantId: ID!): AWSJSON
+
+  # Admissions — legacy
+  listAdmissions(filter: AdmissionFilter, limit: Int, cursor: String): AdmissionsConnection!
+  getAdmission(id: ID!): Admission
+
+  # Enquiries & Applications
+  listEnquiries(campusId: ID, filter: AWSJSON, limit: Int, nextToken: String): AWSJSON
+  getEnquiry(id: ID!): AWSJSON
+  listApplications(campusId: ID, filter: AWSJSON, limit: Int, nextToken: String): AWSJSON
+  getApplication(id: ID!): AWSJSON
+  getApprovalQueue(campusId: ID, limit: Int, nextToken: String): AWSJSON
+  getApplicationReviews(applicationId: ID!): AWSJSON
+  admissionsStats(campusId: ID, academicYearId: ID): AWSJSON
+
+  # Finance
+  listFeeHeads(isActive: Boolean): AWSJSON
+  listFeeStructures(campusId: ID, academicYearId: ID): AWSJSON
+  getFeeStructure(id: ID!): AWSJSON
+  listFeeAssignments(studentId: ID, academicYearId: ID, limit: Int, nextToken: String): AWSJSON
+  getFeeAssignment(id: ID!): AWSJSON
+  getStudentFeeAssignment(studentId: ID!, academicYearId: ID): AWSJSON
+  listFeeSchedules(academicYearId: ID): AWSJSON
+  listInstallmentPlans(isActive: Boolean): AWSJSON
+  listInvoices(studentId: ID, status: String, limit: Int, nextToken: String): AWSJSON
+  getInvoice(id: ID!): AWSJSON
+  getStudentInvoices(studentId: ID!): AWSJSON
+  listPayments(invoiceId: ID, studentId: ID, limit: Int, nextToken: String): AWSJSON
+  getPayment(id: ID!): AWSJSON
+  getFeeRevisions(invoiceId: ID!): AWSJSON
+  dayBookReport(date: String, campusId: ID): AWSJSON
+  feeCollectionAnalytics(campusId: ID, from: String, to: String): AWSJSON
+  classFeeStats(classId: ID!, academicYearId: ID): AWSJSON
+  studentFinancialSummary(studentId: ID!): AWSJSON
+  listReceipts(studentId: ID, from: String, to: String, limit: Int, nextToken: String): AWSJSON
+  getReceipt(id: ID!): AWSJSON
+  getFeeAssignmentQueue(campusId: ID, academicYearId: ID): AWSJSON
+  getAssignableFeeStructures(studentId: ID!, academicYearId: ID): AWSJSON
+  getStudentDues(studentId: ID!): AWSJSON
+
+  # Academics — Classes, Sections, Subjects
+  listClasses(campusId: ID, programId: ID): AWSJSON
+  getClass(id: ID!): AWSJSON
+  listAllSections(classId: ID, campusId: ID, academicYearId: ID): AWSJSON
+  getSection(id: ID!): AWSJSON
+  listSectionStudents(sectionId: ID!): [AttendanceStudentInfo!]!
+  listSubjects(campusId: ID, isActive: Boolean): AWSJSON
+  getSubject(id: ID!): AWSJSON
+  listSectionCourses(sectionId: ID!): AWSJSON
+
+  # Students
+  listStudents(filter: StudentFilter, limit: Int, nextToken: String): StudentConnection!
+  getStudent(id: ID!): AWSJSON
+
+  # Attendance
+  listAttendance(studentId: ID, sectionId: ID, from: String, to: String): AWSJSON
+  getSectionAttendance(sectionId: ID!, date: AWSDate!): [AttendanceRecord!]!
+  getSectionAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!): AttendanceSummary!
+  getClassAttendance(sectionId: ID!, date: AWSDate!): [AttendanceRecord!]!
+  getStudentAttendance(studentId: ID!, from: AWSDate!, to: AWSDate!): [AttendanceRecord!]!
+  getAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!): AttendanceSummary!
+
+  # Exams & Marks
+  listExams(campusId: ID, academicYearId: ID, classId: ID): AWSJSON
+  getExam(id: ID!): AWSJSON
+  listResults(examId: ID!): AWSJSON
+  getExamResults(examId: ID!): AWSJSON
+  getExamStats(id: ID!): AWSJSON
+  getMarksStatus(id: ID!): AWSJSON
+
+  # Timetable
+  getSectionTimetable(sectionId: ID!): SectionTimetable!
+  getTeacherTimetable(profileId: ID!): TeacherTimetable!
+  getTeacherWorkload(profileId: ID!): TeacherWorkload!
+
+  # Certificates
+  listCertificates(studentId: ID!): AWSJSON
+
+  # Settings
+  listAcademicYears: [AcademicYear!]!
+  getAcademicYear(id: ID!): AcademicYear
+  listCampuses: [Campus!]!
+  getCampus(id: ID!): Campus
+  listPrograms(campusId: ID): AWSJSON
+  getProgram(id: ID!): AWSJSON
+  listTemplates(type: String): [Template!]!
+  getTemplate(id: ID!): AWSJSON
+  getTenantFeatures: AWSJSON
+
+  # Audit logs
+  listAuditLogs(filter: AWSJSON, limit: Int, nextToken: String): AWSJSON
+  listPlatformAuditLogs(input: ListPlatformAuditLogsInput!): PlatformAuditLogsConnection!
+  getPlatformAuditLog(id: ID!): PlatformAuditLogDetail!
+
+  # Comms
+  listAnnouncements(campusId: ID, status: String, limit: Int, nextToken: String): AWSJSON
+  getAnnouncement(id: ID!): AWSJSON
+  listEvents(campusId: ID, from: String, to: String, limit: Int, nextToken: String): AWSJSON
+  getEvent(id: ID!): AWSJSON
+  listLeaveRequests(profileId: ID, status: String, limit: Int, nextToken: String): AWSJSON
+  getLeaveRequest(id: ID!): AWSJSON
+
+  # Results service
+  listResultBatches(campusId: ID, academicYearId: ID, status: String): AWSJSON
+  getResultBatch(id: ID!): AWSJSON
+  getPublicResult(token: String!): AWSJSON
+  getResultPublicToken(id: ID!): AWSJSON
+
+  # Admin cleanup / dedup
+  getDuplicateReport(campusId: ID): AWSJSON
+  getDuplicateEnquiryReport(campusId: ID): AWSJSON
+  getDuplicateStudentReport(campusId: ID): AWSJSON
+
+  # Storage
+  generateDownloadUrl(key: String!): AWSJSON
+
+  # Legacy placeholders (kept for backward compat)
+  _studentsEmpty: String
+  _feesEmpty: String
+  _templatesEmpty: String
+}
+
+# ─── Mutation ─────────────────────────────────────────────────────────────────
+
+type Mutation {
+  _empty: String
+
+  # Identity
+  createUser(input: CreateUserInput!): User!
+  updateUser(input: UpdateUserInput!): User!
+  deactivateUser(id: ID!): Boolean
+  reactivateUser(id: ID!): Boolean
+  inviteStaff(input: InviteStaffInput!): InviteStaffPayload!
+  updateEmployee(id: ID!, input: AWSJSON!): AWSJSON
+  addCampusAccess(userId: ID!, campusId: ID!): AWSJSON
+  removeCampusAccess(userId: ID!, campusId: ID!): Boolean
+  assignRole(userId: ID!, roleId: ID!): AWSJSON
+  removeRole(userId: ID!, roleId: ID!): Boolean
+  bulkDeactivateUsers(userIds: [ID!]!): AWSJSON
+  impersonateUser(userId: ID!): AWSJSON
+  updateMyProfile(input: AWSJSON!): AWSJSON
+  uploadAvatar(input: AWSJSON!): AWSJSON
+  uploadTenantLogo(input: AWSJSON!): AWSJSON
+  resendInvite(staffId: ID!): Boolean
+
+  # Tenants
+  createTenant(input: CreateTenantInput!): Tenant!
+  updateTenant(input: UpdateTenantInput!): Tenant!
+  deactivateTenant(id: ID!): Boolean
+  provisionTenant(input: ProvisionTenantInput!): ProvisionTenantResult!
+  requestTenantDeletion(tenantId: ID!): TenantDeletionOtpResult!
+  confirmTenantDeletion(tenantId: ID!, otp: String!): Boolean!
+  createFirstAdmin(tenantId: ID!, input: AWSJSON!): AWSJSON
+  finalizeOnboarding(tenantId: ID!, input: AWSJSON): AWSJSON
+  finalizeTenant(tenantId: ID!, input: AWSJSON): AWSJSON
+  resendTenantInvite(tenantId: ID!): Boolean
+  provisionTenantUser(tenantId: ID!, input: AWSJSON!): AWSJSON
+  deleteTenantUser(tenantId: ID!, userId: ID!): Boolean
+
+  # Admissions — legacy
+  createAdmission(input: CreateAdmissionInput!): Admission!
+  updateAdmission(input: UpdateAdmissionInput!): Admission!
+  submitAdmission(id: ID!): Admission!
+  reviewAdmission(id: ID!, input: ReviewAdmissionInput!): Admission!
+  withdrawAdmission(id: ID!): Admission!
+  updateAdmissionStatus(id: ID!, status: String!): Admission!
+
+  # Enquiries & Applications
+  createPublicEnquiry(input: AWSJSON!): AWSJSON
+  createEnquiry(input: AWSJSON!): AWSJSON
+  updateEnquiry(id: ID!, input: AWSJSON!): AWSJSON
+  deleteEnquiry(id: ID!): Boolean
+  checkDuplicate(input: AWSJSON!): AWSJSON
+  createApplication(input: AWSJSON!): AWSJSON
+  submitApplication(id: ID!): AWSJSON
+  reviewApplication(id: ID!, input: AWSJSON!): AWSJSON
+  withdrawApplication(id: ID!): AWSJSON
+  approveApplication(id: ID!, input: AWSJSON): AWSJSON
+  rejectApplication(id: ID!, input: AWSJSON): AWSJSON
+  verifyDocument(applicationId: ID!, documentId: ID!, input: AWSJSON!): AWSJSON
+  getUploadUrl(input: AWSJSON!): AWSJSON
+
+  # Finance
+  createFeeHead(input: CreateFeeHeadInput!): FeeHead!
+  updateFeeHead(id: ID!, input: AWSJSON!): AWSJSON
+  deleteFeeHead(id: ID!): Boolean
+  createFeeStructure(input: CreateFeeStructureInput!): FeeStructure!
+  updateFeeStructure(id: ID!, input: AWSJSON!): AWSJSON
+  deleteFeeStructure(id: ID!): Boolean
+  createFeeAssignment(input: AWSJSON!): AWSJSON
+  bulkAssignFeeStructure(input: AWSJSON!): AWSJSON
+  createFeeSchedule(input: AWSJSON!): AWSJSON
+  updateFeeSchedule(id: ID!, input: AWSJSON!): AWSJSON
+  deleteFeeSchedule(id: ID!): Boolean
+  createInstallmentPlan(input: AWSJSON!): AWSJSON
+  updateInstallmentPlan(id: ID!, input: AWSJSON!): AWSJSON
+  deleteInstallmentPlan(id: ID!): Boolean
+  createInvoice(input: AWSJSON!): AWSJSON
+  updateInvoice(id: ID!, input: AWSJSON!): AWSJSON
+  cancelInvoice(id: ID!, reason: String): AWSJSON
+  reviseInvoice(id: ID!, input: AWSJSON!): AWSJSON
+  recordPayment(input: AWSJSON!): AWSJSON
+  createPaymentOrder(invoiceId: ID!): AWSJSON
+  verifyPaymentSignature(input: AWSJSON!): AWSJSON
+  createOneOffCharge(input: AWSJSON!): AWSJSON
+  bulkCreateCharge(input: AWSJSON!): AWSJSON
+  collectPaymentByStudent(studentId: ID!, input: AWSJSON!): AWSJSON
+  generatePaymentLink(invoiceId: ID!): AWSJSON
+  addScheduleSlot(scheduleId: ID!, input: AWSJSON!): AWSJSON
+  deleteScheduleSlot(scheduleId: ID!, slotIndex: Int!): Boolean
+
+  # Academics — Classes & Sections
+  createClass(input: AWSJSON!): AWSJSON
+  updateClass(id: ID!, input: AWSJSON!): AWSJSON
+  deleteClass(id: ID!): Boolean
+  createSection(classId: ID!, input: AWSJSON!): AWSJSON
+  updateSection(id: ID!, input: AWSJSON!): AWSJSON
+  deleteSection(id: ID!): Boolean
+  setSectionIncharge(sectionId: ID!, input: AWSJSON!): AWSJSON
+  assignSectionCourse(sectionId: ID!, input: AWSJSON!): AWSJSON
+  removeSectionCourse(sectionId: ID!, allocationId: ID!): Boolean
+  createSubject(input: AWSJSON!): AWSJSON
+  updateSubject(id: ID!, input: AWSJSON!): AWSJSON
+  deleteSubject(id: ID!): Boolean
+
+  # Students
+  enrollStudent(input: AWSJSON!): AWSJSON
+  updateStudent(id: ID!, input: AWSJSON!): AWSJSON
+  updateStudentStatus(id: ID!, status: String!): AWSJSON
+  assignStudentClass(studentId: ID!, input: AWSJSON!): AWSJSON
+  bulkAssignStudentsToClass(studentIds: [ID!]!, classId: ID!, sectionId: ID!): BulkAssignResult!
+  randomAssignStudentsToClass(classId: ID!, studentIds: [ID!]): RandomAssignResult!
+  convertApplicationToStudent(applicationId: ID!): Student!
+  enablePortalAccess(studentId: ID!, email: String!): PortalEnablementPayload!
+
+  # Attendance
+  markSectionAttendance(input: BulkAttendanceInput!): [AttendanceRecord!]!
+  markClassAttendance(input: BulkAttendanceInput!): [AttendanceRecord!]!
+
+  # Exams & Marks
+  createExam(input: AWSJSON!): AWSJSON
+  updateExam(id: ID!, input: AWSJSON!): AWSJSON
+  deleteExam(id: ID!): Boolean
+  enterMarks(examId: ID!, input: AWSJSON!): AWSJSON
+  publishResults(examId: ID!): AWSJSON
+
+  # Timetable
+  replaceSectionTimetable(sectionId: ID!, slots: [TimetableSlotInput!]!): SectionTimetable!
+
+  # Certificates
+  issueCertificate(studentId: ID!, input: AWSJSON!): AWSJSON
+  approveCertificate(studentId: ID!, certificateId: ID!): AWSJSON
+
+  # Settings
+  createAcademicYear(input: CreateAcademicYearInput!): AcademicYear!
+  updateAcademicYear(id: ID!, input: AWSJSON!): AcademicYear
+  setActiveAcademicYear(id: ID!): AcademicYear
+  createCampus(input: CreateCampusInput!): Campus!
+  updateCampus(id: ID!, input: CreateCampusInput!): Campus!
+  deactivateCampus(id: ID!): Boolean
+  createProgram(input: AWSJSON!): AWSJSON
+  updateProgram(id: ID!, input: AWSJSON!): AWSJSON
+  deleteProgram(id: ID!): Boolean
+  createTemplate(input: CreateTemplateInput!): Template!
+  updateTemplate(id: ID!, input: AWSJSON!): AWSJSON
+  publishTemplateVersion(input: PublishTemplateVersionInput!): TemplateVersion!
+  deleteTemplate(id: ID!): Boolean
+  updateTenantFeatures(input: AWSJSON!): AWSJSON
+
+  # Storage
+  generateUploadUrl(contentType: String!, filename: String!): UploadUrlPayload!
+
+  # Comms
+  createAnnouncement(input: AWSJSON!): AWSJSON
+  updateAnnouncement(id: ID!, input: AWSJSON!): AWSJSON
+  publishAnnouncement(id: ID!): AWSJSON
+  archiveAnnouncement(id: ID!): AWSJSON
+  deleteAnnouncement(id: ID!): Boolean
+  createEvent(input: AWSJSON!): AWSJSON
+  updateEvent(id: ID!, input: AWSJSON!): AWSJSON
+  deleteEvent(id: ID!): Boolean
+  createLeaveRequest(input: AWSJSON!): AWSJSON
+  updateLeaveRequest(id: ID!, input: AWSJSON!): AWSJSON
+  approveLeave(id: ID!, remarks: String): AWSJSON
+  rejectLeave(id: ID!, remarks: String): AWSJSON
+  cancelLeave(id: ID!): AWSJSON
+  deleteLeaveRequest(id: ID!): Boolean
+
+  # Results service
+  createResultBatch(input: AWSJSON!): AWSJSON
+  updateResultBatch(id: ID!, input: AWSJSON!): AWSJSON
+  publishResultBatch(id: ID!): AWSJSON
+  archiveResultBatch(id: ID!): AWSJSON
+  deleteResultBatch(id: ID!): Boolean
+
+  # Admin cleanup / dedup
+  runDeduplication(input: AWSJSON): AWSJSON
+  mergeEnquiries(input: AWSJSON!): AWSJSON
+  mergeStudents(input: AWSJSON!): AWSJSON
+  bulkDeleteInactiveEnquiries(input: AWSJSON): AWSJSON
+
+  # Invites
+  acceptInvite(token: String!, password: String): AcceptInvitePayload!
+
+  # Legacy portal
+  enableStudentPortal(studentId: ID!, email: String!): PortalEnablementPayload!
+  enableGuardianPortal(input: EnableGuardianPortalInput!): PortalEnablementPayload!
 }

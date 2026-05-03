@@ -1,0 +1,163 @@
+# ─── Academics Module ────────────────────────────────────────────────────────
+# Timetable, class assignment (bulk/random), and teacher workload.
+
+# ── Shared scalars ──────────────────────────────────────────────────────────
+
+type TimetableSubject {
+  id: ID!
+  name: String!
+  code: String
+  subjectType: String
+}
+
+type TimetableTeacher {
+  id: ID!
+  fullName: String
+  email: String
+  avatarUrl: String
+}
+
+type TimetableCampus {
+  id: ID!
+  name: String!
+}
+
+type TimetableClass {
+  id: ID!
+  name: String!
+}
+
+type TimetableSectionRef {
+  id: ID!
+  name: String!
+  class: TimetableClass
+  campus: TimetableCampus
+}
+
+# ── Timetable slot ──────────────────────────────────────────────────────────
+
+type TimetableSlot {
+  id: ID!
+  sectionId: ID!
+  subjectId: ID
+  teacherProfileId: ID
+  dayOfWeek: String!
+  periodNumber: Int!
+  startTime: String!
+  endTime: String!
+  room: String
+  label: String
+  isBreak: Boolean!
+  subject: TimetableSubject
+  teacher: TimetableTeacher
+}
+
+type TimetableSlotWithSection {
+  id: ID!
+  sectionId: ID!
+  subjectId: ID
+  teacherProfileId: ID
+  dayOfWeek: String!
+  periodNumber: Int!
+  startTime: String!
+  endTime: String!
+  room: String
+  label: String
+  isBreak: Boolean!
+  subject: TimetableSubject
+  teacher: TimetableTeacher
+  section: TimetableSectionRef
+}
+
+type SectionTimetable {
+  sectionId: ID!
+  slots: [TimetableSlot!]!
+}
+
+# ── Teacher timetable + workload ─────────────────────────────────────────────
+
+type ClassTeacherRole {
+  id: ID!
+  role: String!
+  section: TimetableSectionRef!
+}
+
+type TeacherTimetable {
+  slots: [TimetableSlotWithSection!]!
+  incharges: [ClassTeacherRole!]!
+}
+
+type SubjectAllocationItem {
+  id: ID!
+  subjectType: String
+  subject: TimetableSubject!
+  section: TimetableSectionRef!
+}
+
+type WorkloadProfile {
+  id: ID!
+  fullName: String
+  email: String
+}
+
+type WorkloadSummary {
+  totalSubjects: Int!
+  totalSections: Int!
+  classTeacherOf: Int!
+  totalPeriodsPerWeek: Int!
+}
+
+type TeacherWorkload {
+  profile: WorkloadProfile!
+  allocations: [SubjectAllocationItem!]!
+  incharges: [ClassTeacherRole!]!
+  timetableSlots: [TimetableSlotWithSection!]!
+  summary: WorkloadSummary!
+}
+
+# ── Bulk / random class assignment ──────────────────────────────────────────
+
+type BulkAssignResult {
+  updated: Int!
+}
+
+type StudentSectionAssignment {
+  studentId: ID!
+  sectionId: ID!
+  sectionName: String!
+}
+
+type RandomAssignResult {
+  updated: Int!
+  assignments: [StudentSectionAssignment!]!
+}
+
+# ── Input types ─────────────────────────────────────────────────────────────
+
+input TimetableSlotInput {
+  subjectId: ID
+  teacherProfileId: ID
+  dayOfWeek: String!
+  periodNumber: Int!
+  startTime: String!
+  endTime: String!
+  room: String
+  label: String
+  isBreak: Boolean
+}
+
+# ── Queries ─────────────────────────────────────────────────────────────────
+
+extend type Query {
+  getSectionTimetable(sectionId: ID!): SectionTimetable!
+  getTeacherTimetable(profileId: ID!): TeacherTimetable!
+  getTeacherWorkload(profileId: ID!): TeacherWorkload!
+}
+
+# ── Mutations ────────────────────────────────────────────────────────────────
+
+extend type Mutation {
+  replaceSectionTimetable(sectionId: ID!, slots: [TimetableSlotInput!]!): SectionTimetable!
+  bulkAssignStudentsToClass(studentIds: [ID!]!, classId: ID!, sectionId: ID!): BulkAssignResult!
+  randomAssignStudentsToClass(classId: ID!, studentIds: [ID!]): RandomAssignResult!
+}

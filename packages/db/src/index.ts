@@ -1,0 +1,97 @@
+// ── Connection ────────────────────────────────────────────────────────────────
+export { connectDB, disconnectDB } from './connection';
+
+// ── Lambda bootstrap helpers ──────────────────────────────────────────────────
+export { bootstrapDB, ensureDB } from './lambda';
+
+// ── Tenant scope helper ───────────────────────────────────────────────────────
+export { withTenant } from './withTenant';
+export type { TenantScope } from './withTenant';
+
+// ── Models: Auth ──────────────────────────────────────────────────────────────
+export { AuthUser } from './models/auth/AuthUser.model';
+export type { IAuthUser } from './models/auth/AuthUser.model';
+export { Profile } from './models/auth/Profile.model';
+export type { IProfile, IRoleAssignment, ICampusAccess, PersonaRole } from './models/auth/Profile.model';
+
+// ── Models: Settings ──────────────────────────────────────────────────────────
+export { Tenant } from './models/settings/Tenant.model';
+export type { ITenant } from './models/settings/Tenant.model';
+export { Campus } from './models/settings/Campus.model';
+export type { ICampus, CampusType } from './models/settings/Campus.model';
+export { AcademicYear } from './models/settings/AcademicYear.model';
+export type { IAcademicYear } from './models/settings/AcademicYear.model';
+export { Program } from './models/settings/Program.model';
+export type { IProgram, ProgramType } from './models/settings/Program.model';
+export { Template } from './models/settings/Template.model';
+export type { ITemplate, TemplateType, TemplateStatus } from './models/settings/Template.model';
+export { TenantFeature } from './models/settings/TenantFeature.model';
+export type { ITenantFeature, ITenantFeatureFlags } from './models/settings/TenantFeature.model';
+
+// ── Models: Admissions ────────────────────────────────────────────────────────
+export { Enquiry } from './models/admissions/Enquiry.model';
+export type { IEnquiry, EnquiryStatus } from './models/admissions/Enquiry.model';
+export { Application } from './models/admissions/Application.model';
+export type { IApplication, ApplicationStatus } from './models/admissions/Application.model';
+
+// ── Models: Academics ─────────────────────────────────────────────────────────
+export { Class } from './models/academics/Class.model';
+export type { IClass } from './models/academics/Class.model';
+export { Section } from './models/academics/Section.model';
+export type { ISection } from './models/academics/Section.model';
+export { Subject } from './models/academics/Subject.model';
+export type { ISubject, SubjectType } from './models/academics/Subject.model';
+export { SubjectAllocation } from './models/academics/SubjectAllocation.model';
+export type { ISubjectAllocation } from './models/academics/SubjectAllocation.model';
+export { Student } from './models/academics/Student.model';
+export type { IStudent, StudentStatus } from './models/academics/Student.model';
+export { Employee } from './models/academics/Employee.model';
+export type { IEmployee, StaffType, EmploymentType, StaffCategory } from './models/academics/Employee.model';
+export { Attendance } from './models/academics/Attendance.model';
+export type { IAttendance, AttendanceStatus } from './models/academics/Attendance.model';
+export { Exam } from './models/academics/Exam.model';
+export type { IExam, ExamStatus } from './models/academics/Exam.model';
+export { Timetable } from './models/academics/Timetable.model';
+export type { ITimetable, ITimetableSlot, DayOfWeek } from './models/academics/Timetable.model';
+export { Certificate } from './models/academics/Certificate.model';
+export type { ICertificate, CertificateType, CertificateStatus } from './models/academics/Certificate.model';
+export { PublishedResultBatch } from './models/academics/PublishedResultBatch.model';
+export type { IPublishedResultBatch, ResultBatchStatus } from './models/academics/PublishedResultBatch.model';
+
+// ── Models: Finance ───────────────────────────────────────────────────────────
+export { FeeHead } from './models/finance/FeeHead.model';
+export type { IFeeHead, FeeHeadType } from './models/finance/FeeHead.model';
+export { FeeStructure } from './models/finance/FeeStructure.model';
+export type { IFeeStructure } from './models/finance/FeeStructure.model';
+export { FeeAssignment } from './models/finance/FeeAssignment.model';
+export type { IFeeAssignment, FeeAssignmentStatus } from './models/finance/FeeAssignment.model';
+export { FeeSchedule } from './models/finance/FeeSchedule.model';
+export type { IFeeSchedule, IFeeScheduleSlot } from './models/finance/FeeSchedule.model';
+export { InstallmentPlan } from './models/finance/InstallmentPlan.model';
+export type { IInstallmentPlan } from './models/finance/InstallmentPlan.model';
+export { FeeRevision } from './models/finance/FeeRevision.model';
+export type { IFeeRevision } from './models/finance/FeeRevision.model';
+export { Invoice } from './models/finance/Invoice.model';
+export type { IInvoice, InvoiceStatus } from './models/finance/Invoice.model';
+export { Payment } from './models/finance/Payment.model';
+export type { IPayment, PaymentMethod, PaymentStatus } from './models/finance/Payment.model';
+
+// ── Models: Comms ─────────────────────────────────────────────────────────────
+export { Announcement } from './models/comms/Announcement.model';
+export type { IAnnouncement, AnnouncementStatus, AnnouncementTargetGroup } from './models/comms/Announcement.model';
+export { Event } from './models/comms/Event.model';
+export type { IEvent } from './models/comms/Event.model';
+export { LeaveRequest } from './models/comms/LeaveRequest.model';
+export type { ILeaveRequest, LeaveType, LeaveStatus } from './models/comms/LeaveRequest.model';
+
+// ── Models: Audit ─────────────────────────────────────────────────────────────
+export { AuditLog } from './models/audit/AuditLog.model';
+export type { IAuditLog } from './models/audit/AuditLog.model';
+export { PlatformAuditLog } from './models/audit/PlatformAuditLog.model';
+export type { IPlatformAuditLog } from './models/audit/PlatformAuditLog.model';
+
+// ── Repositories ──────────────────────────────────────────────────────────────
+export { IdentityRepo } from './repositories/identity.repo';
+export { AdmissionsRepo } from './repositories/admissions.repo';
+export { FinanceRepo } from './repositories/finance.repo';
+export { AcademicsRepo } from './repositories/academics.repo';

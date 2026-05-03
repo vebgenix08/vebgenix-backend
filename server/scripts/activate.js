@@ -1,1 +1,0 @@
-import prisma from './src/infrastructure/prisma/client.js'; async function main() { await prisma.tenantMembership.updateMany({ where: { user: { email: 'dhanushags01@gmail.com' } }, data: { status: 'ACTIVE' } }); console.log('Membership activated'); await prisma.$disconnect(); } main();

@@ -1,0 +1,632 @@
+{
+  "info": {
+    "_postman_id": "vebgenix-api-collection",
+    "name": "Vebgenix API",
+    "description": "Complete API collection for Vebgenix Backend. Import with Vebgenix-Dev.postman_environment.json",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",     "value": "{{base_url}}" },
+    { "key": "access_token", "value": "{{access_token}}" },
+    { "key": "tenant_id",    "value": "{{tenant_id}}" }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth (Cognito)",
+      "description": "Authentication is handled by AWS Cognito — not by the Vebgenix backend.\nSet COGNITO_DOMAIN, COGNITO_CLIENT_ID and COGNITO_REGION in the environment.\nAfter 'Get Token', the access_token variable is set automatically for all other requests.",
+      "item": [
+        {
+          "name": "Get Token — User+Password (InitiateAuth)",
+          "request": {
+            "method": "POST",
+            "url": "https://cognito-idp.{{cognito_region}}.amazonaws.com/",
+            "header": [
+              { "key": "Content-Type",  "value": "application/x-amz-json-1.1" },
+              { "key": "X-Amz-Target", "value": "AWSCognitoIdentityProviderService.InitiateAuth" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": {\n    \"USERNAME\": \"admin@example.com\",\n    \"PASSWORD\": \"YourPassword1!\"\n  }\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Got Cognito token', () => pm.expect(pm.response.code).to.equal(200));",
+              "const r = pm.response.json();",
+              "if (r.AuthenticationResult) {",
+              "  pm.environment.set('access_token',  r.AuthenticationResult.AccessToken);",
+              "  pm.environment.set('refresh_token', r.AuthenticationResult.RefreshToken);",
+              "  pm.environment.set('id_token',      r.AuthenticationResult.IdToken);",
+              "  console.log('Tokens saved to environment');",
+              "}"
+            ]}
+          }]
+        },
+        {
+          "name": "Refresh Token (InitiateAuth REFRESH_TOKEN_AUTH)",
+          "request": {
+            "method": "POST",
+            "url": "https://cognito-idp.{{cognito_region}}.amazonaws.com/",
+            "header": [
+              { "key": "Content-Type",  "value": "application/x-amz-json-1.1" },
+              { "key": "X-Amz-Target", "value": "AWSCognitoIdentityProviderService.InitiateAuth" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"AuthFlow\": \"REFRESH_TOKEN_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": {\n    \"REFRESH_TOKEN\": \"{{refresh_token}}\"\n  }\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "const r = pm.response.json();",
+              "if (r.AuthenticationResult) {",
+              "  pm.environment.set('access_token', r.AuthenticationResult.AccessToken);",
+              "  pm.environment.set('id_token',     r.AuthenticationResult.IdToken);",
+              "}"
+            ]}
+          }]
+        },
+        {
+          "name": "Revoke Token (Sign Out)",
+          "request": {
+            "method": "POST",
+            "url": "https://cognito-idp.{{cognito_region}}.amazonaws.com/",
+            "header": [
+              { "key": "Content-Type",  "value": "application/x-amz-json-1.1" },
+              { "key": "X-Amz-Target", "value": "AWSCognitoIdentityProviderService.RevokeToken" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Token\": \"{{refresh_token}}\",\n  \"ClientId\": \"{{cognito_client_id}}\"\n}"
+            }
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Token revoked', () => pm.expect(pm.response.code).to.equal(200));",
+              "pm.environment.unset('access_token');",
+              "pm.environment.unset('refresh_token');",
+              "pm.environment.unset('id_token');"
+            ]}
+          }]
+        },
+        {
+          "name": "Me — My Profile (AppSync / EC2)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/me",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+            ]
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.expect(pm.response.code).to.equal(200));"] } }]
+        }
+      ]
+    },
+    {
+      "name": "👤 Identity — Users & Staff",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/users",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+            ]
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.expect(pm.response.code).to.equal(200));"] } }]
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/admin/users",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-tenant-id",   "value": "{{tenant_id}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"user@example.com\",\n  \"fullName\": \"John Doe\",\n  \"phone\": \"9876543210\",\n  \"personaRole\": \"STAFF\",\n  \"campusId\": \"{{campus_id}}\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 201 or 200', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"] } }]
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/users/:id",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+            ]
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/admin/users/:id",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-tenant-id",   "value": "{{tenant_id}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"isActive\": true\n}" }
+          }
+        },
+        {
+          "name": "Deactivate User",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/admin/users/:id",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+            ]
+          }
+        },
+        {
+          "name": "List Staff",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/admin/staff",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+            ]
+          }
+        },
+        {
+          "name": "Invite Staff",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/admin/staff",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "x-tenant-id",   "value": "{{tenant_id}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"fullName\": \"Mr. Smith\",\n  \"phone\": \"9876543211\",\n  \"campusId\": \"{{campus_id}}\",\n  \"staffType\": \"TEACHER\",\n  \"staffCategory\": \"TEACHING\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Admissions",
+      "item": [
+        {
+          "name": "Enquiries",
+          "item": [
+            {
+              "name": "List Enquiries",
+              "request": {
+                "method": "GET",
+                "url": "{{base_url}}/api/admissions/enquiries",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+                ]
+              },
+              "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.expect(pm.response.code).to.equal(200));"] } }]
+            },
+            {
+              "name": "Create Enquiry",
+              "request": {
+                "method": "POST",
+                "url": "{{base_url}}/api/admissions/enquiries",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"studentName\": \"Alice Johnson\",\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\",\n  \"source\": \"Website\",\n  \"notes\": \"Interested in B.Tech\"\n}" }
+              },
+              "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"] } }]
+            },
+            {
+              "name": "Get Enquiry by ID",
+              "request": {
+                "method": "GET",
+                "url": "{{base_url}}/api/admissions/enquiries/:id",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+                ]
+              }
+            },
+            {
+              "name": "Update Enquiry",
+              "request": {
+                "method": "PATCH",
+                "url": "{{base_url}}/api/admissions/enquiries/:id",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"status\": \"CONTACTED\",\n  \"notes\": \"Called, scheduled visit\"\n}" }
+              }
+            },
+            {
+              "name": "Duplicate Check",
+              "request": {
+                "method": "POST",
+                "url": "{{base_url}}/api/admissions/duplicate-check",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\"\n}" }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Applications",
+          "item": [
+            {
+              "name": "List Applications",
+              "request": {
+                "method": "GET",
+                "url": "{{base_url}}/api/admissions/applications",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+                ]
+              }
+            },
+            {
+              "name": "Create Application",
+              "request": {
+                "method": "POST",
+                "url": "{{base_url}}/api/admissions/applications",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"studentName\": \"Alice Johnson\",\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\",\n  \"dateOfBirth\": \"2005-06-15\",\n  \"gender\": \"FEMALE\",\n  \"guardianName\": \"Bob Johnson\",\n  \"guardianPhone\": \"9876543299\",\n  \"guardianRelation\": \"FATHER\"\n}" }
+              }
+            },
+            {
+              "name": "Get Application by ID",
+              "request": {
+                "method": "GET",
+                "url": "{{base_url}}/api/admissions/applications/:id",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+                ]
+              }
+            },
+            {
+              "name": "Submit Application",
+              "request": {
+                "method": "POST",
+                "url": "{{base_url}}/api/admissions/applications/:id/submit",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+                ]
+              }
+            },
+            {
+              "name": "Review Application",
+              "request": {
+                "method": "POST",
+                "url": "{{base_url}}/api/admissions/applications/:id/review",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" },
+                  { "key": "Content-Type",  "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"decision\": \"APPROVED\",\n  \"remarks\": \"All documents verified\"\n}" }
+              }
+            },
+            {
+              "name": "Withdraw Application",
+              "request": {
+                "method": "POST",
+                "url": "{{base_url}}/api/admissions/applications/:id/withdraw",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                  { "key": "x-tenant-id",   "value": "{{tenant_id}}" }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "💰 Finance",
+      "item": [
+        {
+          "name": "Fee Heads",
+          "item": [
+            {
+              "name": "List Fee Heads",
+              "request": { "method": "GET", "url": "{{base_url}}/api/admin/finance/fee-heads", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            },
+            {
+              "name": "Create Fee Head",
+              "request": { "method": "POST", "url": "{{base_url}}/api/admin/finance/fee-heads", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Tuition Fee\",\n  \"type\": \"RECURRING\",\n  \"description\": \"Monthly tuition charges\"\n}" } }
+            },
+            {
+              "name": "Update Fee Head",
+              "request": { "method": "PATCH", "url": "{{base_url}}/api/admin/finance/fee-heads/:id", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"description\": \"Updated description\"\n}" } }
+            },
+            {
+              "name": "Delete Fee Head",
+              "request": { "method": "DELETE", "url": "{{base_url}}/api/admin/finance/fee-heads/:id", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            }
+          ]
+        },
+        {
+          "name": "Fee Structures",
+          "item": [
+            {
+              "name": "List Fee Structures",
+              "request": { "method": "GET", "url": "{{base_url}}/api/admin/finance/fee-structures", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            },
+            {
+              "name": "Create Fee Structure",
+              "request": { "method": "POST", "url": "{{base_url}}/api/admin/finance/fee-structures", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"name\": \"B.Tech Year 1 Fee\",\n  \"components\": [\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Tuition Fee\", \"amount\": 50000, \"isOptional\": false },\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Lab Fee\", \"amount\": 5000, \"isOptional\": false }\n  ]\n}" } }
+            },
+            {
+              "name": "Delete Fee Structure",
+              "request": { "method": "DELETE", "url": "{{base_url}}/api/admin/finance/fee-structures/:id", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            }
+          ]
+        },
+        {
+          "name": "Invoices",
+          "item": [
+            {
+              "name": "List Invoices",
+              "request": { "method": "GET", "url": "{{base_url}}/api/admin/finance/invoices", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            },
+            {
+              "name": "Get Invoice by ID",
+              "request": { "method": "GET", "url": "{{base_url}}/api/admin/finance/invoices/:id", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            },
+            {
+              "name": "Create Invoice",
+              "request": { "method": "POST", "url": "{{base_url}}/api/admin/finance/invoices", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"dueDate\": \"2026-06-30\",\n  \"items\": [\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Tuition Fee\", \"amount\": 50000, \"concession\": 0 }\n  ]\n}" } }
+            }
+          ]
+        },
+        {
+          "name": "Payments",
+          "item": [
+            {
+              "name": "Record Payment",
+              "request": { "method": "POST", "url": "{{base_url}}/api/admin/finance/payments", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"invoiceId\": \"\",\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"amount\": 50000,\n  \"method\": \"CASH\",\n  \"remarks\": \"Full payment\"\n}" } }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🎓 Academics",
+      "item": [
+        {
+          "name": "Students",
+          "item": [
+            {
+              "name": "List Students",
+              "request": { "method": "GET", "url": "{{base_url}}/api/admin/students", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] },
+              "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.expect(pm.response.code).to.equal(200));"] } }]
+            },
+            {
+              "name": "Enroll Student",
+              "request": { "method": "POST", "url": "{{base_url}}/api/admin/students", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"fullName\": \"Alice Johnson\",\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\",\n  \"dateOfBirth\": \"2005-06-15\",\n  \"gender\": \"FEMALE\",\n  \"guardians\": [{ \"name\": \"Bob Johnson\", \"relation\": \"FATHER\", \"phone\": \"9876543299\" }]\n}" } }
+            },
+            {
+              "name": "Get Student by ID",
+              "request": { "method": "GET", "url": "{{base_url}}/api/admin/students/:id", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            },
+            {
+              "name": "Update Student",
+              "request": { "method": "PATCH", "url": "{{base_url}}/api/admin/students/:id", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"classId\": \"\",\n  \"sectionId\": \"\"\n}" } }
+            }
+          ]
+        },
+        {
+          "name": "Attendance",
+          "item": [
+            {
+              "name": "List Attendance",
+              "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/admin/attendance?classId=&date=2026-05-01", "host": ["{{base_url}}"], "path": ["api", "admin", "attendance"], "query": [{ "key": "classId", "value": "" }, { "key": "date", "value": "2026-05-01" }] }, "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            },
+            {
+              "name": "Mark Attendance",
+              "request": { "method": "POST", "url": "{{base_url}}/api/admin/attendance", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"studentId\": \"\",\n  \"classId\": \"\",\n  \"date\": \"2026-05-01\",\n  \"status\": \"PRESENT\"\n}" } }
+            }
+          ]
+        },
+        {
+          "name": "Exams",
+          "item": [
+            {
+              "name": "List Exams",
+              "request": { "method": "GET", "url": "{{base_url}}/api/admin/exams", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            },
+            {
+              "name": "Create Exam",
+              "request": { "method": "POST", "url": "{{base_url}}/api/admin/exams", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"classId\": \"\",\n  \"name\": \"Mid-Term Exam\",\n  \"maxMarks\": 100,\n  \"passingMarks\": 40,\n  \"examDate\": \"2026-06-15\"\n}" } }
+            },
+            {
+              "name": "Enter Marks",
+              "request": { "method": "POST", "url": "{{base_url}}/api/admin/exams/:id/marks", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"studentId\": \"\",\n  \"marksObtained\": 85,\n  \"maxMarks\": 100,\n  \"isAbsent\": false\n}" } }
+            }
+          ]
+        },
+        {
+          "name": "Results",
+          "item": [
+            {
+              "name": "List Published Results",
+              "request": { "method": "GET", "url": "{{base_url}}/api/results", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+            },
+            {
+              "name": "Publish Results",
+              "request": { "method": "POST", "url": "{{base_url}}/api/results/publish", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"id\": \"\"\n}" } }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "⚙️ Settings",
+      "item": [
+        {
+          "name": "List Tenants (Platform Admin)",
+          "request": { "method": "GET", "url": "{{base_url}}/api/platform/tenants", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }] }
+        },
+        {
+          "name": "Get Tenant",
+          "request": { "method": "GET", "url": "{{base_url}}/api/tenants/:tenantId", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }] }
+        },
+        {
+          "name": "Create Tenant (Platform Admin)",
+          "request": { "method": "POST", "url": "{{base_url}}/api/platform/tenants", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Demo College\",\n  \"slug\": \"demo-college\"\n}" } }
+        },
+        {
+          "name": "List Campuses",
+          "request": { "method": "GET", "url": "{{base_url}}/api/tenants/:tenantId/campuses", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        },
+        {
+          "name": "Create Campus",
+          "request": { "method": "POST", "url": "{{base_url}}/api/tenants/:tenantId/campuses", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Main Campus\",\n  \"code\": \"MAIN\",\n  \"type\": \"DEGREE\",\n  \"city\": \"Bengaluru\",\n  \"state\": \"Karnataka\"\n}" } }
+        },
+        {
+          "name": "List Academic Years",
+          "request": { "method": "GET", "url": "{{base_url}}/api/tenants/:tenantId/academic-years", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        },
+        {
+          "name": "Create Academic Year",
+          "request": { "method": "POST", "url": "{{base_url}}/api/tenants/:tenantId/academic-years", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"2026-27\",\n  \"startDate\": \"2026-06-01\",\n  \"endDate\": \"2027-05-31\",\n  \"isCurrent\": true\n}" } }
+        },
+        {
+          "name": "List Templates",
+          "request": { "method": "GET", "url": "{{base_url}}/api/templates", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        },
+        {
+          "name": "Create Template",
+          "request": { "method": "POST", "url": "{{base_url}}/api/templates", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Admission Letter\",\n  \"type\": \"DOCUMENT\"\n}" } }
+        },
+        {
+          "name": "Publish Template Version",
+          "request": { "method": "POST", "url": "{{base_url}}/api/templates/:id/publish", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"content\": \"<p>Dear {{studentName}}, congratulations on your admission.</p>\",\n  \"variables\": [\"studentName\", \"program\", \"academicYear\"]\n}" } }
+        },
+        {
+          "name": "Dashboard Overview",
+          "request": { "method": "GET", "url": "{{base_url}}/api/dashboard", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        }
+      ]
+    },
+    {
+      "name": "📁 Storage",
+      "item": [
+        {
+          "name": "Get Upload URL",
+          "request": { "method": "POST", "url": "{{base_url}}/api/storage/upload-url", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"fileName\": \"student-photo.jpg\",\n  \"contentType\": \"image/jpeg\",\n  \"folder\": \"student-docs\"\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Got upload URL', () => { pm.expect(pm.response.code).to.equal(200); const r = pm.response.json(); pm.expect(r.uploadUrl).to.include('s3'); pm.environment.set('upload_key', r.key); });"] } }]
+        },
+        {
+          "name": "Get Download URL",
+          "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/storage/download-url?key={{upload_key}}", "host": ["{{base_url}}"], "path": ["api","storage","download-url"], "query": [{ "key": "key", "value": "{{upload_key}}" }] }, "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        }
+      ]
+    },
+    {
+      "name": "🗓 Timetable",
+      "item": [
+        {
+          "name": "Get Section Timetable",
+          "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/timetable?classId=CLASS_ID&academicYearId=AY_ID", "host": ["{{base_url}}"], "path": ["api","timetable"], "query": [{ "key": "classId", "value": "CLASS_ID" }, { "key": "academicYearId", "value": "AY_ID" }] }, "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        },
+        {
+          "name": "Replace Section Timetable",
+          "request": { "method": "PUT", "url": "{{base_url}}/api/timetable", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"classId\": \"CLASS_ID\",\n  \"className\": \"10A\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"AY_ID\",\n  \"slots\": [\n    { \"day\": \"MON\", \"period\": 1, \"subjectId\": \"SUBJ1\", \"subjectName\": \"Mathematics\", \"teacherId\": \"TEACHER1\", \"teacherName\": \"Mr. Sharma\", \"startTime\": \"09:00\", \"endTime\": \"09:45\" },\n    { \"day\": \"MON\", \"period\": 2, \"subjectId\": \"SUBJ2\", \"subjectName\": \"Physics\", \"teacherId\": \"TEACHER2\", \"teacherName\": \"Ms. Rao\", \"startTime\": \"09:45\", \"endTime\": \"10:30\" }\n  ]\n}" } }
+        },
+        {
+          "name": "Get Teacher Timetable",
+          "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/timetable/teacher?teacherId=TEACHER_ID&academicYearId=AY_ID", "host": ["{{base_url}}"], "path": ["api","timetable","teacher"], "query": [{ "key": "teacherId", "value": "TEACHER_ID" }, { "key": "academicYearId", "value": "AY_ID" }] }, "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        },
+        {
+          "name": "Bulk Assign Students to Class",
+          "request": { "method": "POST", "url": "{{base_url}}/api/students/bulk-assign", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"classId\": \"CLASS_ID\",\n  \"studentIds\": [\"STUDENT_ID_1\", \"STUDENT_ID_2\"]\n}" } }
+        },
+        {
+          "name": "Random Assign Students to Classes",
+          "request": { "method": "POST", "url": "{{base_url}}/api/students/random-assign", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"classIds\": [\"CLASS_A\", \"CLASS_B\", \"CLASS_C\"],\n  \"academicYearId\": \"AY_ID\",\n  \"campusId\": \"{{campus_id}}\"\n}" } }
+        }
+      ]
+    },
+    {
+      "name": "📢 Comms",
+      "item": [
+        {
+          "name": "List Communications",
+          "request": { "method": "GET", "url": "{{base_url}}/api/admin/communication", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        },
+        {
+          "name": "Send Communication",
+          "request": { "method": "POST", "url": "{{base_url}}/api/admin/communication", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Holiday Notice\",\n  \"message\": \"College will remain closed on 15th Aug\",\n  \"targetGroup\": \"ALL\"\n}" } }
+        },
+        {
+          "name": "List Events",
+          "request": { "method": "GET", "url": "{{base_url}}/api/admin/events", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        },
+        {
+          "name": "Create Event",
+          "request": { "method": "POST", "url": "{{base_url}}/api/admin/events", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"title\": \"Annual Day\",\n  \"date\": \"2026-12-15\",\n  \"description\": \"Annual cultural event\"\n}" } }
+        },
+        {
+          "name": "List Leave Applications",
+          "request": { "method": "GET", "url": "{{base_url}}/api/admin/leave", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        },
+        {
+          "name": "Apply for Leave",
+          "request": { "method": "POST", "url": "{{base_url}}/api/admin/leave", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"type\": \"CASUAL\",\n  \"fromDate\": \"2026-05-10\",\n  \"toDate\": \"2026-05-12\",\n  \"reason\": \"Personal work\"\n}" } }
+        },
+        {
+          "name": "Update Leave Status",
+          "request": { "method": "PATCH", "url": "{{base_url}}/api/admin/leave/:id", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"APPROVED\"\n}" } }
+        }
+      ]
+    },
+    {
+      "name": "🔍 Audit Logs",
+      "item": [
+        {
+          "name": "List Audit Logs",
+          "request": { "method": "GET", "url": { "raw": "{{base_url}}/api/audit-logs?limit=50", "host": ["{{base_url}}"], "path": ["api", "audit-logs"], "query": [{ "key": "limit", "value": "50" }] }, "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.expect(pm.response.code).to.equal(200));"] } }]
+        },
+        {
+          "name": "Get Audit Log by ID",
+          "request": { "method": "GET", "url": "{{base_url}}/api/audit-logs/:id", "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }] }
+        }
+      ]
+    },
+    {
+      "name": "❤️ Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{base_url}}/api/health" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Health OK', () => pm.expect(pm.response.code).to.equal(200));"] } }]
+        }
+      ]
+    }
+  ]
+}

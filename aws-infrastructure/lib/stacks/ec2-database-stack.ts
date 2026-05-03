@@ -77,7 +77,7 @@ export class Ec2DatabaseStack extends cdk.Stack {
         ? { subnets: [dbSubnet] }
         : { subnetType: ec2.SubnetType.PUBLIC },
       securityGroup: this.hostSecurityGroup,
-      instanceType: new ec2.InstanceType(config.ec2DbInstanceClass),
+      instanceType: new ec2.InstanceType(config.ec2DbInstanceClass ?? 't4g.small'),
       machineImage: ec2.MachineImage.latestAmazonLinux2023({
         cpuType: ec2.AmazonLinuxCpuType.ARM_64,
       }),
@@ -86,7 +86,7 @@ export class Ec2DatabaseStack extends cdk.Stack {
       blockDevices: [
         {
           deviceName: "/dev/xvda",
-          volume: ec2.BlockDeviceVolume.ebs(config.ec2DbVolumeSizeGb, {
+          volume: ec2.BlockDeviceVolume.ebs(config.ec2DbVolumeSizeGb ?? 30, {
             encrypted: true,
             volumeType: ec2.EbsDeviceVolumeType.GP3,
           }),

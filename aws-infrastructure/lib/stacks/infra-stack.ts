@@ -122,7 +122,7 @@ export class InfraStack extends cdk.Stack {
     const instance = new rds.DatabaseInstance(this, 'RdsInstance', {
       engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_16 }),
       instanceIdentifier: `vebgenix-${config.stage}`,
-      instanceType: new ec2.InstanceType(config.dbInstanceClass),
+      instanceType: new ec2.InstanceType(config.dbInstanceClass ?? 't4g.micro'),
       vpc: this.vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       subnetGroup,
@@ -132,7 +132,7 @@ export class InfraStack extends cdk.Stack {
       storageEncrypted: config.dbStorageEncrypted,
       storageType: rds.StorageType.GP2,
       allocatedStorage: 20,
-      backupRetention: cdk.Duration.days(config.dbBackupRetentionDays),
+      backupRetention: cdk.Duration.days(config.dbBackupRetentionDays ?? 1),
       deletionProtection: config.dbDeletionProtection,
       removalPolicy: config.stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       publiclyAccessible: false,
