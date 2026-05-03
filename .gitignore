@@ -12,6 +12,26 @@ dist
 dist-ssr
 *.local
 
+# Turbo local task cache (pure perf cache — safe to delete anytime)
+.turbo/
+
+# CDK synthesis output
+cdk.out/
+
+# TypeScript build artifacts (generated from .ts source — never commit)
+# Applies to aws-infrastructure/lib/**/*.js, *.d.ts, *.js.map
+aws-infrastructure/**/*.js
+aws-infrastructure/**/*.js.map
+aws-infrastructure/**/*.d.ts
+# Exclude CDK bin entrypoint check files that some tools expect tracked
+!aws-infrastructure/bin/*.ts
+!aws-infrastructure/lib/**/*.ts
+!aws-infrastructure/config/**/*.ts
+
+# Compiled package outputs (built by tsc, consumed by Lambda bundler)
+packages/*/dist/
+apps/*/dist/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
