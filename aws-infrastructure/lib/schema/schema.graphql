@@ -674,8 +674,7 @@ input AttendanceRecordInput {
 # ─── Query ────────────────────────────────────────────────────────────────────
 
 type Query {
-  _empty: String
-  health: String @aws_api_key
+  health: String
 
   # Dashboard
   dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
@@ -813,17 +812,11 @@ type Query {
   # Storage
   generateDownloadUrl(key: String!): AWSJSON
 
-  # Legacy placeholders (kept for backward compat)
-  _studentsEmpty: String
-  _feesEmpty: String
-  _templatesEmpty: String
 }
 
 # ─── Mutation ─────────────────────────────────────────────────────────────────
 
 type Mutation {
-  _empty: String
-
   # Identity
   createUser(input: CreateUserInput!): User!
   updateUser(input: UpdateUserInput!): User!

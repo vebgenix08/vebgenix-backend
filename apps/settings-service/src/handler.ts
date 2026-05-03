@@ -35,6 +35,13 @@ function parseEvent(event: Record<string, unknown>) {
 export const handler = async (event: Record<string, unknown>, context: Record<string, unknown>) => {
   bootstrapDB(context);
   try {
+    // Health check — no auth, no DB needed
+    const rawOp = (event.info as Record<string, string> | undefined)?.fieldName
+      ?? (event.httpMethod ? `${event.httpMethod}:${event.path}` : '');
+    if (rawOp === 'health' || rawOp === 'GET:/api/health') {
+      return 'OK';
+    }
+
     await ensureDB();
     const ctx = await resolveContext(event);
     const { operation, args } = parseEvent(event);

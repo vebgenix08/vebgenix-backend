@@ -276,8 +276,19 @@ export class AppSyncStack extends cdk.Stack {
     users('Mutation', 'bulkDeactivateUsers');
     users('Mutation', 'impersonateUser');
 
+    // ── Health check ────────────────────────────────────────────────────────
+    R(settingsDs)('Query', 'health');
+
     // ── Admissions resolvers ────────────────────────────────────────────────
     const admissions = R(admissionsDs);
+    admissions('Query',    'listAdmissions');
+    admissions('Query',    'getAdmission');
+    admissions('Mutation', 'createAdmission');
+    admissions('Mutation', 'updateAdmission');
+    admissions('Mutation', 'submitAdmission');
+    admissions('Mutation', 'reviewAdmission');
+    admissions('Mutation', 'withdrawAdmission');
+    admissions('Mutation', 'updateAdmissionStatus');
     admissions('Query',    'listEnquiries');
     admissions('Query',    'getEnquiry');
     admissions('Query',    'listApplications');
@@ -505,6 +516,8 @@ export class AppSyncStack extends cdk.Stack {
     academics('Query',    'getStudentAttendance');
     academics('Query',    'getAttendanceSummary');
     academics('Mutation', 'enablePortalAccess');
+    academics('Mutation', 'enableStudentPortal');
+    academics('Mutation', 'enableGuardianPortal');
     academics('Mutation', 'markClassAttendance');
 
     // ── Settings extra resolvers ────────────────────────────────────────────

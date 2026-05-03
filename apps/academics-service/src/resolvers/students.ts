@@ -99,6 +99,7 @@ export async function resolveStudents(
         .sort({ fullName: 1 })
         .lean();
 
+    case 'enableStudentPortal':
     case 'enablePortalAccess':
     case 'POST:/api/admin/students/:studentId/enable-portal': {
       authorize(ctx, 'students.portal.manage');
@@ -134,6 +135,56 @@ export async function resolveStudents(
       }));
       await AcademicsRepo.updateStudent(tenantId, studentId, { portalEnabled: true } as never);
       return { success: true, message: `Portal access enabled. Login credentials sent to ${email}` };
+    }
+
+    case 'enableGuardianPortal':
+    case 'POST:/api/admin/students/:studentId/enable-guardian-portal': {
+      authorize(ctx, 'students.portal.manage');
+      const input = (args.input ?? args) as Record<string, unknown>;
+      const studentId    = (input.studentId ?? args.studentId ?? args.id) as string;
+      const guardianName = input.guardianName as string;
+      const email        = input.email        as string;
+      const phone        = input.phone        as string | undefined;
+      const relationship = input.relationship as string | undefined;
+
+      if (!studentId)    throw new AppError('BAD_REQUEST', 'studentId is required');
+      if (!guardianName) throw new AppError('BAD_REQUEST', 'guardianName is required');
+      if (!email)        throw new AppError('BAD_REQUEST', 'email is required');
+
+      const student = await AcademicsRepo.findStudentById(tenantId, studentId);
+      if (!student) throw new AppError('NOT_FOUND', 'Student not found');
+
+      const {
+        AdminCreateUserCommand,
+        AdminAddUserToGroupCommand,
+        CognitoIdentityProviderClient,
+      } = await import('@aws-sdk/client-cognito-identity-provider');
+      const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+
+      const userAttributes = [
+        { Name: 'email',            Value: email },
+        { Name: 'name',             Value: guardianName },
+        { Name: 'custom:tenantId',  Value: tenantId },
+        { Name: 'custom:role',      Value: 'GUARDIAN' },
+        { Name: 'custom:studentId', Value: studentId },
+        { Name: 'email_verified',   Value: 'true' },
+      ];
+      if (phone)        userAttributes.push({ Name: 'phone_number', Value: phone });
+      if (relationship) userAttributes.push({ Name: 'custom:relationship', Value: relationship });
+
+      await cognito.send(new AdminCreateUserCommand({
+        UserPoolId:             process.env.COGNITO_USER_POOL_ID,
+        Username:               email,
+        DesiredDeliveryMediums: ['EMAIL'],
+        UserAttributes:         userAttributes,
+      }));
+      await cognito.send(new AdminAddUserToGroupCommand({
+        UserPoolId: process.env.COGNITO_USER_POOL_ID,
+        Username:   email,
+        GroupName:  'GUARDIAN',
+      }));
+
+      return { success: true, message: `Guardian portal enabled. Login credentials sent to ${email}` };
     }
 
     default:

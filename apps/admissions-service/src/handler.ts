@@ -218,17 +218,99 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'GET:/api/admissions/stats': {
         authorize(ctx, 'admissions.enquiry.read');
         const { Enquiry: EnquiryModel, Application: AppModel } = await import('@vebgenix/db');
-        const { Types: MongoTypes } = await import('mongoose');
-        const tid = new MongoTypes.ObjectId(tenantId);
         const [totalEnquiries, newEnquiries, totalApplications, pendingApplications, approvedApplications] =
           await Promise.all([
-            EnquiryModel.countDocuments({ tenantId: tid }),
-            EnquiryModel.countDocuments({ tenantId: tid, status: 'NEW' }),
-            AppModel.countDocuments({ tenantId: tid }),
-            AppModel.countDocuments({ tenantId: tid, status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } }),
-            AppModel.countDocuments({ tenantId: tid, status: 'APPROVED' }),
+            EnquiryModel.countDocuments({ tenantId }),
+            EnquiryModel.countDocuments({ tenantId, status: 'NEW' }),
+            AppModel.countDocuments({ tenantId }),
+            AppModel.countDocuments({ tenantId, status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } }),
+            AppModel.countDocuments({ tenantId, status: 'APPROVED' }),
           ]);
         return { totalEnquiries, newEnquiries, totalApplications, pendingApplications, approvedApplications };
+      }
+
+      // ── Legacy admission aliases ──────────────────────────────────────────
+      // These map the Admission type (id, studentName, status, createdAt, updatedAt)
+      // onto the existing Application workflow.
+
+      case 'listAdmissions': {
+        authorize(ctx, 'admissions.application.read');
+        const filter: Record<string, unknown> = {};
+        if (args.filter) {
+          const f = args.filter as Record<string, unknown>;
+          if (f.status) filter.status = f.status;
+        }
+        const apps = await AdmissionsRepo.listApplications(tenantId, filter);
+        return {
+          edges: (apps as unknown as Array<Record<string, unknown>>).map((a) => ({
+            cursor: String(a._id),
+            node: { id: String(a._id), studentName: a.studentName ?? a.applicantName ?? '', status: a.status, createdAt: a.createdAt, updatedAt: a.updatedAt },
+          })),
+          pageInfo: { hasNextPage: false, nextCursor: null },
+        };
+      }
+
+      case 'getAdmission': {
+        authorize(ctx, 'admissions.application.read');
+        const app = await AdmissionsRepo.findApplicationById(tenantId, args.id as string) as unknown as Record<string, unknown> | null;
+        if (!app) throw new AppError('NOT_FOUND', 'Admission not found');
+        return { id: String(app._id), studentName: app.studentName ?? app.applicantName ?? '', status: app.status, createdAt: app.createdAt, updatedAt: app.updatedAt };
+      }
+
+      case 'createAdmission': {
+        authorize(ctx, 'admissions.application.create');
+        const input = (args.input ?? args) as Record<string, unknown>;
+        const app = await AdmissionsRepo.createApplication(tenantId, {
+          studentName:   input.studentName as string,
+          phone:         input.phone        as string,
+          status:        'DRAFT',
+          source:        'ADMIN',
+        } as never);
+        const a = app as unknown as Record<string, unknown>;
+        return { id: String(a._id), studentName: a.studentName ?? '', status: a.status, createdAt: a.createdAt, updatedAt: a.updatedAt };
+      }
+
+      case 'updateAdmission': {
+        authorize(ctx, 'admissions.application.update');
+        const input = (args.input ?? args) as Record<string, unknown>;
+        const updated = await AdmissionsRepo.updateApplication(tenantId, input.id as string, {
+          ...(input.studentName ? { studentName: input.studentName as string } : {}),
+          ...(input.status      ? { status:      input.status as never }       : {}),
+        } as never) as unknown as Record<string, unknown> | null;
+        if (!updated) throw new AppError('NOT_FOUND', 'Admission not found');
+        return { id: String(updated._id), studentName: updated.studentName ?? '', status: updated.status, createdAt: updated.createdAt, updatedAt: updated.updatedAt };
+      }
+
+      case 'submitAdmission': {
+        authorize(ctx, 'admissions.application.update');
+        const app = await AdmissionsRepo.findApplicationById(tenantId, args.id as string);
+        if (!app) throw new AppError('NOT_FOUND', 'Admission not found');
+        const updated = await AdmissionsRepo.updateApplication(tenantId, args.id as string, { status: 'SUBMITTED', submittedAt: new Date() }) as unknown as Record<string, unknown>;
+        return { id: String(updated._id), studentName: updated.studentName ?? '', status: updated.status, createdAt: updated.createdAt, updatedAt: updated.updatedAt };
+      }
+
+      case 'reviewAdmission': {
+        const input = (args.input ?? args) as Record<string, unknown>;
+        const reviewed = await ReviewApplication.execute(ctx, {
+          applicationId: args.id as string,
+          decision:      input.decision as 'APPROVED' | 'REJECTED',
+          remarks:       (input.remarks ?? input.comments) as string | undefined,
+        }) as unknown as Record<string, unknown>;
+        return { id: String(reviewed._id ?? args.id), studentName: reviewed.studentName ?? '', status: reviewed.status, createdAt: reviewed.createdAt, updatedAt: reviewed.updatedAt };
+      }
+
+      case 'withdrawAdmission': {
+        authorize(ctx, 'admissions.application.update');
+        const updated = await AdmissionsRepo.updateApplication(tenantId, args.id as string, { status: 'WITHDRAWN' as never }) as unknown as Record<string, unknown> | null;
+        if (!updated) throw new AppError('NOT_FOUND', 'Admission not found');
+        return { id: String(updated._id), studentName: updated.studentName ?? '', status: updated.status, createdAt: updated.createdAt, updatedAt: updated.updatedAt };
+      }
+
+      case 'updateAdmissionStatus': {
+        authorize(ctx, 'admissions.application.update');
+        const updated = await AdmissionsRepo.updateApplication(tenantId, args.id as string, { status: args.status as never }) as unknown as Record<string, unknown> | null;
+        if (!updated) throw new AppError('NOT_FOUND', 'Admission not found');
+        return { id: String(updated._id), studentName: updated.studentName ?? '', status: updated.status, createdAt: updated.createdAt, updatedAt: updated.updatedAt };
       }
 
       default:

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthContext } from '@vebgenix/auth';
 import { AppError } from '@vebgenix/errors';
+import { TenantFeature } from '@vebgenix/db';
 
 export function requirePermission(...permissions: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -45,12 +46,50 @@ export function requireSuperAdmin(req: Request, res: Response, next: NextFunctio
 }
 
 export function requireFeatureAccess(feature: string) {
-  return (_req: Request, _res: Response, next: NextFunction): void => {
-    // TODO: query TenantFeature model for feature flag
-    // For now, pass through — feature flag check to be implemented per-service
-    void feature;
-    next();
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const ctx = req.ctx as AuthContext | undefined;
+    if (!ctx) {
+      res.status(401).json({ code: 'UNAUTHORIZED', message: 'Not authenticated' });
+      return;
+    }
+    // Platform admins bypass all feature flags
+    if (ctx.isPlatformAdmin) { next(); return; }
+
+    const tenantId = ctx.membership?.tenantId;
+    if (!tenantId) {
+      res.status(403).json({ code: 'FORBIDDEN', message: 'No tenant context for feature check' });
+      return;
+    }
+
+    TenantFeature.findOne({ tenantId }).lean().then((doc) => {
+      const features = (doc as Record<string, unknown> | null)?.features as Record<string, boolean> | undefined;
+      const enabled  = features?.[feature] ?? false;
+      if (!enabled) {
+        res.status(403).json({ code: 'FEATURE_DISABLED', message: `Feature "${feature}" is not enabled for this tenant` });
+        return;
+      }
+      next();
+    }).catch((err: unknown) => {
+      console.error('[requireFeatureAccess] DB error:', err);
+      res.status(500).json({ code: 'INTERNAL', message: 'Feature check failed' });
+    });
   };
+}
+
+/**
+ * Use-case level feature guard — throws AppError if feature is disabled.
+ * Call with `await requireFeatureEnabled(ctx, 'admissions')` inside use-cases.
+ */
+export async function requireFeatureEnabled(ctx: AuthContext, feature: string): Promise<void> {
+  if (ctx.isPlatformAdmin) return;
+  const tenantId = ctx.membership?.tenantId;
+  if (!tenantId) throw new AppError('FORBIDDEN', 'No tenant context for feature check');
+  const doc = await TenantFeature.findOne({ tenantId }).lean();
+  const features = (doc as Record<string, unknown> | null)?.features as Record<string, boolean> | undefined;
+  const enabled  = features?.[feature] ?? false;
+  if (!enabled) {
+    throw new AppError('FORBIDDEN', `Feature "${feature}" is not enabled for this tenant`);
+  }
 }
 
 /** Utility: throw AppError if ctx is missing a permission (for use inside use-cases) */
