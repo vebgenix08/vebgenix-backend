@@ -8,6 +8,9 @@ export { bootstrapDB, ensureDB } from './lambda';
 export { withTenant } from './withTenant';
 export type { TenantScope } from './withTenant';
 
+// ── Tenant ID generator ───────────────────────────────────────────────────────
+export { generateTenantId, isValidTenantId } from './generateTenantId';
+
 // ── Models: Auth ──────────────────────────────────────────────────────────────
 export { AuthUser } from './models/auth/AuthUser.model';
 export type { IAuthUser } from './models/auth/AuthUser.model';

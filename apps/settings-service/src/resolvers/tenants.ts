@@ -1,4 +1,4 @@
-import { Tenant, TenantFeature } from '@vebgenix/db';
+import { Tenant, TenantFeature, generateTenantId } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
@@ -31,9 +31,11 @@ export async function resolveTenants(
     case 'createTenant':
     case 'POST:/api/platform/tenants': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
-      const input  = (args.input as Record<string, unknown>) ?? args;
-      const tenant = await Tenant.create({ ...input, isActive: true });
-      await TenantFeature.create({ tenantId: tenant._id.toString() });
+      const input    = (args.input as Record<string, unknown>) ?? args;
+      // Generate a human-readable prefixed tenant ID (e.g. inst_a3f9k2xb)
+      const tenantId = generateTenantId(input.type as string | undefined);
+      const tenant   = await Tenant.create({ ...input, tenantId, isActive: true });
+      await TenantFeature.create({ tenantId });
       return tenant;
     }
 

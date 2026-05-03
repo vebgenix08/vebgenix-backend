@@ -52,8 +52,7 @@ jobs:
         run: npm ci
 
       - name: Run TypeScript type-check
-        run: npx tsc --noEmit -p tsconfig.base.json 2>/dev/null || \
-             npx turbo run typecheck --filter='./packages/*' --filter='./apps/*' 2>/dev/null || true
+        run: npx turbo run typecheck
 
       - name: CDK deploy all prod stacks
         working-directory: aws-infrastructure

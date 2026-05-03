@@ -9,7 +9,7 @@ output "atlas_project_id" {
   value       = mongodbatlas_project.dev.id
 }
 
-output "mongodb_ssm_parameter_name" {
-  description = "SSM parameter name holding the MongoDB URI"
-  value       = aws_ssm_parameter.mongodb_uri.name
+output "mongodb_secret_name" {
+  description = "Secrets Manager secret name holding the MongoDB URI (read by CDK stacks)"
+  value       = aws_secretsmanager_secret.mongodb.name
 }

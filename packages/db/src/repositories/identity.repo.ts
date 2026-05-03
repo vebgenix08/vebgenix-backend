@@ -44,21 +44,15 @@ export const IdentityRepo = {
   // ── Profile ───────────────────────────────────────────────────────────────
 
   async findProfileByAuthUserId(tenantId: string, authUserId: string): Promise<IProfile | null> {
-    return Profile.findOne({
-      tenantId:   new Types.ObjectId(tenantId),
-      authUserId: new Types.ObjectId(authUserId),
-    });
+    return Profile.findOne({ tenantId, authUserId: new Types.ObjectId(authUserId) });
   },
 
   async findProfileById(tenantId: string, profileId: string): Promise<IProfile | null> {
-    return Profile.findOne({
-      tenantId: new Types.ObjectId(tenantId),
-      _id:      new Types.ObjectId(profileId),
-    });
+    return Profile.findOne({ tenantId, _id: new Types.ObjectId(profileId) });
   },
 
   async listProfiles(tenantId: string, filters: Record<string, unknown> = {}) {
-    return Profile.find({ tenantId: new Types.ObjectId(tenantId), ...filters }).sort({ createdAt: -1 });
+    return Profile.find({ tenantId, ...filters }).sort({ createdAt: -1 });
   },
 
   async createProfile(data: Partial<IProfile>) {
@@ -67,7 +61,7 @@ export const IdentityRepo = {
 
   async updateProfile(tenantId: string, profileId: string, update: Partial<IProfile>) {
     return Profile.findOneAndUpdate(
-      { tenantId: new Types.ObjectId(tenantId), _id: new Types.ObjectId(profileId) },
+      { tenantId, _id: new Types.ObjectId(profileId) },
       { $set: update },
       { new: true },
     );
@@ -75,7 +69,7 @@ export const IdentityRepo = {
 
   async deactivateProfile(tenantId: string, profileId: string) {
     return Profile.findOneAndUpdate(
-      { tenantId: new Types.ObjectId(tenantId), _id: new Types.ObjectId(profileId) },
+      { tenantId, _id: new Types.ObjectId(profileId) },
       { $set: { isActive: false } },
       { new: true },
     );

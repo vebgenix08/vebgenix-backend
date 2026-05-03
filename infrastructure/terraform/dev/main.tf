@@ -78,16 +78,29 @@ resource "mongodbatlas_project_ip_access_list" "all" {
   comment    = "Dev: all IPs (Lambda IPs are dynamic)"
 }
 
-# ── AWS SSM: Write Atlas connection string so CDK stacks can read it ──────────
+# ── AWS Secrets Manager: Write Atlas URI so CDK resolves it at deploy time ────
+#
+# CDK stacks read this via CloudFormation dynamic references:
+#   {{resolve:secretsmanager:vebgenix/dev/mongodb:SecretString:uri}}
+#
+# The secret name MUST match exactly: vebgenix/{stage}/mongodb
+# The JSON key MUST be: uri
 
-resource "aws_ssm_parameter" "mongodb_uri" {
-  name        = "/vebgenix/dev/MONGODB_URI"
-  type        = "SecureString"
-  description = "MongoDB Atlas connection string for dev"
-  value       = "mongodb+srv://${mongodbatlas_database_user.app.username}:${var.mongodb_app_password}@${replace(mongodbatlas_cluster.dev.connection_strings[0].standard_srv, "mongodb+srv://", "")}/${var.mongodb_db_name}?retryWrites=true&w=majority"
+locals {
+  mongodb_uri = "mongodb+srv://${mongodbatlas_database_user.app.username}:${var.mongodb_app_password}@${replace(mongodbatlas_cluster.dev.connection_strings[0].standard_srv, "mongodb+srv://", "")}/${var.mongodb_db_name}?retryWrites=true&w=majority"
+}
+
+resource "aws_secretsmanager_secret" "mongodb" {
+  name        = "vebgenix/dev/mongodb"
+  description = "MongoDB Atlas connection string for dev — read by CDK Lambdas at runtime"
 
   tags = {
     Environment = "dev"
     ManagedBy   = "terraform"
   }
+}
+
+resource "aws_secretsmanager_secret_version" "mongodb" {
+  secret_id     = aws_secretsmanager_secret.mongodb.id
+  secret_string = jsonencode({ uri = local.mongodb_uri })
 }
