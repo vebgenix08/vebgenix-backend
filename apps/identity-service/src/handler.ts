@@ -292,6 +292,35 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         return { success: true, message: 'Invitation resent' };
       }
 
+      // ── Accept invite ─────────────────────────────────────────────────────
+      // Called when a staff member clicks their invite link before setting
+      // a password. The `token` is their email address (or a profile lookup key).
+      // The actual Cognito password-set happens client-side via confirmSignIn;
+      // this endpoint validates the invite is still open and returns pre-fill info.
+      case 'acceptInvite':
+      case 'POST:/api/auth/accept-invite': {
+        const token = args.token as string;
+        if (!token) throw new AppError('BAD_REQUEST', 'token is required');
+        // Lookup by email (the token sent in the Cognito invitation email)
+        const authUser = await IdentityRepo.findAuthUserByEmail(token);
+        if (!authUser) {
+          // Try treating token as a profileId
+          const profileById = await Profile.findById(token).lean() as unknown as Record<string, unknown> | null;
+          if (!profileById) throw new AppError('NOT_FOUND', 'Invalid or expired invite token');
+          return {
+            success:        true,
+            email:          profileById.email as string,
+            isExistingUser: !!(authUser),
+          };
+        }
+        const isExistingUser = !!authUser.cognitoSub;
+        return {
+          success: true,
+          email:   authUser.email,
+          isExistingUser,
+        };
+      }
+
       // ── Bulk operations ────────────────────────────────────────────────────
       case 'bulkDeactivateUsers':
       case 'POST:/api/admin/users/bulk-deactivate': {

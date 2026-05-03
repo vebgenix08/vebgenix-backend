@@ -482,6 +482,7 @@ export class AppSyncStack extends cdk.Stack {
     users('Mutation', 'uploadAvatar');
     users('Mutation', 'uploadTenantLogo');
     users('Mutation', 'resendInvite');
+    users('Mutation', 'acceptInvite');
 
     // ── Finance extra resolvers ─────────────────────────────────────────────
     finance('Mutation', 'createOneOffCharge');
@@ -500,9 +501,18 @@ export class AppSyncStack extends cdk.Stack {
     // ── Academics extra resolvers ───────────────────────────────────────────
     academics('Query',    'getExamStats');
     academics('Query',    'getMarksStatus');
+    academics('Query',    'getClassAttendance');
+    academics('Query',    'getStudentAttendance');
+    academics('Query',    'getAttendanceSummary');
     academics('Mutation', 'enablePortalAccess');
+    academics('Mutation', 'markClassAttendance');
 
     // ── Settings extra resolvers ────────────────────────────────────────────
+    settings('Query',    'validateSubdomain');
+    settings('Query',    'listAvailableFeatures');
+    settings('Mutation', 'provisionTenant');
+    settings('Mutation', 'requestTenantDeletion');
+    settings('Mutation', 'confirmTenantDeletion');
     settings('Mutation', 'createFirstAdmin');
     settings('Mutation', 'finalizeOnboarding');
     settings('Mutation', 'finalizeTenant');

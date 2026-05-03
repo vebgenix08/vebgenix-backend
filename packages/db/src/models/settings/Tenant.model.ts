@@ -20,6 +20,10 @@ export interface ITenant extends Document {
   finalizedAt?:        Date;
   finalizedBy?:        string;
   plan?:               string;
+  deletedAt?:          Date;
+  deletedBy?:          string;
+  deletionOtp?:            string;
+  deletionOtpExpiresAt?:   Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,10 +37,14 @@ const TenantSchema = new Schema<ITenant>(
     logoUrl:   { type: String },
     domain:    { type: String },
     isActive:  { type: Boolean, default: true },
-    onboardingComplete: { type: Boolean, default: false },
-    finalizedAt:        { type: Date },
-    finalizedBy:        { type: String },
-    plan:      { type: String },
+    onboardingComplete:    { type: Boolean, default: false },
+    finalizedAt:           { type: Date },
+    finalizedBy:           { type: String },
+    plan:                  { type: String },
+    deletedAt:             { type: Date },
+    deletedBy:             { type: String },
+    deletionOtp:           { type: String, select: false },  // never returned in queries by default
+    deletionOtpExpiresAt:  { type: Date,   select: false },
   },
   { timestamps: true },
 );
