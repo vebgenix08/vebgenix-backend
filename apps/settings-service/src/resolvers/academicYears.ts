@@ -2,6 +2,12 @@ import { AcademicYear } from '@vebgenix/db';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 
+function toGql(doc: Record<string, unknown> | null) {
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  return { ...rest, id: String(_id) };
+}
+
 export async function resolveAcademicYears(
   operation: string,
   args: Record<string, unknown>,
@@ -11,40 +17,44 @@ export async function resolveAcademicYears(
   switch (operation) {
 
     case 'listAcademicYears':
-    case 'GET:/api/admin/settings/academic-years':
-      return AcademicYear.find({ tenantId }).sort({ startDate: -1 }).lean();
+    case 'GET:/api/admin/settings/academic-years': {
+      const docs = await AcademicYear.find({ tenantId }).sort({ startDate: -1 }).lean();
+      return docs.map(d => toGql(d as Record<string, unknown>));
+    }
 
     case 'getAcademicYear':
     case 'GET:/api/admin/settings/academic-years/:id':
-      return AcademicYear.findOne({ tenantId, _id: args.id as string }).lean();
+      return toGql(await AcademicYear.findOne({ tenantId, _id: args.id as string }).lean() as Record<string, unknown> | null);
 
     case 'createAcademicYear':
     case 'POST:/api/admin/settings/academic-years': {
       authorize(ctx, 'settings.academic_year.create');
       const input = (args.input as Record<string, unknown>) ?? args;
-      return AcademicYear.create({ ...input, tenantId });
+      const doc = await AcademicYear.create({ ...input, tenantId });
+      return toGql(doc.toObject() as Record<string, unknown>);
     }
 
     case 'updateAcademicYear':
     case 'PATCH:/api/admin/settings/academic-years/:id': {
       authorize(ctx, 'settings.academic_year.update');
-      const { id, ...input } = args as Record<string, unknown>;
-      return AcademicYear.findOneAndUpdate(
+      const { id, input } = args as Record<string, unknown>;
+      const update = (input as Record<string, unknown>) ?? {};
+      return toGql(await AcademicYear.findOneAndUpdate(
         { tenantId, _id: id as string },
-        { $set: input },
+        { $set: update },
         { new: true },
-      ).lean();
+      ).lean() as Record<string, unknown> | null);
     }
 
     case 'setActiveAcademicYear':
     case 'POST:/api/admin/settings/academic-years/:id/activate': {
       authorize(ctx, 'settings.academic_year.update');
       await AcademicYear.updateMany({ tenantId }, { $set: { isActive: false } });
-      return AcademicYear.findOneAndUpdate(
+      return toGql(await AcademicYear.findOneAndUpdate(
         { tenantId, _id: args.id as string },
         { $set: { isActive: true } },
         { new: true },
-      ).lean();
+      ).lean() as Record<string, unknown> | null);
     }
 
     default:

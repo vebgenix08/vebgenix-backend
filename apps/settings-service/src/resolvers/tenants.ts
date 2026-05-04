@@ -15,6 +15,13 @@ function generateOtp(): string {
   return String(Math.floor(100_000 + Math.random() * 900_000));
 }
 
+/** Serialize a Tenant DB document to GraphQL shape (maps tenantId → id). */
+function toGql(doc: Record<string, unknown> | null) {
+  if (!doc) return null;
+  const { _id, ...rest } = doc as Record<string, unknown>;
+  return { ...rest, id: rest['tenantId'] };
+}
+
 export async function resolveTenants(
   operation: string,
   args: Record<string, unknown>,
@@ -30,7 +37,8 @@ export async function resolveTenants(
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const filter: Record<string, unknown> = {};
       if (args.isActive !== undefined) filter.isActive = args.isActive === 'true' || args.isActive === true;
-      return Tenant.find(filter).sort({ name: 1 }).lean();
+      const docs = await Tenant.find(filter).sort({ name: 1 }).lean();
+      return { items: docs.map(d => toGql(d as Record<string, unknown>)), nextToken: null };
     }
 
     case 'getTenant':
@@ -39,7 +47,7 @@ export async function resolveTenants(
       if (!ctx.isPlatformAdmin && id !== tenantId) {
         throw new AppError('FORBIDDEN', 'Cannot view another tenant');
       }
-      return Tenant.findOne({ tenantId: id }).lean();
+      return toGql(await Tenant.findOne({ tenantId: id }).lean() as Record<string, unknown> | null);
     }
 
     // ── Subdomain validation ──────────────────────────────────────────────────
@@ -72,7 +80,7 @@ export async function resolveTenants(
       const newTenantId = generateTenantId(input.type as string | undefined);
       const tenant     = await Tenant.create({ ...input, tenantId: newTenantId, isActive: true });
       await TenantFeature.create({ tenantId: newTenantId });
-      return tenant;
+      return toGql(tenant.toObject() as Record<string, unknown>);
     }
 
     // ── Provision tenant (full automated workflow) ────────────────────────────
@@ -172,22 +180,22 @@ export async function resolveTenants(
       if (!ctx.isPlatformAdmin) authorize(ctx, 'tenant.settings.update');
       const input = (args.input as Record<string, unknown>) ?? args;
       const { isActive: _ia, slug: _sl, tenantId: _tid, ...safeInput } = input as Record<string, unknown>;
-      return Tenant.findOneAndUpdate(
+      return toGql(await Tenant.findOneAndUpdate(
         { tenantId: resolvedTenantId },
         { $set: safeInput },
         { new: true },
-      ).lean();
+      ).lean() as Record<string, unknown> | null);
     }
 
     case 'deactivateTenant':
     case 'DELETE:/api/platform/tenants/:id': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const id = (args.tenantId ?? args.id) as string;
-      return Tenant.findOneAndUpdate(
+      return toGql(await Tenant.findOneAndUpdate(
         { tenantId: id },
         { $set: { isActive: false } },
         { new: true },
-      ).lean();
+      ).lean() as Record<string, unknown> | null);
     }
 
     // ── Tenant deletion OTP flow ──────────────────────────────────────────────
