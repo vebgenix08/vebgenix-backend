@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "vebgenix-api-collection",
     "name": "Vebgenix API",
-    "description": "Complete API collection for Vebgenix Backend.\nImport alongside Vebgenix-Dev.postman_environment.json.\n\nRequired environment variables:\n  base_url          - Lambda Function URL / API Gateway / local REST base URL\n  appsync_url       - AWS AppSync GraphQL endpoint\n  access_token      - Set automatically by 'Get Token'\n  tenant_id         - Your tenant slug/ID\n  campus_id         - Default campus ObjectId\n  cognito_region    - e.g. ap-south-1\n  cognito_client_id - Cognito App Client ID",
+    "description": "Complete Vebgenix backend Postman collection.\n\nImport `Vebgenix-Dev.postman_environment.json`, set `base_url`, `tenant_id`, Cognito values, and run Auth -> Get Token before protected APIs.\n\nDetailed testing guide is in `postman/README.md`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -26,7 +26,7 @@
   "item": [
     {
       "name": "🔐 Auth (Cognito)",
-      "description": "Authentication is via AWS Cognito. 'Get Token' sets access_token automatically.",
+      "description": "Cognito authentication requests. Run Get Token first, then copy or auto-store access_token, id_token, and refresh_token in the Postman environment.",
       "item": [
         {
           "name": "Get Token — User+Password",
@@ -46,7 +46,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": { \"USERNAME\": \"admin@example.com\", \"PASSWORD\": \"YourPassword1!\" }\n}"
-            }
+            },
+            "description": "Returns one token — user+password by id or filter.\n\nMethod: POST\nURL: https://cognito-idp.{{cognito_region}}.amazonaws.com/\nAuth: Cognito service request\nEnvironment variables: {{cognito_client_id}}, {{cognito_region}}\n\nExample body:\n```json\n{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": { \"USERNAME\": \"admin@example.com\", \"PASSWORD\": \"YourPassword1!\" }\n}\n```"
           },
           "event": [
             {
@@ -82,7 +83,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"AuthFlow\": \"REFRESH_TOKEN_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": { \"REFRESH_TOKEN\": \"{{refresh_token}}\" }\n}"
-            }
+            },
+            "description": "Gets or refreshes Cognito tokens for Postman testing.\n\nMethod: POST\nURL: https://cognito-idp.{{cognito_region}}.amazonaws.com/\nAuth: Cognito service request\nEnvironment variables: {{cognito_client_id}}, {{cognito_region}}, {{refresh_token}}\n\nExample body:\n```json\n{\n  \"AuthFlow\": \"REFRESH_TOKEN_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": { \"REFRESH_TOKEN\": \"{{refresh_token}}\" }\n}\n```"
           },
           "event": [
             {
@@ -117,7 +119,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"Token\": \"{{refresh_token}}\",\n  \"ClientId\": \"{{cognito_client_id}}\"\n}"
-            }
+            },
+            "description": "Gets or refreshes Cognito tokens for Postman testing.\n\nMethod: POST\nURL: https://cognito-idp.{{cognito_region}}.amazonaws.com/\nAuth: Cognito service request\nEnvironment variables: {{cognito_client_id}}, {{cognito_region}}, {{refresh_token}}\n\nExample body:\n```json\n{\n  \"Token\": \"{{refresh_token}}\",\n  \"ClientId\": \"{{cognito_client_id}}\"\n}\n```"
           },
           "event": [
             {
@@ -146,7 +149,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "GET request for 🔐 Auth (Cognito).\n\nMethod: GET\nURL: {{base_url}}/api/me\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         }
       ]
@@ -168,7 +172,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of users.\n\nMethod: GET\nURL: {{base_url}}/api/admin/users\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -193,7 +198,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"user@example.com\",\n  \"fullName\": \"John Doe\",\n  \"phone\": \"9876543210\",\n  \"personaRole\": \"STAFF\",\n  \"campusId\": \"{{campus_id}}\"\n}"
-            }
+            },
+            "description": "Creates a new user record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/users\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"email\": \"user@example.com\",\n  \"fullName\": \"John Doe\",\n  \"phone\": \"9876543210\",\n  \"personaRole\": \"STAFF\",\n  \"campusId\": \"{{campus_id}}\"\n}\n```"
           }
         },
         {
@@ -210,7 +216,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns one user by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/users/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -235,7 +242,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"isActive\": true\n}"
-            }
+            },
+            "description": "Updates an existing user record.\n\nMethod: PATCH\nURL: {{base_url}}/api/admin/users/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fullName\": \"Jane Doe\",\n  \"isActive\": true\n}\n```"
           }
         },
         {
@@ -252,7 +260,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Deletes or deactivates the selected 👤 identity — users & staff record.\n\nMethod: DELETE\nURL: {{base_url}}/api/admin/users/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -269,7 +278,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of staff.\n\nMethod: GET\nURL: {{base_url}}/api/admin/staff\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -294,10 +304,12 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"teacher@example.com\",\n  \"fullName\": \"Mr. Smith\",\n  \"phone\": \"9876543211\",\n  \"campusId\": \"{{campus_id}}\",\n  \"staffType\": \"TEACHER\",\n  \"staffCategory\": \"TEACHING\"\n}"
-            }
+            },
+            "description": "POST request for 👤 Identity — Users & Staff.\n\nMethod: POST\nURL: {{base_url}}/api/admin/staff\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"email\": \"teacher@example.com\",\n  \"fullName\": \"Mr. Smith\",\n  \"phone\": \"9876543211\",\n  \"campusId\": \"{{campus_id}}\",\n  \"staffType\": \"TEACHER\",\n  \"staffCategory\": \"TEACHING\"\n}\n```"
           }
         }
-      ]
+      ],
+      "description": "Tenant user, profile, staff invitation, role, permission, and access-control APIs. These requests require a Cognito access token and tenant context."
     },
     {
       "name": "📋 Admissions",
@@ -319,7 +331,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of enquiries.\n\nMethod: GET\nURL: {{base_url}}/api/admissions/enquiries\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -344,7 +357,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"studentName\": \"Alice Johnson\",\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\",\n  \"source\": \"Website\",\n  \"notes\": \"Interested in Grade 9\"\n}"
-                }
+                },
+                "description": "Creates a new enquiry record.\n\nMethod: POST\nURL: {{base_url}}/api/admissions/enquiries\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"campusId\": \"{{campus_id}}\",\n  \"studentName\": \"Alice Johnson\",\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\",\n  \"source\": \"Website\",\n  \"notes\": \"Interested in Grade 9\"\n}\n```"
               }
             },
             {
@@ -361,7 +375,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one enquiry by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admissions/enquiries/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -386,7 +401,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"status\": \"CONTACTED\",\n  \"notes\": \"Called, scheduled visit\"\n}"
-                }
+                },
+                "description": "Updates an existing enquiry record.\n\nMethod: PATCH\nURL: {{base_url}}/api/admissions/enquiries/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"status\": \"CONTACTED\",\n  \"notes\": \"Called, scheduled visit\"\n}\n```"
               }
             },
             {
@@ -411,10 +427,12 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\"\n}"
-                }
+                },
+                "description": "POST request for 📋 Admissions / Enquiries.\n\nMethod: POST\nURL: {{base_url}}/api/admissions/duplicate-check\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\"\n}\n```"
               }
             }
-          ]
+          ],
+          "description": "Admission enquiry and application lifecycle APIs. Approval only marks an application approved; enrollment/student account creation is handled separately."
         },
         {
           "name": "Applications",
@@ -433,7 +451,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of applications.\n\nMethod: GET\nURL: {{base_url}}/api/admissions/applications\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -458,7 +477,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"studentName\": \"Alice Johnson\",\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\",\n  \"dateOfBirth\": \"2010-06-15\",\n  \"gender\": \"FEMALE\",\n  \"guardianName\": \"Bob Johnson\",\n  \"guardianPhone\": \"9876543299\",\n  \"guardianRelation\": \"FATHER\"\n}"
-                }
+                },
+                "description": "Creates a new application record.\n\nMethod: POST\nURL: {{base_url}}/api/admissions/applications\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"studentName\": \"Alice Johnson\",\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\",\n  \"dateOfBirth\": \"2010-06-15\",\n  \"gender\": \"FEMALE\",\n  \"guardianName\": \"Bob Johnson\",\n  \"guardianPhone\": \"9876543299\",\n  \"guardianRelation\": \"FATHER\"\n}\n```"
               }
             },
             {
@@ -475,7 +495,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one application by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admissions/applications/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -500,7 +521,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"decision\": \"APPROVED\",\n  \"remarks\": \"All documents verified\"\n}"
-                }
+                },
+                "description": "POST request for 📋 Admissions / Applications.\n\nMethod: POST\nURL: {{base_url}}/api/admissions/applications/:id/review\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"decision\": \"APPROVED\",\n  \"remarks\": \"All documents verified\"\n}\n```"
               }
             },
             {
@@ -525,7 +547,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"academicYearId\": \"\"\n}"
-                }
+                },
+                "description": "Approves the selected workflow record.\n\nMethod: POST\nURL: {{base_url}}/api/admissions/applications/:id/approve\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"campusId\": \"{{campus_id}}\",\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"academicYearId\": \"\"\n}\n```"
               }
             },
             {
@@ -542,12 +565,15 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "POST request for 📋 Admissions / Applications.\n\nMethod: POST\nURL: {{base_url}}/api/admissions/applications/:id/withdraw\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             }
-          ]
+          ],
+          "description": "Admission enquiry and application lifecycle APIs. Approval only marks an application approved; enrollment/student account creation is handled separately."
         }
-      ]
+      ],
+      "description": "Admission enquiry and application lifecycle APIs. Approval only marks an application approved; enrollment/student account creation is handled separately."
     },
     {
       "name": "💰 Finance",
@@ -586,7 +612,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of fee categories.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/fee-categories?activeOnly=true\nAuth: Bearer token required\nQuery parameters: activeOnly\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -603,7 +630,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one fee category by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/fee-categories/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -628,7 +656,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"General Fee\",\n  \"feeType\": \"GENERAL\",\n  \"moduleType\": \"FEE\",\n  \"invoicePrefix\": \"GEN/INV\",\n  \"receiptPrefix\": \"GEN/REC\",\n  \"defaultAllocationMethod\": \"PRO_RATA\"\n}"
-                }
+                },
+                "description": "Creates a new fee category record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/fee-categories\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"General Fee\",\n  \"feeType\": \"GENERAL\",\n  \"moduleType\": \"FEE\",\n  \"invoicePrefix\": \"GEN/INV\",\n  \"receiptPrefix\": \"GEN/REC\",\n  \"defaultAllocationMethod\": \"PRO_RATA\"\n}\n```"
               },
               "event": [
                 {
@@ -663,7 +692,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"defaultAllocationMethod\": \"PRIORITY_WISE\"\n}"
-                }
+                },
+                "description": "Updates an existing fee category record.\n\nMethod: PATCH\nURL: {{base_url}}/api/admin/finance/fee-categories/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"defaultAllocationMethod\": \"PRIORITY_WISE\"\n}\n```"
               }
             },
             {
@@ -680,10 +710,12 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Deletes or deactivates the selected fee categories record.\n\nMethod: DELETE\nURL: {{base_url}}/api/admin/finance/fee-categories/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             }
-          ]
+          ],
+          "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
         },
         {
           "name": "Fee Heads",
@@ -719,7 +751,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of fee heads.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/fee-heads?feeCategoryId=\nAuth: Bearer token required\nQuery parameters: feeCategoryId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -744,7 +777,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Tuition Fee\",\n  \"type\": \"RECURRING\",\n  \"feeCategoryId\": \"\",\n  \"code\": \"TUI\",\n  \"isRefundable\": false,\n  \"isMandatory\": true,\n  \"priorityOrder\": 1,\n  \"description\": \"Monthly tuition charges\"\n}"
-                }
+                },
+                "description": "Creates a new fee head record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/fee-heads\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"Tuition Fee\",\n  \"type\": \"RECURRING\",\n  \"feeCategoryId\": \"\",\n  \"code\": \"TUI\",\n  \"isRefundable\": false,\n  \"isMandatory\": true,\n  \"priorityOrder\": 1,\n  \"description\": \"Monthly tuition charges\"\n}\n```"
               }
             },
             {
@@ -769,7 +803,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"priorityOrder\": 2,\n  \"isRefundable\": true\n}"
-                }
+                },
+                "description": "Updates an existing fee head record.\n\nMethod: PATCH\nURL: {{base_url}}/api/admin/finance/fee-heads/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"priorityOrder\": 2,\n  \"isRefundable\": true\n}\n```"
               }
             },
             {
@@ -786,10 +821,12 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Deletes or deactivates the selected fee heads record.\n\nMethod: DELETE\nURL: {{base_url}}/api/admin/finance/fee-heads/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             }
-          ]
+          ],
+          "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
         },
         {
           "name": "Fee Schedules",
@@ -825,7 +862,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of fee schedules.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/fee-schedules?academicYearId=\nAuth: Bearer token required\nQuery parameters: academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -850,7 +888,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Quarterly Schedule 25-26\",\n  \"academicYearId\": \"\",\n  \"feeCategoryId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"collectionType\": \"PARTIAL_ALLOWED\",\n  \"allowPartialPayment\": true,\n  \"minimumAmount\": 0,\n  \"minimumPercentage\": 0,\n  \"graceDays\": 5,\n  \"lateFeeEnabled\": false,\n  \"notificationEnabled\": true,\n  \"slots\": [\n    { \"name\": \"Q1\", \"dueDate\": \"2025-07-15\", \"percentOfTotal\": 25 },\n    { \"name\": \"Q2\", \"dueDate\": \"2025-10-15\", \"percentOfTotal\": 25 },\n    { \"name\": \"Q3\", \"dueDate\": \"2026-01-15\", \"percentOfTotal\": 25 },\n    { \"name\": \"Q4\", \"dueDate\": \"2026-04-15\", \"percentOfTotal\": 25 }\n  ]\n}"
-                }
+                },
+                "description": "Creates a new fee schedule record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/fee-schedules\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"Quarterly Schedule 25-26\",\n  \"academicYearId\": \"\",\n  \"feeCategoryId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"collectionType\": \"PARTIAL_ALLOWED\",\n  \"allowPartialPayment\": true,\n  \"minimumAmount\": 0,\n  \"minimumPercentage\": 0,\n  \"graceDays\": 5,\n  \"lateFeeEnabled\": false,\n  \"notificationEnabled\": true,\n  \"slots\": [\n    { \"name\": \"Q1\", \"dueDate\": \"2025-07-15\", \"percentOfTotal\": 25 },\n    { \"name\": \"Q2\", \"dueDate\": \"2025-10-15\", \"percentOfTotal\": 25 },\n    { \"name\": \"Q3\", \"dueDate\": \"2026-01-15\", \"percentOfTotal\": 25 },\n    { \"name\": \"Q4\", \"dueDate\": \"2026-04-15\", \"percentOfTotal\": 25 }\n  ]\n}\n```"
               }
             },
             {
@@ -875,7 +914,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"graceDays\": 10,\n  \"lateFeeEnabled\": true\n}"
-                }
+                },
+                "description": "Updates an existing fee schedule record.\n\nMethod: PATCH\nURL: {{base_url}}/api/admin/finance/fee-schedules/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"graceDays\": 10,\n  \"lateFeeEnabled\": true\n}\n```"
               }
             },
             {
@@ -900,7 +940,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Supplementary\",\n  \"dueDate\": \"2026-03-01\",\n  \"fixedAmount\": 5000\n}"
-                }
+                },
+                "description": "POST request for 💰 Finance / Fee Schedules.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/fee-schedules/:id/slots\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"Supplementary\",\n  \"dueDate\": \"2026-03-01\",\n  \"fixedAmount\": 5000\n}\n```"
               }
             },
             {
@@ -917,7 +958,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Deletes or deactivates the selected fee schedules record.\n\nMethod: DELETE\nURL: {{base_url}}/api/admin/finance/fee-schedules/:id/slots/:slotIndex\nAuth: Bearer token required\nPath parameters: id, slotIndex\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -934,10 +976,12 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Deletes or deactivates the selected fee schedules record.\n\nMethod: DELETE\nURL: {{base_url}}/api/admin/finance/fee-schedules/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             }
-          ]
+          ],
+          "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
         },
         {
           "name": "Fee Structures",
@@ -977,7 +1021,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of fee structures.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/fee-structures?academicYearId=&feeCategoryId=\nAuth: Bearer token required\nQuery parameters: academicYearId, feeCategoryId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -994,7 +1039,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one fee structure by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/fee-structures/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1019,7 +1065,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Grade 10 Annual Fee 25-26\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"classId\": \"\",\n  \"feeCategoryId\": \"\",\n  \"feeScheduleId\": \"\",\n  \"allocationMethod\": \"PRO_RATA\",\n  \"components\": [\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Tuition Fee\", \"amount\": 50000, \"isOptional\": false, \"priorityOrder\": 1 },\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Lab Fee\",     \"amount\": 5000,  \"isOptional\": false, \"priorityOrder\": 2 },\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Sports Fee\",  \"amount\": 2000,  \"isOptional\": true,  \"priorityOrder\": 3 }\n  ]\n}"
-                }
+                },
+                "description": "Creates a new fee structure record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/fee-structures\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"Grade 10 Annual Fee 25-26\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"classId\": \"\",\n  \"feeCategoryId\": \"\",\n  \"feeScheduleId\": \"\",\n  \"allocationMethod\": \"PRO_RATA\",\n  \"components\": [\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Tuition Fee\", \"amount\": 50000, \"isOptional\": false, \"priorityOrder\": 1 },\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Lab Fee\",     \"amount\": 5000,  \"isOptional\": false, \"priorityOrder\": 2 },\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Sports Fee\",  \"amount\": 2000,  \"isOptional\": true,  \"priorityOrder\": 3 }\n  ]\n}\n```"
               }
             },
             {
@@ -1044,7 +1091,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"allocationMethod\": \"PRIORITY_WISE\"\n}"
-                }
+                },
+                "description": "Updates an existing fee structure record.\n\nMethod: PATCH\nURL: {{base_url}}/api/admin/finance/fee-structures/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"allocationMethod\": \"PRIORITY_WISE\"\n}\n```"
               }
             },
             {
@@ -1061,7 +1109,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Deletes or deactivates the selected fee structures record.\n\nMethod: DELETE\nURL: {{base_url}}/api/admin/finance/fee-structures/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1086,10 +1135,12 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"feeCategoryId\": \"\",\n  \"activateCopies\": false\n}"
-                }
+                },
+                "description": "POST request for 💰 Finance / Fee Structures.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/fee-pattern/copy\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"feeCategoryId\": \"\",\n  \"activateCopies\": false\n}\n```"
               }
             }
-          ]
+          ],
+          "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
         },
         {
           "name": "Fee Assignments",
@@ -1129,7 +1180,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of fee assignments.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/fee-assignments?studentId=&academicYearId=\nAuth: Bearer token required\nQuery parameters: studentId, academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1146,7 +1198,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one fee assignment by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/fee-assignments/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1182,7 +1235,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one student fee assignment by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/students/:studentId/fee-assignment?academicYearId=\nAuth: Bearer token required\nPath parameters: studentId\nQuery parameters: academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1207,7 +1261,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"studentId\": \"\",\n  \"feeStructureId\": \"\",\n  \"academicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"discountAmount\": 0,\n  \"discountReason\": \"\"\n}"
-                }
+                },
+                "description": "POST request for 💰 Finance / Fee Assignments.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/fee-assignments\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"studentId\": \"\",\n  \"feeStructureId\": \"\",\n  \"academicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"discountAmount\": 0,\n  \"discountReason\": \"\"\n}\n```"
               }
             },
             {
@@ -1232,7 +1287,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"feeStructureId\": \"\",\n  \"academicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"classId\": \"\",\n  \"discountAmount\": 0\n}"
-                }
+                },
+                "description": "POST request for 💰 Finance / Fee Assignments.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/fee-assignments/bulk\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"feeStructureId\": \"\",\n  \"academicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"classId\": \"\",\n  \"discountAmount\": 0\n}\n```"
               }
             },
             {
@@ -1270,7 +1326,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "GET request for 💰 Finance / Fee Assignments.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/fee-assignment-queue?academicYearId=&classId=\nAuth: Bearer token required\nQuery parameters: academicYearId, classId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1308,10 +1365,12 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "GET request for 💰 Finance / Fee Assignments.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/assignable-fee-structures?academicYearId=&classId=\nAuth: Bearer token required\nQuery parameters: academicYearId, classId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             }
-          ]
+          ],
+          "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
         },
         {
           "name": "Invoices",
@@ -1351,7 +1410,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of invoices.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/invoices?studentId=&status=PENDING\nAuth: Bearer token required\nQuery parameters: studentId, status\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1368,7 +1428,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one invoice by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/invoices/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1393,7 +1454,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"feeCategoryId\": \"\",\n  \"dueDate\": \"2026-06-30\",\n  \"collectionType\": \"FULL_ONLY\",\n  \"allocationMethod\": \"PRO_RATA\",\n  \"items\": [\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Re-admission Fee\", \"amount\": 2000, \"concession\": 0, \"priorityOrder\": 1 }\n  ]\n}"
-                }
+                },
+                "description": "Creates a new one-off charge record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/invoices\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"feeCategoryId\": \"\",\n  \"dueDate\": \"2026-06-30\",\n  \"collectionType\": \"FULL_ONLY\",\n  \"allocationMethod\": \"PRO_RATA\",\n  \"items\": [\n    { \"feeHeadId\": \"\", \"feeHeadName\": \"Re-admission Fee\", \"amount\": 2000, \"concession\": 0, \"priorityOrder\": 1 }\n  ]\n}\n```"
               }
             },
             {
@@ -1410,10 +1472,12 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "GET request for 💰 Finance / Invoices.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/students/:studentId/dues\nAuth: Bearer token required\nPath parameters: studentId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             }
-          ]
+          ],
+          "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
         },
         {
           "name": "Payments",
@@ -1440,7 +1504,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"invoiceId\": \"\",\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"amount\": 10000,\n  \"method\": \"CASH\",\n  \"remarks\": \"Partial payment\"\n}"
-                }
+                },
+                "description": "Handles payment, allocation, receipt, or payment gateway workflow.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/payments\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"invoiceId\": \"\",\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"amount\": 10000,\n  \"method\": \"CASH\",\n  \"remarks\": \"Partial payment\"\n}\n```"
               }
             },
             {
@@ -1465,7 +1530,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"invoiceId\": \"\",\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"amount\": 10000,\n  \"method\": \"CHEQUE\",\n  \"allocations\": [\n    { \"invoiceItemId\": \"\", \"allocatedAmount\": 8000 },\n    { \"invoiceItemId\": \"\", \"allocatedAmount\": 2000 }\n  ]\n}"
-                }
+                },
+                "description": "Handles payment, allocation, receipt, or payment gateway workflow.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/payments\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"invoiceId\": \"\",\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"amount\": 10000,\n  \"method\": \"CHEQUE\",\n  \"allocations\": [\n    { \"invoiceItemId\": \"\", \"allocatedAmount\": 8000 },\n    { \"invoiceItemId\": \"\", \"allocatedAmount\": 2000 }\n  ]\n}\n```"
               }
             },
             {
@@ -1490,7 +1556,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"amount\": 50000,\n  \"method\": \"ONLINE\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\"\n}"
-                }
+                },
+                "description": "POST request for 💰 Finance / Payments.\n\nMethod: POST\nURL: {{base_url}}/api/admin/finance/students/:studentId/collect\nAuth: Bearer token required\nPath parameters: studentId\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"amount\": 50000,\n  \"method\": \"ONLINE\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\"\n}\n```"
               }
             },
             {
@@ -1515,7 +1582,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"invoiceId\": \"\",\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"amount\": 50000,\n  \"currency\": \"INR\"\n}"
-                }
+                },
+                "description": "Creates a new razorpay order record.\n\nMethod: POST\nURL: {{base_url}}/api/finance/payments/create-order\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"invoiceId\": \"\",\n  \"studentId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"amount\": 50000,\n  \"currency\": \"INR\"\n}\n```"
               },
               "event": [
                 {
@@ -1550,7 +1618,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"razorpay_order_id\": \"{{razorpay_order_id}}\",\n  \"razorpay_payment_id\": \"\",\n  \"razorpay_signature\": \"\"\n}"
-                }
+                },
+                "description": "POST request for 💰 Finance / Payments.\n\nMethod: POST\nURL: {{base_url}}/api/finance/payments/verify\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{razorpay_order_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"razorpay_order_id\": \"{{razorpay_order_id}}\",\n  \"razorpay_payment_id\": \"\",\n  \"razorpay_signature\": \"\"\n}\n```"
               }
             },
             {
@@ -1588,7 +1657,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of payments.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/payments?invoiceId=&status=SUCCESS\nAuth: Bearer token required\nQuery parameters: invoiceId, status\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1605,7 +1675,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one payment by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/payments/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1639,7 +1710,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of receipts.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/receipts?studentId=\nAuth: Bearer token required\nQuery parameters: studentId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1656,10 +1728,54 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one receipt by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/receipts/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             }
-          ]
+          ],
+          "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
+        },
+        {
+          "name": "Payment Allocations",
+          "item": [
+            {
+              "name": "List Allocations by Payment",
+              "request": {
+                "method": "GET",
+                "url": "{{base_url}}/api/admin/finance/payments/:paymentId/allocations",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "description": "Returns a list of allocations by payment.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/payments/:paymentId/allocations\nAuth: Bearer token required\nPath parameters: paymentId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
+              }
+            },
+            {
+              "name": "List Allocations by Invoice",
+              "request": {
+                "method": "GET",
+                "url": "{{base_url}}/api/admin/finance/invoices/:invoiceId/allocations",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "description": "Returns a list of allocations by invoice.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/invoices/:invoiceId/allocations\nAuth: Bearer token required\nPath parameters: invoiceId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
+              }
+            }
+          ],
+          "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
         },
         {
           "name": "Reports",
@@ -1704,7 +1820,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "GET request for 💰 Finance / Reports.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/reports/day-book?from=2025-06-01&to=2025-06-30&campusId={{campus_id}}\nAuth: Bearer token required\nQuery parameters: from, to, campusId\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}"
               }
             },
             {
@@ -1739,7 +1856,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "GET request for 💰 Finance / Reports.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/reports/analytics?academicYearId=\nAuth: Bearer token required\nQuery parameters: academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1756,12 +1874,15 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "GET request for 💰 Finance / Reports.\n\nMethod: GET\nURL: {{base_url}}/api/admin/finance/students/:studentId/summary\nAuth: Bearer token required\nPath parameters: studentId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             }
-          ]
+          ],
+          "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
         }
-      ]
+      ],
+      "description": "Finance setup and collection APIs following FeeCategory -> FeeHead -> FeeSchedule -> FeeStructure -> FeeAssignment -> Invoice -> Payment -> PaymentAllocation -> Receipt."
     },
     {
       "name": "🎓 Academics",
@@ -1800,7 +1921,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of classes.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/classes?academicYearId=\nAuth: Bearer token required\nQuery parameters: academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1825,7 +1947,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Grade 10\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"orderIndex\": 10\n}"
-                }
+                },
+                "description": "Creates a new class record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/classes\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"Grade 10\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"orderIndex\": 10\n}\n```"
               }
             },
             {
@@ -1863,7 +1986,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of all sections.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/sections?classId=&academicYearId=\nAuth: Bearer token required\nQuery parameters: classId, academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -1888,7 +2012,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"classId\": \"\",\n  \"name\": \"A\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"maxStrength\": 40\n}"
-                }
+                },
+                "description": "Creates a new section record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/sections\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"classId\": \"\",\n  \"name\": \"A\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"maxStrength\": 40\n}\n```"
               }
             },
             {
@@ -1913,10 +2038,12 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"teacherId\": \"\"\n}"
-                }
+                },
+                "description": "POST request for 🎓 Academics / Classes & Sections.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/sections/:id/incharge\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"teacherId\": \"\"\n}\n```"
               }
             }
-          ]
+          ],
+          "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
         },
         {
           "name": "Students & Enrollments",
@@ -1959,7 +2086,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of students.\n\nMethod: GET\nURL: {{base_url}}/api/admin/students?classId=&sectionId=&status=ACTIVE\nAuth: Bearer token required\nQuery parameters: classId, sectionId, status\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               },
               "event": [
                 {
@@ -1994,7 +2122,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"fullName\": \"Alice Johnson\",\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\",\n  \"dateOfBirth\": \"2010-06-15\",\n  \"gender\": \"FEMALE\",\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"transportRouteId\": \"ROUTE_A\",\n  \"guardians\": [{ \"name\": \"Bob Johnson\", \"relation\": \"FATHER\", \"phone\": \"9876543299\" }]\n}"
-                }
+                },
+                "description": "POST request for 🎓 Academics / Students & Enrollments.\n\nMethod: POST\nURL: {{base_url}}/api/admin/students\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"fullName\": \"Alice Johnson\",\n  \"phone\": \"9876543210\",\n  \"email\": \"alice@example.com\",\n  \"dateOfBirth\": \"2010-06-15\",\n  \"gender\": \"FEMALE\",\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"transportRouteId\": \"ROUTE_A\",\n  \"guardians\": [{ \"name\": \"Bob Johnson\", \"relation\": \"FATHER\", \"phone\": \"9876543299\" }]\n}\n```"
               },
               "event": [
                 {
@@ -2021,7 +2150,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one student by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/students/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2046,7 +2176,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"transportRouteId\": \"ROUTE_B\",\n  \"classId\": \"\",\n  \"sectionId\": \"\"\n}"
-                }
+                },
+                "description": "Updates an existing student record.\n\nMethod: PATCH\nURL: {{base_url}}/api/admin/students/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"transportRouteId\": \"ROUTE_B\",\n  \"classId\": \"\",\n  \"sectionId\": \"\"\n}\n```"
               }
             },
             {
@@ -2071,7 +2202,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"studentId\": \"\",\n  \"sectionId\": \"\",\n  \"academicYearId\": \"\"\n}"
-                }
+                },
+                "description": "POST request for 🎓 Academics / Students & Enrollments.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/enrollments/assign-section\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"studentId\": \"\",\n  \"sectionId\": \"\",\n  \"academicYearId\": \"\"\n}\n```"
               }
             },
             {
@@ -2096,7 +2228,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"studentId\": \"\",\n  \"fromSectionId\": \"\",\n  \"toSectionId\": \"\",\n  \"academicYearId\": \"\",\n  \"reason\": \"Parental request\"\n}"
-                }
+                },
+                "description": "POST request for 🎓 Academics / Students & Enrollments.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/enrollments/transfer-section\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"studentId\": \"\",\n  \"fromSectionId\": \"\",\n  \"toSectionId\": \"\",\n  \"academicYearId\": \"\",\n  \"reason\": \"Parental request\"\n}\n```"
               }
             },
             {
@@ -2142,7 +2275,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of enrollments.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/enrollments?academicYearId=&classId=&sectionId=&status=ACTIVE\nAuth: Bearer token required\nQuery parameters: academicYearId, classId, sectionId, status\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2167,10 +2301,12 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"email\": \"alice@example.com\"\n}"
-                }
+                },
+                "description": "POST request for 🎓 Academics / Students & Enrollments.\n\nMethod: POST\nURL: {{base_url}}/api/admin/students/:id/portal-access\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"email\": \"alice@example.com\"\n}\n```"
               }
             }
-          ]
+          ],
+          "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
         },
         {
           "name": "Registration Numbers",
@@ -2210,7 +2346,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of registration batches.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/registration-batches?academicYearId=&classId=\nAuth: Bearer token required\nQuery parameters: academicYearId, classId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2235,7 +2372,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"academicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"gradeId\": \"\",\n  \"prefix\": \"REG\",\n  \"startFrom\": 1,\n  \"padLength\": 4\n}"
-                }
+                },
+                "description": "Generates the requested numbers, links, documents, or derived records.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/registration-numbers/generate\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"academicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"gradeId\": \"\",\n  \"prefix\": \"REG\",\n  \"startFrom\": 1,\n  \"padLength\": 4\n}\n```"
               }
             },
             {
@@ -2260,10 +2398,12 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"batchId\": \"\"\n}"
-                }
+                },
+                "description": "Freezes generated academic numbers for the configured scope.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/registration-numbers/freeze\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"batchId\": \"\"\n}\n```"
               }
             }
-          ]
+          ],
+          "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
         },
         {
           "name": "Roll Numbers",
@@ -2307,7 +2447,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of roll number batches.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/roll-no-batches?academicYearId=&classId=&sectionId=\nAuth: Bearer token required\nQuery parameters: academicYearId, classId, sectionId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2332,7 +2473,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"academicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"gradeId\": \"\",\n  \"sectionId\": \"\",\n  \"mode\": \"ALPHABETICAL\",\n  \"startFrom\": 1\n}"
-                }
+                },
+                "description": "Generates the requested numbers, links, documents, or derived records.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/roll-numbers/generate\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"academicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"gradeId\": \"\",\n  \"sectionId\": \"\",\n  \"mode\": \"ALPHABETICAL\",\n  \"startFrom\": 1\n}\n```"
               }
             },
             {
@@ -2357,10 +2499,12 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"batchId\": \"\"\n}"
-                }
+                },
+                "description": "Freezes generated academic numbers for the configured scope.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/roll-numbers/freeze\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"batchId\": \"\"\n}\n```"
               }
             }
-          ]
+          ],
+          "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
         },
         {
           "name": "Promotions",
@@ -2379,7 +2523,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of promotion batches.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/promotions?fromAcademicYearId=&toAcademicYearId=&campusId={{campus_id}}&fromGradeId=&status=\nAuth: Bearer token required\nQuery parameters: fromAcademicYearId, toAcademicYearId, campusId, fromGradeId, status\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}"
               }
             },
             {
@@ -2396,7 +2541,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one promotion batch by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/promotions/:id\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2413,7 +2559,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of promotion batch items.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/promotions/:id/items\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2438,7 +2585,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"academicYearId\": \"\",\n  \"updates\": [\n    {\n      \"studentId\": \"\",\n      \"eligibility\": \"ELIGIBLE\"\n    },\n    {\n      \"studentId\": \"\",\n      \"eligibility\": \"DETAINED\"\n    },\n    {\n      \"studentId\": \"\",\n      \"eligibility\": \"ON_HOLD\"\n    }\n  ]\n}"
-                }
+                },
+                "description": "POST request for 🎓 Academics / Promotions.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotion-eligibility\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"academicYearId\": \"\",\n  \"updates\": [\n    {\n      \"studentId\": \"\",\n      \"eligibility\": \"ELIGIBLE\"\n    },\n    {\n      \"studentId\": \"\",\n      \"eligibility\": \"DETAINED\"\n    },\n    {\n      \"studentId\": \"\",\n      \"eligibility\": \"ON_HOLD\"\n    }\n  ]\n}\n```"
               }
             },
             {
@@ -2463,7 +2611,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\",\n    \"\"\n  ],\n  \"sectionStrategy\": \"SAME_SECTION\",\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\",\n  \"allowPendingFee\": false\n}"
-                }
+                },
+                "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotions\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\",\n    \"\"\n  ],\n  \"sectionStrategy\": \"SAME_SECTION\",\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\",\n  \"allowPendingFee\": false\n}\n```"
               }
             },
             {
@@ -2488,7 +2637,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\",\n    \"\"\n  ],\n  \"sectionStrategy\": \"MANUAL\",\n  \"sectionAssignments\": [\n    {\n      \"studentId\": \"\",\n      \"sectionId\": \"\"\n    },\n    {\n      \"studentId\": \"\",\n      \"sectionId\": \"\"\n    }\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"COPY_PATTERN\",\n  \"feeCategoryId\": \"\",\n  \"allowPendingFee\": false\n}"
-                }
+                },
+                "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotions\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\",\n    \"\"\n  ],\n  \"sectionStrategy\": \"MANUAL\",\n  \"sectionAssignments\": [\n    {\n      \"studentId\": \"\",\n      \"sectionId\": \"\"\n    },\n    {\n      \"studentId\": \"\",\n      \"sectionId\": \"\"\n    }\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"COPY_PATTERN\",\n  \"feeCategoryId\": \"\",\n  \"allowPendingFee\": false\n}\n```"
               }
             },
             {
@@ -2513,7 +2663,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\",\n    \"\"\n  ],\n  \"sectionStrategy\": \"AUTO_SHUFFLE\",\n  \"targetSectionIds\": [\n    \"\",\n    \"\",\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"ASSIGN_EXISTING\",\n  \"feeStructureIds\": [\n    \"\"\n  ],\n  \"allowPendingFee\": false\n}"
-                }
+                },
+                "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotions\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\",\n    \"\"\n  ],\n  \"sectionStrategy\": \"AUTO_SHUFFLE\",\n  \"targetSectionIds\": [\n    \"\",\n    \"\",\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"ASSIGN_EXISTING\",\n  \"feeStructureIds\": [\n    \"\"\n  ],\n  \"allowPendingFee\": false\n}\n```"
               }
             },
             {
@@ -2538,7 +2689,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"PERFORMANCE_RANK\",\n  \"rankByExamId\": \"\",\n  \"targetSectionIds\": [\n    \"\",\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\"\n}"
-                }
+                },
+                "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotions\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"PERFORMANCE_RANK\",\n  \"rankByExamId\": \"\",\n  \"targetSectionIds\": [\n    \"\",\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\"\n}\n```"
               }
             },
             {
@@ -2563,7 +2715,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"SUBJECT_GROUP\",\n  \"subjectGroupSectionMap\": [\n    {\n      \"subjectGroupId\": \"HINDI\",\n      \"sectionId\": \"\"\n    },\n    {\n      \"subjectGroupId\": \"FRENCH\",\n      \"sectionId\": \"\"\n    }\n  ],\n  \"targetSectionIds\": [\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\"\n}"
-                }
+                },
+                "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotions\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"SUBJECT_GROUP\",\n  \"subjectGroupSectionMap\": [\n    {\n      \"subjectGroupId\": \"HINDI\",\n      \"sectionId\": \"\"\n    },\n    {\n      \"subjectGroupId\": \"FRENCH\",\n      \"sectionId\": \"\"\n    }\n  ],\n  \"targetSectionIds\": [\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\"\n}\n```"
               }
             },
             {
@@ -2588,7 +2741,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"TRANSPORT_ROUTE\",\n  \"transportRouteSectionMap\": [\n    {\n      \"transportRouteId\": \"ROUTE_A\",\n      \"sectionId\": \"\"\n    },\n    {\n      \"transportRouteId\": \"ROUTE_B\",\n      \"sectionId\": \"\"\n    }\n  ],\n  \"targetSectionIds\": [\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\"\n}"
-                }
+                },
+                "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotions\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"TRANSPORT_ROUTE\",\n  \"transportRouteSectionMap\": [\n    {\n      \"transportRouteId\": \"ROUTE_A\",\n      \"sectionId\": \"\"\n    },\n    {\n      \"transportRouteId\": \"ROUTE_B\",\n      \"sectionId\": \"\"\n    }\n  ],\n  \"targetSectionIds\": [\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\"\n}\n```"
               }
             },
             {
@@ -2613,7 +2767,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\",\n    \"\"\n  ],\n  \"sectionStrategy\": \"EXCEL_IMPORT\",\n  \"sectionAssignments\": [\n    {\n      \"studentId\": \"\",\n      \"sectionId\": \"\"\n    },\n    {\n      \"studentId\": \"\",\n      \"sectionId\": \"\"\n    }\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"COPY_PATTERN\",\n  \"feeCategoryId\": \"\",\n  \"allowPendingFee\": false\n}"
-                }
+                },
+                "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotions\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\",\n    \"\"\n  ],\n  \"sectionStrategy\": \"EXCEL_IMPORT\",\n  \"sectionAssignments\": [\n    {\n      \"studentId\": \"\",\n      \"sectionId\": \"\"\n    },\n    {\n      \"studentId\": \"\",\n      \"sectionId\": \"\"\n    }\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"COPY_PATTERN\",\n  \"feeCategoryId\": \"\",\n  \"allowPendingFee\": false\n}\n```"
               }
             },
             {
@@ -2638,7 +2793,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"CAPACITY_LIMIT\",\n  \"targetSectionIds\": [\n    \"\",\n    \"\"\n  ],\n  \"maxStudentsPerSection\": 40,\n  \"eligibilityMode\": \"IGNORE_RESULTS\",\n  \"feeAction\": \"SKIP\"\n}"
-                }
+                },
+                "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotions\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"CAPACITY_LIMIT\",\n  \"targetSectionIds\": [\n    \"\",\n    \"\"\n  ],\n  \"maxStudentsPerSection\": 40,\n  \"eligibilityMode\": \"IGNORE_RESULTS\",\n  \"feeAction\": \"SKIP\"\n}\n```"
               }
             },
             {
@@ -2663,11 +2819,12 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"GENDER_BALANCE\",\n  \"targetSectionIds\": [\n    \"\",\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\"\n}"
-                }
+                },
+                "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/promotions\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fromAcademicYearId\": \"\",\n  \"toAcademicYearId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"fromGradeId\": \"\",\n  \"toGradeId\": \"\",\n  \"studentIds\": [\n    \"\"\n  ],\n  \"sectionStrategy\": \"GENDER_BALANCE\",\n  \"targetSectionIds\": [\n    \"\",\n    \"\"\n  ],\n  \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n  \"feeAction\": \"SKIP\"\n}\n```"
               }
             }
           ],
-          "description": "Promotion creates a new target-year academic enrollment. Admission No stays unchanged. Registration No and Roll No stay PENDING unless generated separately. Fee invoices are created only when feeAction is ASSIGN_EXISTING or COPY_PATTERN."
+          "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
         },
         {
           "name": "Subjects",
@@ -2703,7 +2860,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of subjects.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/subjects?classId=\nAuth: Bearer token required\nQuery parameters: classId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2728,10 +2886,12 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Mathematics\",\n  \"code\": \"MATH\",\n  \"classId\": \"\",\n  \"type\": \"CORE\"\n}"
-                }
+                },
+                "description": "Creates a new subject record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/subjects\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"Mathematics\",\n  \"code\": \"MATH\",\n  \"classId\": \"\",\n  \"type\": \"CORE\"\n}\n```"
               }
             }
-          ]
+          ],
+          "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
         },
         {
           "name": "Attendance",
@@ -2775,7 +2935,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one section attendance by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/attendance?classId=&sectionId=&date=2026-05-04\nAuth: Bearer token required\nQuery parameters: classId, sectionId, date\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2800,10 +2961,12 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"date\": \"2026-05-04\",\n  \"entries\": [\n    { \"studentId\": \"\", \"status\": \"PRESENT\" },\n    { \"studentId\": \"\", \"status\": \"ABSENT\" }\n  ]\n}"
-                }
+                },
+                "description": "POST request for 🎓 Academics / Attendance.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/attendance\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"date\": \"2026-05-04\",\n  \"entries\": [\n    { \"studentId\": \"\", \"status\": \"PRESENT\" },\n    { \"studentId\": \"\", \"status\": \"ABSENT\" }\n  ]\n}\n```"
               }
             }
-          ]
+          ],
+          "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
         },
         {
           "name": "Exams & Results",
@@ -2843,7 +3006,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of exams.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/exams?classId=&academicYearId=\nAuth: Bearer token required\nQuery parameters: classId, academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2868,7 +3032,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"name\": \"Annual Exam 2025-26\",\n  \"examDate\": \"2026-03-15\",\n  \"maxMarks\": 100,\n  \"passingMarks\": 33\n}"
-                }
+                },
+                "description": "Creates a new exam record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/exams\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"name\": \"Annual Exam 2025-26\",\n  \"examDate\": \"2026-03-15\",\n  \"maxMarks\": 100,\n  \"passingMarks\": 33\n}\n```"
               },
               "event": [
                 {
@@ -2903,7 +3068,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"studentId\": \"\",\n  \"marksObtained\": 85,\n  \"maxMarks\": 100,\n  \"grade\": \"A\",\n  \"isAbsent\": false\n}"
-                }
+                },
+                "description": "POST request for 🎓 Academics / Exams & Results.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/exams/:id/marks\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"studentId\": \"\",\n  \"marksObtained\": 85,\n  \"maxMarks\": 100,\n  \"grade\": \"A\",\n  \"isAbsent\": false\n}\n```"
               }
             },
             {
@@ -2920,7 +3086,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "POST request for 🎓 Academics / Exams & Results.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/exams/:id/publish\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2954,7 +3121,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of result batches.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/result-batches?academicYearId=\nAuth: Bearer token required\nQuery parameters: academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -2979,7 +3147,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"examId\": \"\",\n  \"title\": \"Annual Results 2025-26\",\n  \"description\": \"\"\n}"
-                }
+                },
+                "description": "Creates a new result batch record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/result-batches\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"examId\": \"\",\n  \"title\": \"Annual Results 2025-26\",\n  \"description\": \"\"\n}\n```"
               }
             },
             {
@@ -2996,7 +3165,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "POST request for 🎓 Academics / Exams & Results.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/result-batches/:id/publish\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -3013,7 +3183,8 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns one public result token by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/result-batches/:id/public-token\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             },
             {
@@ -3036,10 +3207,12 @@
                       "value": ""
                     }
                   ]
-                }
+                },
+                "description": "Returns one public result (no auth) by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/results/public?token=\nAuth: No bearer token in request headers\nQuery parameters: token\nEnvironment variables: {{base_url}}"
               }
             }
-          ]
+          ],
+          "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
         },
         {
           "name": "Certificates",
@@ -3066,7 +3239,8 @@
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"studentId\": \"\",\n  \"type\": \"BONAFIDE\",\n  \"templateId\": \"\",\n  \"remarks\": \"\"\n}"
-                }
+                },
+                "description": "POST request for 🎓 Academics / Certificates.\n\nMethod: POST\nURL: {{base_url}}/api/admin/academics/certificates\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"studentId\": \"\",\n  \"type\": \"BONAFIDE\",\n  \"templateId\": \"\",\n  \"remarks\": \"\"\n}\n```"
               }
             },
             {
@@ -3100,12 +3274,15 @@
                     "key": "x-tenant-id",
                     "value": "{{tenant_id}}"
                   }
-                ]
+                ],
+                "description": "Returns a list of certificates.\n\nMethod: GET\nURL: {{base_url}}/api/admin/academics/certificates?studentId=\nAuth: Bearer token required\nQuery parameters: studentId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
               }
             }
-          ]
+          ],
+          "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
         }
-      ]
+      ],
+      "description": "Academic master data, student enrollment, registration number, roll number, promotion, attendance, exams, results, and certificates APIs."
     },
     {
       "name": "⚙️ Settings",
@@ -3120,7 +3297,8 @@
                 "key": "Authorization",
                 "value": "Bearer {{access_token}}"
               }
-            ]
+            ],
+            "description": "Returns a list of tenants (platform).\n\nMethod: GET\nURL: {{base_url}}/api/platform/tenants\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}"
           }
         },
         {
@@ -3133,7 +3311,8 @@
                 "key": "Authorization",
                 "value": "Bearer {{access_token}}"
               }
-            ]
+            ],
+            "description": "Returns one tenant by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/tenants/:tenantId\nAuth: Bearer token required\nPath parameters: tenantId\nEnvironment variables: {{access_token}}, {{base_url}}"
           }
         },
         {
@@ -3154,7 +3333,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Demo School\",\n  \"slug\": \"demo-school\"\n}"
-            }
+            },
+            "description": "Creates a new tenant (platform) record.\n\nMethod: POST\nURL: {{base_url}}/api/platform/tenants\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}\n\nExample body:\n```json\n{\n  \"name\": \"Demo School\",\n  \"slug\": \"demo-school\"\n}\n```"
           }
         },
         {
@@ -3175,7 +3355,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"planId\": \"BASIC\"\n}"
-            }
+            },
+            "description": "POST request for ⚙️ Settings.\n\nMethod: POST\nURL: {{base_url}}/api/platform/tenants/:tenantId/finalize\nAuth: Bearer token required\nPath parameters: tenantId\nEnvironment variables: {{access_token}}, {{base_url}}\n\nExample body:\n```json\n{\n  \"planId\": \"BASIC\"\n}\n```"
           }
         },
         {
@@ -3192,7 +3373,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of campuses.\n\nMethod: GET\nURL: {{base_url}}/api/tenants/:tenantId/campuses\nAuth: Bearer token required\nPath parameters: tenantId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3217,7 +3399,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Main Campus\",\n  \"code\": \"MAIN\",\n  \"type\": \"SCHOOL\",\n  \"city\": \"Bengaluru\",\n  \"state\": \"Karnataka\"\n}"
-            }
+            },
+            "description": "Creates a new campus record.\n\nMethod: POST\nURL: {{base_url}}/api/tenants/:tenantId/campuses\nAuth: Bearer token required\nPath parameters: tenantId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"Main Campus\",\n  \"code\": \"MAIN\",\n  \"type\": \"SCHOOL\",\n  \"city\": \"Bengaluru\",\n  \"state\": \"Karnataka\"\n}\n```"
           }
         },
         {
@@ -3234,7 +3417,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of programs.\n\nMethod: GET\nURL: {{base_url}}/api/admin/programs\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3259,7 +3443,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"CBSE K-12\",\n  \"type\": \"SCHOOL\",\n  \"campusId\": \"{{campus_id}}\"\n}"
-            }
+            },
+            "description": "Creates a new program record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/programs\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"CBSE K-12\",\n  \"type\": \"SCHOOL\",\n  \"campusId\": \"{{campus_id}}\"\n}\n```"
           }
         },
         {
@@ -3276,7 +3461,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of academic years.\n\nMethod: GET\nURL: {{base_url}}/api/tenants/:tenantId/academic-years\nAuth: Bearer token required\nPath parameters: tenantId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3301,7 +3487,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"25-26\",\n  \"startDate\": \"2025-06-01\",\n  \"endDate\": \"2026-05-31\",\n  \"isCurrent\": true\n}"
-            }
+            },
+            "description": "Creates a new academic year record.\n\nMethod: POST\nURL: {{base_url}}/api/tenants/:tenantId/academic-years\nAuth: Bearer token required\nPath parameters: tenantId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"25-26\",\n  \"startDate\": \"2025-06-01\",\n  \"endDate\": \"2026-05-31\",\n  \"isCurrent\": true\n}\n```"
           }
         },
         {
@@ -3318,7 +3505,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "POST request for ⚙️ Settings.\n\nMethod: POST\nURL: {{base_url}}/api/tenants/:tenantId/academic-years/:id/activate\nAuth: Bearer token required\nPath parameters: id, tenantId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3335,7 +3523,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns one tenant features by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/admin/features\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3360,7 +3549,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"onlinePayments\": true,\n  \"certificates\": true,\n  \"studentPortal\": true\n}"
-            }
+            },
+            "description": "Updates an existing tenant features record.\n\nMethod: PATCH\nURL: {{base_url}}/api/admin/features\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"onlinePayments\": true,\n  \"certificates\": true,\n  \"studentPortal\": true\n}\n```"
           }
         },
         {
@@ -3377,7 +3567,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of templates.\n\nMethod: GET\nURL: {{base_url}}/api/templates\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3402,7 +3593,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Bonafide Certificate\",\n  \"type\": \"CERTIFICATE\"\n}"
-            }
+            },
+            "description": "Creates a new template record.\n\nMethod: POST\nURL: {{base_url}}/api/templates\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"name\": \"Bonafide Certificate\",\n  \"type\": \"CERTIFICATE\"\n}\n```"
           }
         },
         {
@@ -3427,7 +3619,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"content\": \"<p>This is to certify that {{studentName}} is a bonafide student.</p>\",\n  \"variables\": [\"studentName\", \"admissionNo\", \"class\", \"academicYear\"]\n}"
-            }
+            },
+            "description": "POST request for ⚙️ Settings.\n\nMethod: POST\nURL: {{base_url}}/api/templates/:id/publish\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{studentName}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"content\": \"<p>This is to certify that {{studentName}} is a bonafide student.</p>\",\n  \"variables\": [\"studentName\", \"admissionNo\", \"class\", \"academicYear\"]\n}\n```"
           }
         },
         {
@@ -3444,7 +3637,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "GET request for ⚙️ Settings.\n\nMethod: GET\nURL: {{base_url}}/api/dashboard\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3457,10 +3651,12 @@
                 "key": "Authorization",
                 "value": "Bearer {{access_token}}"
               }
-            ]
+            ],
+            "description": "GET request for ⚙️ Settings.\n\nMethod: GET\nURL: {{base_url}}/api/platform/overview\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}"
           }
         }
-      ]
+      ],
+      "description": "Tenant, campus, academic year, feature flag, template, branding, and platform settings APIs."
     },
     {
       "name": "📢 Comms",
@@ -3479,7 +3675,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of announcements.\n\nMethod: GET\nURL: {{base_url}}/api/admin/announcements\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3504,7 +3701,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"title\": \"Holiday Notice\",\n  \"body\": \"College will remain closed on 15th Aug\",\n  \"targetGroup\": \"ALL\",\n  \"campusId\": \"{{campus_id}}\"\n}"
-            }
+            },
+            "description": "Creates a new announcement record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/announcements\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"title\": \"Holiday Notice\",\n  \"body\": \"College will remain closed on 15th Aug\",\n  \"targetGroup\": \"ALL\",\n  \"campusId\": \"{{campus_id}}\"\n}\n```"
           }
         },
         {
@@ -3521,7 +3719,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "POST request for 📢 Comms.\n\nMethod: POST\nURL: {{base_url}}/api/admin/announcements/:id/publish\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3538,7 +3737,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of events.\n\nMethod: GET\nURL: {{base_url}}/api/admin/events\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3563,7 +3763,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"title\": \"Annual Day\",\n  \"date\": \"2026-12-15\",\n  \"description\": \"Annual cultural event\",\n  \"campusId\": \"{{campus_id}}\"\n}"
-            }
+            },
+            "description": "Creates a new event record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/events\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"title\": \"Annual Day\",\n  \"date\": \"2026-12-15\",\n  \"description\": \"Annual cultural event\",\n  \"campusId\": \"{{campus_id}}\"\n}\n```"
           }
         },
         {
@@ -3580,7 +3781,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of leave requests.\n\nMethod: GET\nURL: {{base_url}}/api/admin/leave\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3605,7 +3807,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"type\": \"CASUAL\",\n  \"fromDate\": \"2026-05-10\",\n  \"toDate\": \"2026-05-12\",\n  \"reason\": \"Personal work\"\n}"
-            }
+            },
+            "description": "Creates a new leave request record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/leave\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"type\": \"CASUAL\",\n  \"fromDate\": \"2026-05-10\",\n  \"toDate\": \"2026-05-12\",\n  \"reason\": \"Personal work\"\n}\n```"
           }
         },
         {
@@ -3630,10 +3833,12 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"action\": \"APPROVED\",\n  \"remarks\": \"\"\n}"
-            }
+            },
+            "description": "Approves the selected workflow record.\n\nMethod: POST\nURL: {{base_url}}/api/admin/leave/:id/approve\nAuth: Bearer token required\nPath parameters: id\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"action\": \"APPROVED\",\n  \"remarks\": \"\"\n}\n```"
           }
         }
-      ]
+      ],
+      "description": "Communication APIs for announcements, notifications, leave requests, and messages."
     },
     {
       "name": "🗓 Timetable",
@@ -3675,7 +3880,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns one section timetable by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/timetable?classId=&sectionId=&academicYearId=\nAuth: Bearer token required\nQuery parameters: classId, sectionId, academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3712,7 +3918,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns one teacher timetable by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/timetable/teacher?teacherId=&academicYearId=\nAuth: Bearer token required\nQuery parameters: teacherId, academicYearId\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3737,10 +3944,12 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"slots\": [\n    { \"day\": \"MON\", \"period\": 1, \"subjectId\": \"\", \"subjectName\": \"Mathematics\", \"teacherId\": \"\", \"teacherName\": \"Mr. Sharma\", \"startTime\": \"09:00\", \"endTime\": \"09:45\" }\n  ]\n}"
-            }
+            },
+            "description": "PUT request for 🗓 Timetable.\n\nMethod: PUT\nURL: {{base_url}}/api/timetable\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"classId\": \"\",\n  \"sectionId\": \"\",\n  \"campusId\": \"{{campus_id}}\",\n  \"academicYearId\": \"\",\n  \"slots\": [\n    { \"day\": \"MON\", \"period\": 1, \"subjectId\": \"\", \"subjectName\": \"Mathematics\", \"teacherId\": \"\", \"teacherName\": \"Mr. Sharma\", \"startTime\": \"09:00\", \"endTime\": \"09:45\" }\n  ]\n}\n```"
           }
         }
-      ]
+      ],
+      "description": "Timetable and scheduling APIs."
     },
     {
       "name": "📁 Storage",
@@ -3767,7 +3976,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"fileName\": \"student-photo.jpg\",\n  \"contentType\": \"image/jpeg\",\n  \"folder\": \"student-docs\"\n}"
-            }
+            },
+            "description": "Returns one upload url by id or filter.\n\nMethod: POST\nURL: {{base_url}}/api/storage/upload-url\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"fileName\": \"student-photo.jpg\",\n  \"contentType\": \"image/jpeg\",\n  \"folder\": \"student-docs\"\n}\n```"
           },
           "event": [
             {
@@ -3810,10 +4020,12 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns one download url by id or filter.\n\nMethod: GET\nURL: {{base_url}}/api/storage/download-url?key={{upload_key}}\nAuth: Bearer token required\nQuery parameters: key\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}, {{upload_key}}"
           }
         }
-      ]
+      ],
+      "description": "Document upload/download helper APIs, including pre-signed upload URLs."
     },
     {
       "name": "🔍 Audit & Cleanup",
@@ -3851,7 +4063,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "Returns a list of audit logs.\n\nMethod: GET\nURL: {{base_url}}/api/audit-logs?limit=50&entityType=\nAuth: Bearer token required\nQuery parameters: limit, entityType\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3880,7 +4093,8 @@
                 "key": "Authorization",
                 "value": "Bearer {{access_token}}"
               }
-            ]
+            ],
+            "description": "Returns a list of platform audit logs.\n\nMethod: GET\nURL: {{base_url}}/api/platform/audit-logs?limit=50\nAuth: Bearer token required\nQuery parameters: limit\nEnvironment variables: {{access_token}}, {{base_url}}"
           }
         },
         {
@@ -3897,7 +4111,8 @@
                 "key": "x-tenant-id",
                 "value": "{{tenant_id}}"
               }
-            ]
+            ],
+            "description": "GET request for 🔍 Audit & Cleanup.\n\nMethod: GET\nURL: {{base_url}}/api/admin/cleanup/duplicate-students\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}"
           }
         },
         {
@@ -3922,7 +4137,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"primaryStudentId\": \"\",\n  \"duplicateStudentIds\": [\"\", \"\"]\n}"
-            }
+            },
+            "description": "POST request for 🔍 Audit & Cleanup.\n\nMethod: POST\nURL: {{base_url}}/api/admin/cleanup/merge-students\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"primaryStudentId\": \"\",\n  \"duplicateStudentIds\": [\"\", \"\"]\n}\n```"
           }
         },
         {
@@ -3947,14 +4163,16 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"primaryEnquiryId\": \"\",\n  \"duplicateEnquiryIds\": [\"\", \"\"]\n}"
-            }
+            },
+            "description": "POST request for 🔍 Audit & Cleanup.\n\nMethod: POST\nURL: {{base_url}}/api/admin/cleanup/merge-enquiries\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{base_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"primaryEnquiryId\": \"\",\n  \"duplicateEnquiryIds\": [\"\", \"\"]\n}\n```"
           }
         }
-      ]
+      ],
+      "description": "Audit log, duplicate detection, cleanup, and admin maintenance APIs."
     },
     {
       "name": "🔗 AppSync GraphQL",
-      "description": "Direct AppSync GraphQL calls for the Lambda resolvers. Use appsync_url and Cognito access_token.",
+      "description": "AppSync GraphQL requests. Set appsync_url and use a valid Cognito access token in Authorization.",
       "item": [
         {
           "name": "Promote Students",
@@ -3978,7 +4196,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"\\\",\\\"toAcademicYearId\\\":\\\"\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"\\\",\\\"toGradeId\\\":\\\"\\\",\\\"studentIds\\\":[\\\"\\\"],\\\"sectionStrategy\\\":\\\"SAME_SECTION\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\",\\\"allowPendingFee\\\":false}\"\n  }\n}"
-            }
+            },
+            "description": "Creates next academic-year enrollment records for promoted students.\n\nMethod: POST\nURL: {{appsync_url}}\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{appsync_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"\\\",\\\"toAcademicYearId\\\":\\\"\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"\\\",\\\"toGradeId\\\":\\\"\\\",\\\"studentIds\\\":[\\\"\\\"],\\\"sectionStrategy\\\":\\\"SAME_SECTION\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\",\\\"allowPendingFee\\\":false}\"\n  }\n}\n```"
           }
         },
         {
@@ -4003,7 +4222,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"query\": \"mutation SetStudentPromotionEligibility($input: AWSJSON!) { setStudentPromotionEligibility(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"\\\",\\\"updates\\\":[{\\\"studentId\\\":\\\"\\\",\\\"eligibility\\\":\\\"ELIGIBLE\\\"}]}\"\n  }\n}"
-            }
+            },
+            "description": "Runs an AppSync GraphQL operation.\n\nMethod: POST\nURL: {{appsync_url}}\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{appsync_url}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"query\": \"mutation SetStudentPromotionEligibility($input: AWSJSON!) { setStudentPromotionEligibility(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"\\\",\\\"updates\\\":[{\\\"studentId\\\":\\\"\\\",\\\"eligibility\\\":\\\"ELIGIBLE\\\"}]}\"\n  }\n}\n```"
           }
         },
         {
@@ -4028,7 +4248,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"query\": \"query ListPromotionBatches($fromAcademicYearId: ID, $toAcademicYearId: ID, $campusId: ID, $fromGradeId: ID, $status: String) { listPromotionBatches(fromAcademicYearId: $fromAcademicYearId, toAcademicYearId: $toAcademicYearId, campusId: $campusId, fromGradeId: $fromGradeId, status: $status) }\",\n  \"variables\": {\n    \"fromAcademicYearId\": \"\",\n    \"toAcademicYearId\": \"\",\n    \"campusId\": \"{{campus_id}}\",\n    \"fromGradeId\": \"\",\n    \"status\": \"\"\n  }\n}"
-            }
+            },
+            "description": "Returns a list of promotion batches.\n\nMethod: POST\nURL: {{appsync_url}}\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{appsync_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"query\": \"query ListPromotionBatches($fromAcademicYearId: ID, $toAcademicYearId: ID, $campusId: ID, $fromGradeId: ID, $status: String) { listPromotionBatches(fromAcademicYearId: $fromAcademicYearId, toAcademicYearId: $toAcademicYearId, campusId: $campusId, fromGradeId: $fromGradeId, status: $status) }\",\n  \"variables\": {\n    \"fromAcademicYearId\": \"\",\n    \"toAcademicYearId\": \"\",\n    \"campusId\": \"{{campus_id}}\",\n    \"fromGradeId\": \"\",\n    \"status\": \"\"\n  }\n}\n```"
           }
         },
         {
@@ -4053,7 +4274,8 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"query\": \"mutation CopyFeePatternToNextYear($input: AWSJSON!) { copyFeePatternToNextYear(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"\\\",\\\"toAcademicYearId\\\":\\\"\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"\\\",\\\"toGradeId\\\":\\\"\\\",\\\"feeCategoryId\\\":\\\"\\\",\\\"activateCopies\\\":false}\"\n  }\n}"
-            }
+            },
+            "description": "Runs an AppSync GraphQL operation.\n\nMethod: POST\nURL: {{appsync_url}}\nAuth: Bearer token required\nEnvironment variables: {{access_token}}, {{appsync_url}}, {{campus_id}}, {{tenant_id}}\n\nExample body:\n```json\n{\n  \"query\": \"mutation CopyFeePatternToNextYear($input: AWSJSON!) { copyFeePatternToNextYear(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"\\\",\\\"toAcademicYearId\\\":\\\"\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"\\\",\\\"toGradeId\\\":\\\"\\\",\\\"feeCategoryId\\\":\\\"\\\",\\\"activateCopies\\\":false}\"\n  }\n}\n```"
           }
         }
       ]
@@ -4065,7 +4287,8 @@
           "name": "Health Check",
           "request": {
             "method": "GET",
-            "url": "{{base_url}}/api/health"
+            "url": "{{base_url}}/api/health",
+            "description": "GET request for ❤️ Health.\n\nMethod: GET\nURL: {{base_url}}/api/health\nAuth: No bearer token in request headers\nEnvironment variables: {{base_url}}"
           },
           "event": [
             {
@@ -4078,7 +4301,8 @@
             }
           ]
         }
-      ]
+      ],
+      "description": "Health check endpoints used for deployment and smoke testing."
     }
   ]
 }
