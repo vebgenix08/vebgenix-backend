@@ -13,6 +13,7 @@ import { MonitoringStack } from "../lib/stacks/monitoring-stack";
 import { AppSyncStack }    from "../lib/stacks/appsync-stack";
 import { FrontendStack }   from "../lib/stacks/frontend-stack";
 import { GithubOidcStack } from "../lib/stacks/github-oidc-stack";
+import { RuntimeDepsStack } from "../lib/stacks/runtime-deps-stack";
 
 const app = new cdk.App();
 
@@ -34,41 +35,52 @@ const networkStack = new NetworkStack(app, `VebgenixNetwork-${config.stage}`, {
   config,
 });
 
-// 2. Auth: Cognito User Pool + PostConfirmation trigger Lambda
+// 2. Stable third-party Node.js packages shared through a Lambda Layer
+const runtimeDepsStack = new RuntimeDepsStack(app, `VebgenixRuntimeDeps-${config.stage}`, {
+  env,
+  config,
+});
+
+// 3. Auth: Cognito User Pool + PostConfirmation trigger Lambda
 // vpc/sgLambda passed only when NAT is enabled — Lambdas run outside VPC otherwise
 const authStack = new AuthStack(app, `VebgenixAuth-${config.stage}`, {
   env,
   config,
+  runtimeDepsLayer: runtimeDepsStack.layer,
   ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
 });
 authStack.addDependency(networkStack);
+authStack.addDependency(runtimeDepsStack);
 
-// 3. Storage: Private S3 Bucket
+// 4. Storage: Private S3 Bucket
 const storageStack = new StorageStack(app, `VebgenixStorage-${config.stage}`, {
   env,
   config,
 });
 
-// 4. Async: EventBridge + SQS + Worker Lambdas
+// 5. Async: EventBridge + SQS + Worker Lambdas
 const asyncStack = new AsyncStack(app, `VebgenixAsync-${config.stage}`, {
   env,
   config,
+  runtimeDepsLayer: runtimeDepsStack.layer,
   ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
 });
 asyncStack.addDependency(networkStack);
+asyncStack.addDependency(runtimeDepsStack);
 
-// 5. Monitoring: CloudWatch Alarms + Budget
+// 6. Monitoring: CloudWatch Alarms + Budget
 new MonitoringStack(app, `VebgenixMonitoring-${config.stage}`, {
   env,
   config,
   asyncStack,
 });
 
-// 6. AppSync: GraphQL API + all domain Lambda resolvers
+// 7. AppSync: GraphQL API + all domain Lambda resolvers
 const appSyncStack = new AppSyncStack(app, `VebgenixAppSync-${config.stage}`, {
   env,
   config,
   userPool:        authStack.userPool,
+  runtimeDepsLayer: runtimeDepsStack.layer,
   ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
   eventBus:        asyncStack.eventBus,
   documentsBucket: storageStack.bucket,
@@ -76,8 +88,9 @@ const appSyncStack = new AppSyncStack(app, `VebgenixAppSync-${config.stage}`, {
 appSyncStack.addDependency(authStack);
 appSyncStack.addDependency(networkStack);
 appSyncStack.addDependency(asyncStack);
+appSyncStack.addDependency(runtimeDepsStack);
 
-// 7. Frontend: S3 Bucket + CloudFront Distribution
+// 8. Frontend: S3 Bucket + CloudFront Distribution
 const frontendStack = new FrontendStack(app, `VebgenixFrontend-${config.stage}`, {
   env,
   config,
@@ -88,7 +101,7 @@ const frontendStack = new FrontendStack(app, `VebgenixFrontend-${config.stage}`,
 frontendStack.addDependency(appSyncStack);
 frontendStack.addDependency(authStack);
 
-// 8. CI/CD OIDC: Passwordless GitHub Actions integration
+// 9. CI/CD OIDC: Passwordless GitHub Actions integration
 new GithubOidcStack(app, `VebgenixOidc-${config.stage}`, {
   env,
   config,

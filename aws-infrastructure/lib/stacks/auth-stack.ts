@@ -6,6 +6,7 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Construct } from 'constructs';
 import { EnvConfig } from '../../config/types';
 import * as path from 'path';
+import { RUNTIME_LAYER_EXTERNAL_MODULES } from './runtime-deps-stack';
 
 const REPO_ROOT = path.resolve(__dirname, '../../../');
 
@@ -14,6 +15,7 @@ interface AuthStackProps extends cdk.StackProps {
   /** Only required when enableNat is true — see AppSyncStack comment. */
   vpc?: ec2.Vpc;
   sgLambda?: ec2.SecurityGroup;
+  runtimeDepsLayer: lambda.ILayerVersion;
 }
 
 export class AuthStack extends cdk.Stack {
@@ -24,7 +26,7 @@ export class AuthStack extends cdk.Stack {
 
   constructor(scope: Construct, id: string, props: AuthStackProps) {
     super(scope, id, props);
-    const { config, vpc, sgLambda } = props;
+    const { config, vpc, sgLambda, runtimeDepsLayer } = props;
     const vpcConfig = vpc && sgLambda
       ? { vpc, vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }, securityGroups: [sgLambda] }
       : {};
@@ -46,12 +48,13 @@ export class AuthStack extends cdk.Stack {
         MONGODB_URI: `{{resolve:secretsmanager:vebgenix/${config.stage}/mongodb:SecretString:uri}}`,
         NODE_OPTIONS: '--enable-source-maps',
       },
+      layers: [runtimeDepsLayer],
       tracing: lambda.Tracing.ACTIVE,
       bundling: {
         forceDockerBundling: false,
         minify:    config.stage === 'prod',
         sourceMap: config.stage !== 'prod',
-        externalModules: ['@aws-sdk/*'],
+        externalModules: ['@aws-sdk/*', ...RUNTIME_LAYER_EXTERNAL_MODULES],
       },
     });
 

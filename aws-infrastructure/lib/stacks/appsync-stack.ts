@@ -11,6 +11,7 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import { Construct } from 'constructs';
 import { EnvConfig } from '../../config/types';
 import * as path from 'path';
+import { RUNTIME_LAYER_EXTERNAL_MODULES } from './runtime-deps-stack';
 
 // Root of the monorepo (two levels above aws-infrastructure/)
 const REPO_ROOT = path.resolve(__dirname, '../../../');
@@ -25,6 +26,7 @@ interface AppSyncStackProps extends cdk.StackProps {
   sgLambda?: ec2.SecurityGroup;
   eventBus: events.EventBus;
   documentsBucket: s3.Bucket;
+  runtimeDepsLayer: lambda.ILayerVersion;
 }
 
 /**
@@ -41,7 +43,7 @@ export class AppSyncStack extends cdk.Stack {
 
   constructor(scope: Construct, id: string, props: AppSyncStackProps) {
     super(scope, id, props);
-    const { config, userPool, vpc, sgLambda, eventBus, documentsBucket } = props;
+    const { config, userPool, vpc, sgLambda, eventBus, documentsBucket, runtimeDepsLayer } = props;
 
     // ── AppSync GraphQL API ─────────────────────────────────────────────────
     this.api = new appsync.GraphqlApi(this, 'Api', {
@@ -143,12 +145,13 @@ export class AppSyncStack extends cdk.Stack {
           securityGroups: [sgLambda],
         } : {}),
         environment:    { ...sharedEnv, ...(extraEnv ?? {}) },
+        layers:         [runtimeDepsLayer],
         tracing:        lambda.Tracing.ACTIVE,
         bundling: {
           forceDockerBundling: false,
           minify:    config.stage === 'prod',
           sourceMap: config.stage !== 'prod',
-          externalModules: ['@aws-sdk/*'],
+          externalModules: ['@aws-sdk/*', ...RUNTIME_LAYER_EXTERNAL_MODULES],
         },
       });
       (extraPolicies ?? []).forEach(p => fn.addToRolePolicy(p));
