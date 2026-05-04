@@ -1,0 +1,350 @@
+/**
+ * Identity Service Lambda
+ *
+ * Handles: user profiles, staff management, roles, campus access,
+ *          employee records, impersonation (platform admin only).
+ *
+ * Does NOT handle: login / logout / token refresh — those are owned by Cognito.
+ *
+ * Invoked by:
+ *   - AppSync (Cognito User Pool authorizer) — event.identity.claims is pre-verified
+ *   - EC2 REST proxy — Authorization: Bearer <Cognito Access Token>
+ */
+import { bootstrapDB, ensureDB, IdentityRepo, Profile, Employee } from '@vebgenix/db';
+import { resolveContext } from '@vebgenix/auth';
+import { AppError, isAppError } from '@vebgenix/errors';
+import { getTenantId } from '@vebgenix/tenant';
+import { authorize } from '@vebgenix/permissions';
+import { CreateUser } from './use-cases/CreateUser';
+import { UpdateUser } from './use-cases/UpdateUser';
+import { DeactivateUser } from './use-cases/DeactivateUser';
+import { InviteStaff } from './use-cases/InviteStaff';
+import { Types } from 'mongoose';
+
+
+function parseEvent(event: Record<string, unknown>) {
+  // AppSync: event.info.fieldName = 'listUsers', 'createUser', etc.
+  if (event.info) {
+    const info = event.info as Record<string, string>;
+    return { operation: info.fieldName, args: (event.arguments ?? {}) as Record<string, unknown> };
+  }
+  // API Gateway (REST)
+  const method = event.httpMethod as string;
+  const path   = event.path as string;
+  const body   = typeof event.body === 'string'
+    ? JSON.parse(event.body || '{}')
+    : (event.body ?? {}) as Record<string, unknown>;
+  const params = (event.pathParameters ?? {}) as Record<string, string>;
+  const qs     = (event.queryStringParameters ?? {}) as Record<string, string>;
+  return { operation: `${method}:${path}`, args: { ...body, ...params, ...qs } };
+}
+
+export const handler = async (event: Record<string, unknown>, context: Record<string, unknown>) => {
+  bootstrapDB(context);
+  try {
+    await ensureDB();
+
+    const ctx                  = await resolveContext(event);
+    const { operation, args } = parseEvent(event);
+
+    switch (operation) {
+
+      // ── Who am I ──────────────────────────────────────────────────────────
+      case 'me':
+      case 'GET:/api/me': {
+        const tenantId = ctx.membership?.tenantId;
+        if (!tenantId) {
+          return { id: ctx.userId, email: ctx.email, isPlatformAdmin: ctx.isPlatformAdmin };
+        }
+        return IdentityRepo.findProfileByAuthUserId(tenantId, ctx.userId);
+      }
+
+      // ── Users ─────────────────────────────────────────────────────────────
+      case 'listUsers':
+      case 'GET:/api/admin/users': {
+        const tenantId = getTenantId(ctx);
+        const filter: Record<string, unknown> = { personaRole: { $ne: 'STUDENT' } };
+        if (args.isActive !== undefined) filter.isActive = args.isActive === 'true' || args.isActive === true;
+        if (args.campusId) filter['campusAccess.campusId'] = args.campusId;
+        return IdentityRepo.listProfiles(tenantId, filter);
+      }
+
+      case 'getUser':
+      case 'GET:/api/admin/users/:id': {
+        const tenantId = getTenantId(ctx);
+        return IdentityRepo.findProfileById(tenantId, args.id as string);
+      }
+
+      case 'createUser':
+      case 'POST:/api/admin/users':
+        return CreateUser.execute(ctx, args as Parameters<typeof CreateUser.execute>[1]);
+
+      case 'updateUser':
+      case 'PATCH:/api/admin/users/:id':
+        return UpdateUser.execute(ctx, {
+          profileId: args.id as string,
+          ...(args.input ?? args) as object,
+        } as Parameters<typeof UpdateUser.execute>[1]);
+
+      case 'deactivateUser':
+      case 'DELETE:/api/admin/users/:id':
+        return DeactivateUser.execute(ctx, args.id as string);
+
+      case 'reactivateUser':
+      case 'POST:/api/admin/users/:id/reactivate': {
+        authorize(ctx, 'identity.users.update');
+        const tenantId = getTenantId(ctx);
+        const updated  = await IdentityRepo.updateProfile(tenantId, args.id as string, { isActive: true });
+        if (!updated) throw new AppError('NOT_FOUND', 'User not found');
+        return updated;
+      }
+
+      // ── Staff ─────────────────────────────────────────────────────────────
+      case 'inviteStaff':
+      case 'POST:/api/admin/staff':
+        return InviteStaff.execute(ctx, args as Parameters<typeof InviteStaff.execute>[1]);
+
+      case 'listStaff':
+      case 'GET:/api/admin/staff': {
+        const tenantId = getTenantId(ctx);
+        const filter: Record<string, unknown> = { personaRole: { $in: ['STAFF', 'TEACHER'] } };
+        if (args.campusId) filter['campusAccess.campusId'] = args.campusId;
+        return IdentityRepo.listProfiles(tenantId, filter);
+      }
+
+      case 'getStaffMember':
+      case 'GET:/api/admin/staff/:id': {
+        const tenantId = getTenantId(ctx);
+        return IdentityRepo.findProfileById(tenantId, args.id as string);
+      }
+
+      // ── Employee Records ───────────────────────────────────────────────────
+      case 'listEmployees':
+      case 'GET:/api/admin/employees': {
+        authorize(ctx, 'identity.staff.read');
+        const tenantId = getTenantId(ctx);
+        const filter: Record<string, unknown> = { tenantId };
+        if (args.staffType)   filter.staffType   = args.staffType;
+        if (args.campusId)    filter.campusId     = args.campusId;
+        if (args.isActive !== undefined) filter.isActive = args.isActive === 'true' || args.isActive === true;
+        return Employee.find(filter).sort({ createdAt: -1 }).lean();
+      }
+
+      case 'getEmployee':
+      case 'GET:/api/admin/employees/:id': {
+        authorize(ctx, 'identity.staff.read');
+        const tenantId = getTenantId(ctx);
+        return Employee.findOne({ tenantId, _id: args.id as string }).lean();
+      }
+
+      case 'updateEmployee':
+      case 'PATCH:/api/admin/employees/:id': {
+        authorize(ctx, 'identity.staff.update');
+        const tenantId = getTenantId(ctx);
+        const { id, ...update } = args as Record<string, unknown>;
+        return Employee.findOneAndUpdate(
+          { tenantId, _id: id as string },
+          { $set: update },
+          { new: true }
+        ).lean();
+      }
+
+      // ── Campus Access ──────────────────────────────────────────────────────
+      case 'addCampusAccess':
+      case 'POST:/api/admin/users/:id/campus-access': {
+        authorize(ctx, 'identity.users.update');
+        const tenantId  = getTenantId(ctx);
+        const profileId = args.id as string;
+        const campusId  = args.campusId as string;
+        const roleAtCampus = args.role as string | undefined;
+        const profile = await IdentityRepo.findProfileById(tenantId, profileId);
+        if (!profile) throw new AppError('NOT_FOUND', 'User not found');
+        const existing = (profile.campusAccess ?? []) as unknown as Array<Record<string, unknown>>;
+        if (existing.some((ca) => ca.campusId?.toString() === campusId)) {
+          throw new AppError('CONFLICT', 'User already has access to this campus');
+        }
+        return IdentityRepo.updateProfile(tenantId, profileId, {
+          campusAccess: [
+            ...existing,
+            { campusId, role: roleAtCampus, grantedAt: new Date() },
+          ] as never,
+        });
+      }
+
+      case 'removeCampusAccess':
+      case 'DELETE:/api/admin/users/:id/campus-access/:campusId': {
+        authorize(ctx, 'identity.users.update');
+        const tenantId  = getTenantId(ctx);
+        const profileId = (args.id ?? args.profileId) as string;
+        const campusId  = args.campusId as string;
+        const profile = await IdentityRepo.findProfileById(tenantId, profileId);
+        if (!profile) throw new AppError('NOT_FOUND', 'User not found');
+        const filtered = (profile.campusAccess ?? []).filter(
+          (ca) => ca.campusId?.toString() !== campusId
+        );
+        return IdentityRepo.updateProfile(tenantId, profileId, { campusAccess: filtered as never });
+      }
+
+      case 'listCampusAccess':
+      case 'GET:/api/admin/users/:id/campus-access': {
+        const tenantId = getTenantId(ctx);
+        const profile  = await IdentityRepo.findProfileById(tenantId, args.id as string);
+        if (!profile) throw new AppError('NOT_FOUND', 'User not found');
+        return profile.campusAccess ?? [];
+      }
+
+      // ── Roles ──────────────────────────────────────────────────────────────
+      case 'assignRole':
+      case 'POST:/api/admin/users/:id/roles': {
+        authorize(ctx, 'identity.roles.assign');
+        const tenantId = getTenantId(ctx);
+        const profile  = await IdentityRepo.findProfileById(tenantId, args.id as string);
+        if (!profile) throw new AppError('NOT_FOUND', 'User not found');
+        const roles        = (profile.roles ?? []) as unknown as Array<Record<string, unknown>>;
+        const roleName     = args.role as string;
+        const campusId     = args.campusId as string | undefined;
+        if (roles.some((r) => r.role === roleName && r.campusId?.toString() === campusId)) {
+          throw new AppError('CONFLICT', 'Role already assigned');
+        }
+        roles.push({ role: roleName, campusId, assignedAt: new Date(), assignedBy: ctx.membership!.profileId });
+        return IdentityRepo.updateProfile(tenantId, args.id as string, {
+          roles: roles as never,
+        });
+      }
+
+      case 'removeRole':
+      case 'DELETE:/api/admin/users/:id/roles/:role': {
+        authorize(ctx, 'identity.roles.assign');
+        const tenantId = getTenantId(ctx);
+        const profile  = await IdentityRepo.findProfileById(tenantId, args.id as string);
+        if (!profile) throw new AppError('NOT_FOUND', 'User not found');
+        const filtered = (profile.roles ?? []).filter(
+          (r) => (r as unknown as Record<string, unknown>).role !== args.role
+        );
+        return IdentityRepo.updateProfile(tenantId, args.id as string, {
+          roles: filtered as never,
+        });
+      }
+
+      // ── Impersonation (platform admin only) ────────────────────────────────
+      case 'impersonateUser':
+      case 'POST:/api/platform/impersonate': {
+        if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
+        const targetUserId = args.userId as string;
+        // Return a limited context token info — actual Cognito impersonation
+        // is done via AdminInitiateAuth with ALLOW_USER_PASSWORD_AUTH for super admin
+        // This endpoint logs the action and returns target user profile
+        const targetProfile = await Profile.findOne({ _id: targetUserId }).lean() as unknown as Record<string, unknown> | null;
+        if (!targetProfile) throw new AppError('NOT_FOUND', 'Target user not found');
+        console.warn(`[IMPERSONATION] Platform admin ${ctx.userId} impersonating ${targetUserId}`);
+        return { targetProfile, note: 'Use Cognito Admin APIs to obtain token for this user' };
+      }
+
+      // ── Self-service profile ───────────────────────────────────────────────
+      case 'updateMyProfile':
+      case 'PATCH:/api/me': {
+        const tenantId = ctx.membership?.tenantId;
+        if (!tenantId) throw new AppError('BAD_REQUEST', 'No tenant context');
+        const profileId = ctx.membership!.profileId;
+        const { isActive: _ia, personaRole: _pr, roleAssignments: _ra, campusAccess: _ca, ...safeUpdate } =
+          args as Record<string, unknown>;
+        return IdentityRepo.updateProfile(tenantId, profileId, safeUpdate as never);
+      }
+
+      case 'uploadAvatar':
+      case 'POST:/api/me/avatar': {
+        const tenantId = ctx.membership?.tenantId ?? 'platform';
+        const key      = `${tenantId}/avatars/${ctx.userId}-${Date.now()}.jpg`;
+        return {
+          storageOperation: 'getUploadUrl',
+          key,
+          contentType: (args.contentType as string) ?? 'image/jpeg',
+          instructions: 'PUT file to uploadUrl, then call updateMyProfile with { avatarKey }',
+        };
+      }
+
+      case 'uploadTenantLogo':
+      case 'POST:/api/admin/settings/logo': {
+        authorize(ctx, 'tenant.settings.update');
+        const tenantId = getTenantId(ctx);
+        const key      = `${tenantId}/logos/tenant-logo-${Date.now()}.png`;
+        return {
+          storageOperation: 'getUploadUrl',
+          key,
+          contentType: (args.contentType as string) ?? 'image/png',
+          instructions: 'PUT file to uploadUrl, then call updateTenant with { logoKey }',
+        };
+      }
+
+      case 'resendInvite':
+      case 'POST:/api/admin/staff/:id/resend-invite': {
+        authorize(ctx, 'identity.users.update');
+        const tenantId = getTenantId(ctx);
+        const profile  = await IdentityRepo.findProfileById(tenantId, args.id as string);
+        if (!profile) throw new AppError('NOT_FOUND', 'Staff member not found');
+        const { AdminCreateUserCommand, CognitoIdentityProviderClient } = await import('@aws-sdk/client-cognito-identity-provider');
+        const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+        await cognitoClient.send(new AdminCreateUserCommand({
+          UserPoolId:    process.env.COGNITO_USER_POOL_ID,
+          Username:      profile.email,
+          MessageAction: 'RESEND',
+        }));
+        return { success: true, message: 'Invitation resent' };
+      }
+
+      // ── Accept invite ─────────────────────────────────────────────────────
+      // Called when a staff member clicks their invite link before setting
+      // a password. The `token` is their email address (or a profile lookup key).
+      // The actual Cognito password-set happens client-side via confirmSignIn;
+      // this endpoint validates the invite is still open and returns pre-fill info.
+      case 'acceptInvite':
+      case 'POST:/api/auth/accept-invite': {
+        const token = args.token as string;
+        if (!token) throw new AppError('BAD_REQUEST', 'token is required');
+        // Lookup by email (the token sent in the Cognito invitation email)
+        const authUser = await IdentityRepo.findAuthUserByEmail(token);
+        if (!authUser) {
+          // Try treating token as a profileId
+          const profileById = await Profile.findById(token).lean() as unknown as Record<string, unknown> | null;
+          if (!profileById) throw new AppError('NOT_FOUND', 'Invalid or expired invite token');
+          return {
+            success:        true,
+            email:          profileById.email as string,
+            isExistingUser: !!(authUser),
+          };
+        }
+        const isExistingUser = !!authUser.cognitoSub;
+        return {
+          success: true,
+          email:   authUser.email,
+          isExistingUser,
+        };
+      }
+
+      // ── Bulk operations ────────────────────────────────────────────────────
+      case 'bulkDeactivateUsers':
+      case 'POST:/api/admin/users/bulk-deactivate': {
+        authorize(ctx, 'identity.users.delete');
+        const tenantId  = getTenantId(ctx);
+        const userIds   = args.userIds as string[];
+        if (!Array.isArray(userIds) || userIds.length === 0) {
+          throw new AppError('BAD_REQUEST', 'userIds array is required');
+        }
+        const result = await Profile.updateMany(
+          { tenantId, _id: { $in: userIds.map((id) => new Types.ObjectId(id)) } },
+          { $set: { isActive: false } }
+        );
+        return { modifiedCount: result.modifiedCount };
+      }
+
+      default:
+        throw new AppError('NOT_FOUND', `Unknown operation: ${operation}`);
+    }
+  } catch (err) {
+    if (isAppError(err)) {
+      return { __error: true, code: err.code, message: err.message, statusCode: err.statusCode };
+    }
+    console.error('[identity-service] unhandled error:', err);
+    return { __error: true, code: 'INTERNAL', message: 'Internal server error', statusCode: 500 };
+  }
+};

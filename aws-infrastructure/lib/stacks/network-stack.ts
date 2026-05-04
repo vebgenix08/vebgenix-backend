@@ -43,40 +43,46 @@ export class NetworkStack extends cdk.Stack {
     });
 
     // ---------------------------------------------------------------
-    // VPC Endpoints — avoid NAT for proven AWS service traffic
+    // VPC Endpoints — only useful when Lambdas are inside the VPC
+    // (i.e. when enableNat:true and private subnets have internet via NAT).
+    // When enableNat:false, Lambdas run outside the VPC and reach all AWS
+    // services over their public endpoints — no VPC endpoints needed.
     // ---------------------------------------------------------------
-    this.vpc.addGatewayEndpoint('S3Endpoint', {
-      service: ec2.GatewayVpcEndpointAwsService.S3,
-      subnets: [
-        { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-        { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
-      ],
-    });
-    this.vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      privateDnsEnabled: true,
-    });
-    this.vpc.addInterfaceEndpoint('SsmEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      privateDnsEnabled: true,
-    });
-    this.vpc.addInterfaceEndpoint('SsmMessagesEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      privateDnsEnabled: true,
-    });
-    this.vpc.addInterfaceEndpoint('EventsEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      privateDnsEnabled: true,
-    });
-    this.vpc.addInterfaceEndpoint('CognitoIdpEndpoint', {
-      service: ec2.InterfaceVpcEndpointAwsService.COGNITO_IDP,
-      subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      privateDnsEnabled: true,
-    });
+    if (config.enableNat) {
+      // S3 Gateway endpoint is free — always worth adding when in VPC
+      this.vpc.addGatewayEndpoint('S3Endpoint', {
+        service: ec2.GatewayVpcEndpointAwsService.S3,
+        subnets: [
+          { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+          { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+        ],
+      });
+      this.vpc.addInterfaceEndpoint('SecretsManagerEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+        subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        privateDnsEnabled: true,
+      });
+      this.vpc.addInterfaceEndpoint('SsmEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.SSM,
+        subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        privateDnsEnabled: true,
+      });
+      this.vpc.addInterfaceEndpoint('SsmMessagesEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
+        subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        privateDnsEnabled: true,
+      });
+      this.vpc.addInterfaceEndpoint('EventsEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.EVENTBRIDGE,
+        subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        privateDnsEnabled: true,
+      });
+      this.vpc.addInterfaceEndpoint('CognitoIdpEndpoint', {
+        service: ec2.InterfaceVpcEndpointAwsService.COGNITO_IDP,
+        subnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        privateDnsEnabled: true,
+      });
+    }
 
     // ---------------------------------------------------------------
     // Security Groups — least privilege: Lambda -> Proxy -> DB

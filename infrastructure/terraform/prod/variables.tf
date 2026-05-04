@@ -7,65 +7,42 @@ variable "aws_region" {
 variable "aws_account_id" {
   description = "AWS account ID"
   type        = string
-  default     = "278035644568" # Prod account
 }
 
-variable "neon_database_url" {
-  description = "Neon PostgreSQL connection string for prod environment"
+variable "mongodb_atlas_org_id" {
+  description = "MongoDB Atlas Organization ID"
   type        = string
   sensitive   = true
 }
 
-variable "frontend_url" {
-  description = "Frontend application URL (prod)"
+variable "mongodb_atlas_public_key" {
+  description = "MongoDB Atlas API public key"
   type        = string
-  default     = ""
+  sensitive   = true
 }
 
-variable "domain_name" {
-  description = "Root domain name (e.g., vebgenix.com). Leave empty to skip DNS/custom domain setup."
+variable "mongodb_atlas_private_key" {
+  description = "MongoDB Atlas API private key"
   type        = string
-  default     = ""
+  sensitive   = true
 }
 
-variable "api_subdomain" {
-  description = "API subdomain prefix"
+variable "mongodb_app_password" {
+  description = "Password for the MongoDB Atlas app user (vebgenix_app)"
   type        = string
-  default     = "api"
+  sensitive   = true
 }
 
-variable "app_subdomain" {
-  description = "Frontend app subdomain prefix"
+variable "mongodb_db_name" {
+  description = "MongoDB database name"
   type        = string
-  default     = "app"
+  default     = "vebgenix_prod"
 }
 
-variable "prod_lambda_version" {
-  description = "Lambda version number for the prod alias"
-  type        = string
-  default     = "1"
-}
-
-variable "alert_email" {
-  description = "Email address for CloudWatch alarm notifications"
-  type        = string
-  default     = ""
-}
-
-variable "ec2_instance_type" {
-  description = "EC2 instance type for REST API"
-  type        = string
-  default     = "t4g.small"
-}
-
-variable "ec2_volume_size_gb" {
-  description = "EC2 root volume size in GB"
-  type        = number
-  default     = 20
-}
-
-variable "availability_zones" {
-  description = "Availability zones for subnets"
+variable "lambda_egress_cidrs" {
+  description = "List of NAT Gateway EIP CIDRs that Lambdas use for outbound traffic. Add /32 per EIP. Get these from the CDK VPC stack outputs."
   type        = list(string)
-  default     = ["ap-south-1a", "ap-south-1b"]
+  # Example: ["13.235.10.100/32", "52.66.200.50/32"]
+  # Leave empty to skip IP access list entries (open to all — NOT recommended for prod)
+  default     = []
 }

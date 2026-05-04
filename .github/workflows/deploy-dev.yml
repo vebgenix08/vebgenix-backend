@@ -1,4 +1,4 @@
-name: Deploy Backend to dev
+name: Deploy to dev
 
 on:
   push:
@@ -18,161 +18,54 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: dev
-    env:
-      STAGE: dev
-      REGION: ap-south-1
-      ARTIFACT_BUCKET: vebgenix-documents-prod-278035644568
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v5
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v5
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: aws-infrastructure/package-lock.json
 
       - name: Configure AWS Credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::278035644568:role/GitHubDeployRole-vebgenix-backend-prod
+          role-to-assume: arn:aws:iam::278035644568:role/GitHubDeployRole-vebgenix-backend-dev
           aws-region: ap-south-1
 
-      - name: Resolve EC2 instance ID
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Install root monorepo dependencies
+        run: npm ci
+
+      - name: Install CDK dependencies
+        working-directory: aws-infrastructure
+        run: npm ci
+
+      - name: Run TypeScript type-check
+        run: npx turbo run typecheck
+
+      - name: CDK deploy all dev stacks
+        working-directory: aws-infrastructure
+        run: npx cdk deploy --all -c env=dev --require-approval never
+        env:
+          # Secrets are injected into Lambdas via CloudFormation dynamic references
+          # ({{resolve:secretsmanager:...}}) — no env vars needed here for runtime secrets
+          FORCE_COLOR: '0'
+
+      - name: Print stack outputs
+        if: always()
         run: |
-          set -euo pipefail
-          # There is a single EC2 instance serving the REST API (tagged prod).
-          # Dev environment shares this instance — Lambda aliases handle dev/prod separation.
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters \
-              "Name=tag:Project,Values=vebgenix" \
-              "Name=instance-state-name,Values=running" \
-            --query "Reservations[0].Instances[0].InstanceId" \
-            --output text)
-
-          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "ERROR: No running EC2 instance found with tag Project=vebgenix"
-            exit 1
-          fi
-
-          echo "Found instance: $INSTANCE_ID"
-          echo "INSTANCE_ID=$INSTANCE_ID" >> "$GITHUB_ENV"
-
-      - name: Install server deps and build
-        working-directory: server
-        run: |
-          npm ci
-          ./node_modules/.bin/prisma generate --schema=prisma/schema.prisma
-          npm run build
-
-      - name: Package backend artifact
-        run: |
-          set -euo pipefail
-          ARTIFACT_KEY="rest-deployments/backend-${GITHUB_SHA}.tgz"
-
-          tar \
-            --exclude='.git' \
-            --exclude='server/node_modules' \
-            --exclude='aws-infrastructure/node_modules' \
-            --exclude='aws-infrastructure/cdk.out' \
-            --exclude='.claude' \
-            -czf /tmp/backend-rest.tgz .
-
-          aws s3 cp /tmp/backend-rest.tgz "s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
-          echo "Uploaded artifact: s3://${ARTIFACT_BUCKET}/${ARTIFACT_KEY}"
-          echo "ARTIFACT_KEY=$ARTIFACT_KEY" >> "$GITHUB_ENV"
-
-      - name: Wait for EC2 SSM registration
-        run: |
-          set -euo pipefail
-          for i in $(seq 1 30); do
-            MANAGED=$(aws ssm describe-instance-information \
-              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
-              --query "InstanceInformationList[0].InstanceId" \
-              --output text 2>/dev/null || echo "None")
-            if [ "$MANAGED" = "$INSTANCE_ID" ]; then
-              echo "Instance $INSTANCE_ID is SSM-managed"
-              break
-            fi
-            echo "Waiting for SSM registration [$i/30]..."
-            sleep 10
+          echo "=== Dev stack outputs ==="
+          for stack in VebgenixNetwork-dev VebgenixAuth-dev VebgenixAppSync-dev VebgenixStorage-dev VebgenixAsync-dev; do
+            echo ""
+            echo "--- $stack ---"
+            aws cloudformation describe-stacks \
+              --stack-name "$stack" \
+              --query "Stacks[0].Outputs[*].{Key:OutputKey,Value:OutputValue}" \
+              --output table 2>/dev/null || echo "(not deployed)"
           done
-
-      - name: Deploy REST app to EC2 via SSM
-        run: |
-          set -euo pipefail
-          COMMANDS=$(jq -n \
-            --arg bucket "$ARTIFACT_BUCKET" \
-            --arg key "$ARTIFACT_KEY" \
-            '{commands: [
-              "set -euxo pipefail",
-              ("ARTIFACT_BUCKET=" + $bucket),
-              ("ARTIFACT_KEY=" + $key),
-              "APP_DIR=/opt/vebgenix/app",
-              "rm -rf \"$APP_DIR\"",
-              "mkdir -p \"$APP_DIR\"",
-              "aws s3 cp \"s3://$ARTIFACT_BUCKET/$ARTIFACT_KEY\" /tmp/vebgenix-backend.tgz --region ap-south-1",
-              "tar -xzf /tmp/vebgenix-backend.tgz -C \"$APP_DIR\"",
-              "cd \"$APP_DIR/server\"",
-              "npm ci",
-              "set -a && source /etc/vebgenix-rest.env && set +a",
-              "npx prisma@5 db push --accept-data-loss --schema=prisma/schema.prisma",
-              "npx prisma@5 generate --schema=prisma/schema.prisma",
-              "npm run seed:permissions 2>/dev/null || true",
-              "npm run build",
-              "systemctl daemon-reload",
-              "systemctl enable vebgenix-rest",
-              "systemctl restart vebgenix-rest",
-              "sleep 5 && systemctl is-active vebgenix-rest && echo REST service is running"
-            ]}')
-
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --parameters "$COMMANDS" \
-            --comment "Deploy backend ${GITHUB_SHA:0:8}" \
-            --query "Command.CommandId" \
-            --output text)
-
-          echo "SSM command ID: $COMMAND_ID"
-          sleep 5
-
-          for i in $(seq 1 60); do
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id "$COMMAND_ID" \
-              --instance-id "$INSTANCE_ID" \
-              --query "Status" \
-              --output text 2>/dev/null || echo "Pending")
-            echo "[$i/60] $STATUS"
-            case "$STATUS" in
-              Success) break ;;
-              Failed|Cancelled|TimedOut)
-                echo "=== SSM output ==="
-                aws ssm get-command-invocation \
-                  --command-id "$COMMAND_ID" \
-                  --instance-id "$INSTANCE_ID" \
-                  --query "[StandardOutputContent,StandardErrorContent]" \
-                  --output text
-                exit 1 ;;
-            esac
-            sleep 10
-          done
-
-      - name: Verify REST health
-        run: |
-          set -euo pipefail
-          PUBLIC_IP=$(aws ec2 describe-instances \
-            --instance-ids "$INSTANCE_ID" \
-            --query "Reservations[0].Instances[0].PublicIpAddress" \
-            --output text)
-
-          echo "Checking health at http://$PUBLIC_IP/api/health"
-          for i in $(seq 1 30); do
-            if curl --fail --silent --show-error --max-time 5 "http://$PUBLIC_IP/api/health"; then
-              echo "REST server healthy"
-              exit 0
-            fi
-            echo "Waiting [$i/30]..."
-            sleep 10
-          done
-          exit 1

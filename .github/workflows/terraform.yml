@@ -1,12 +1,9 @@
-name: Terraform Infrastructure
+name: CDK Infrastructure (OIDC stacks)
+
+# This workflow deploys OIDC + IAM-only stacks that don't change often.
+# For full infrastructure deployment, use deploy-dev.yml or deploy-prod.yml.
 
 on:
-  # Auto-plan only (never auto-apply — infrastructure changes must be deliberate)
-  pull_request:
-    paths:
-      - 'infrastructure/terraform/**'
-
-  # Manual apply/plan/destroy — choose environment + action explicitly
   workflow_dispatch:
     inputs:
       environment:
@@ -15,40 +12,30 @@ on:
         default: 'dev'
         type: choice
         options: [dev, prod]
-      action:
-        description: 'Terraform action'
-        required: true
-        default: 'plan'
-        type: choice
-        options: [plan, apply, destroy]
 
 permissions:
   id-token: write
   contents: read
-  pull-requests: write
 
-# Prevent concurrent runs per environment
 concurrency:
-  group: terraform-${{ github.event.inputs.environment || 'pr' }}
+  group: cdk-oidc-${{ github.event.inputs.environment }}
   cancel-in-progress: false
 
 jobs:
-  terraform:
+  deploy-oidc:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'prod' }}
-
-    env:
-      ENVIRONMENT:    ${{ github.event.inputs.environment || 'dev' }}
-      TF_ACTION:      ${{ github.event.inputs.action || 'plan' }}
+    environment: ${{ github.event.inputs.environment }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
         with:
-          terraform_version: 1.7.5
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: aws-infrastructure/package-lock.json
 
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -56,93 +43,17 @@ jobs:
           role-to-assume: arn:aws:iam::278035644568:role/GitHubDeployRole-vebgenix-backend-prod
           aws-region: ap-south-1
 
-      # Write tfvars from GitHub secrets — never stored in repo
-      - name: Write terraform.tfvars
-        working-directory: infrastructure/terraform/${{ env.ENVIRONMENT }}
-        env:
-          NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
-          ALERT_EMAIL:       ${{ secrets.ALERT_EMAIL }}
-          DOMAIN_NAME:       ${{ secrets.DOMAIN_NAME }}
-          FRONTEND_URL:      ${{ secrets.FRONTEND_URL }}
-          PROD_LAMBDA_VER:   ${{ secrets.PROD_LAMBDA_VERSION }}
+      - name: Install CDK dependencies
+        working-directory: aws-infrastructure
+        run: npm ci
+
+      - name: Deploy OIDC stack
+        working-directory: aws-infrastructure
+        run: npx cdk deploy VebgenixOidc-${{ github.event.inputs.environment }} -c env=${{ github.event.inputs.environment }} --require-approval never
+
+      - name: Show outputs
         run: |
-          cat > terraform.tfvars << TFVARS
-          aws_region     = "ap-south-1"
-          aws_account_id = "278035644568"
-
-          neon_database_url = "$NEON_DATABASE_URL"
-
-          alert_email  = "${ALERT_EMAIL:-}"
-          domain_name  = "${DOMAIN_NAME:-}"
-          frontend_url = "${FRONTEND_URL:-}"
-
-          prod_lambda_version = "${PROD_LAMBDA_VER:-1}"
-          api_subdomain       = "api"
-          app_subdomain       = "app"
-
-          ec2_instance_type  = "t4g.small"
-          ec2_volume_size_gb = 20
-          availability_zones = ["ap-south-1a", "ap-south-1b"]
-          TFVARS
-
-      - name: Terraform Init
-        working-directory: infrastructure/terraform/${{ env.ENVIRONMENT }}
-        run: terraform init -input=false
-
-      - name: Terraform Validate
-        working-directory: infrastructure/terraform/${{ env.ENVIRONMENT }}
-        run: terraform validate
-
-      - name: Terraform Format Check
-        working-directory: infrastructure/terraform/${{ env.ENVIRONMENT }}
-        run: terraform fmt -check -recursive
-        continue-on-error: true
-
-      - name: Terraform Plan
-        working-directory: infrastructure/terraform/${{ env.ENVIRONMENT }}
-        id: plan
-        run: |
-          terraform plan \
-            -input=false \
-            -out=tfplan 2>&1 | tee plan_output.txt
-          echo "exitcode=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
-
-      # Post plan to PR as comment
-      - name: Post Plan to PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const plan = fs.readFileSync('infrastructure/terraform/${{ env.ENVIRONMENT }}/plan_output.txt', 'utf8');
-            const truncated = plan.length > 60000
-              ? plan.substring(0, 60000) + '\n\n...(truncated — see full logs)'
-              : plan;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: [
-                `## 🏗️ Terraform Plan — \`${{ env.ENVIRONMENT }}\``,
-                '```hcl',
-                truncated,
-                '```',
-              ].join('\n')
-            });
-
-      - name: Terraform Apply
-        if: env.TF_ACTION == 'apply'
-        working-directory: infrastructure/terraform/${{ env.ENVIRONMENT }}
-        run: terraform apply -input=false -auto-approve tfplan
-
-      - name: Terraform Destroy
-        if: env.TF_ACTION == 'destroy'
-        working-directory: infrastructure/terraform/${{ env.ENVIRONMENT }}
-        run: terraform destroy -input=false -auto-approve
-
-      - name: Show Outputs
-        if: env.TF_ACTION == 'apply'
-        working-directory: infrastructure/terraform/${{ env.ENVIRONMENT }}
-        run: |
-          echo "## Terraform Outputs"
-          terraform output -json 2>/dev/null || true
+          aws cloudformation describe-stacks \
+            --stack-name VebgenixOidc-${{ github.event.inputs.environment }} \
+            --query "Stacks[0].Outputs[*].{Key:OutputKey,Value:OutputValue}" \
+            --output table

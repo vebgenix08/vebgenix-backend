@@ -1,3 +1,24 @@
+/**
+ * build-schema.mjs
+ *
+ * Single source of truth for the AppSync GraphQL schema.
+ *
+ * Canonical location:  graphql/schema.graphql
+ * CDK deployment copy: aws-infrastructure/lib/schema/schema.graphql
+ *
+ * This script copies the canonical schema to the CDK location so that
+ * `cdk deploy` always picks up the latest changes.
+ *
+ * Workflow:
+ *   1. Edit graphql/schema.graphql
+ *   2. Run: npm run build:schema
+ *   3. Commit BOTH graphql/schema.graphql AND aws-infrastructure/lib/schema/schema.graphql
+ *   4. Deploy: cd aws-infrastructure && npx cdk deploy -c env=dev --all
+ *
+ * NOTE: The graphql/modules/ directory contains legacy module fragments from
+ * the old Express backend. They are NOT used by this script and should be
+ * ignored. The canonical schema is the single file at graphql/schema.graphql.
+ */
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,134 +27,113 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const rootDir = path.join(__dirname, "..");
-const MODULES_DIR = path.join(rootDir, "graphql", "modules");
-const OUTPUT_SCHEMA = path.join(rootDir, "graphql", "schema.graphql");
-const CDK_SCHEMA_DIR = path.join(
-  rootDir,
-  "aws-infrastructure",
-  "lib",
-  "schema",
-);
-const CDK_SCHEMA_FILE = path.join(CDK_SCHEMA_DIR, "schema.graphql");
+const SOURCE_SCHEMA  = path.join(rootDir, "graphql", "schema.graphql");
+const CDK_SCHEMA_DIR = path.join(rootDir, "aws-infrastructure", "lib", "schema");
+const CDK_SCHEMA     = path.join(CDK_SCHEMA_DIR, "schema.graphql");
 
-// Order matters: base types (common.graphql) MUST come first so AppSync
-// sees 'type Query' before any 'extend type Query' blocks.
-// Add new feature files here when you create them.
-const ORDER = [
-  "common.graphql",      // base Query/Mutation types — always first
-  "dashboard.graphql",
-  "admissions.graphql",
-  "students.graphql",
-  "users.graphql",
-  "fees.graphql",
-  "templates.graphql",
-  "auditLogs.graphql",
-  "tenants.graphql",
-  // "attendance.graphql", ← example: add new feature file here
+// ---------------------------------------------------------------------------
+// 1. Read canonical source
+// ---------------------------------------------------------------------------
+if (!fs.existsSync(SOURCE_SCHEMA)) {
+  console.error(`Error: Source schema not found at ${SOURCE_SCHEMA}`);
+  process.exit(1);
+}
+
+const schema = fs.readFileSync(SOURCE_SCHEMA, "utf-8");
+if (!schema.trim()) {
+  console.error("Error: Source schema is empty!");
+  process.exit(1);
+}
+console.log(`Source schema: ${SOURCE_SCHEMA} (${schema.length} bytes)`);
+
+// ---------------------------------------------------------------------------
+// 2. Verify required fields are present
+//    Add new fields here as new resolvers are registered in appsync-stack.ts
+// ---------------------------------------------------------------------------
+const REQUIRED_FIELDS = [
+  // Auth / Identity
+  "me", "listUsers", "createUser", "inviteStaff",
+  // Admissions
+  "listEnquiries", "createEnquiry", "createPublicEnquiry",
+  "listApplications", "reviewApplication", "approveApplication",
+  "checkDuplicate", "admissionsStats",
+  // Finance
+  "listFeeCategories", "createFeeCategory",
+  "listFeeHeads", "createFeeHead",
+  "listFeeStructures", "createFeeStructure",
+  "listFeeAssignments", "createFeeAssignment", "bulkAssignFeeStructure",
+  "listInvoices", "createOneOffCharge", "recordPayment",
+  "createPaymentOrder", "verifyPaymentSignature",
+  "dayBookReport", "feeCollectionAnalytics",
+  // Academics
+  "listClasses", "getClass", "createClass",
+  "listAllSections", "getSection", "createSection", "setSectionIncharge",
+  "listSubjects", "getSubject", "createSubject",
+  "enrollStudent", "listStudents", "getStudent",
+  "listEnrollments", "assignStudentToSection", "transferStudentSection",
+  "generateRegistrationNumbers", "freezeRegistrationNumbers", "listRegistrationBatches",
+  "generateRollNumbers", "freezeRollNumbers", "listRollNoBatches",
+  "promoteStudents", "setStudentPromotionEligibility",
+  "listPromotionBatches", "getPromotionBatch", "listPromotionBatchItems",
+  "copyFeePatternToNextYear",
+  "markSectionAttendance", "getSectionAttendance",
+  "createExam", "enterMarks", "publishResults",
+  "issueCertificate", "enablePortalAccess",
+  // Settings
+  "listTenants", "getTenant", "createTenant",
+  "listCampuses", "createCampus",
+  "listPrograms", "createProgram",
+  "listAcademicYears", "createAcademicYear", "setActiveAcademicYear",
+  "listTemplates", "createTemplate", "publishTemplateVersion",
+  "getTenantFeatures", "updateTenantFeatures",
+  "createFirstAdmin", "finalizeTenant",
+  "dashboardOverview", "superAdminOverview",
+  "listAuditLogs", "listPlatformAuditLogs",
+  // Comms
+  "listAnnouncements", "createAnnouncement", "publishAnnouncement",
+  "listEvents", "createEvent",
+  "listLeaveRequests", "createLeaveRequest", "approveLeave",
+  // Results
+  "listResultBatches", "createResultBatch", "publishResultBatch",
+  "getPublicResult", "getResultPublicToken",
+  // Storage
+  "generateUploadUrl", "generateDownloadUrl",
+  // Cleanup
+  "getDuplicateReport", "mergeEnquiries", "mergeStudents",
 ];
 
-// ---------------------------------------------------------------------------
-// Prefer the checked-in root schema as the source of truth.
-// The old graphql/modules/* fragments are incomplete and only kept as fallback.
-// ---------------------------------------------------------------------------
-let rawSchema = "";
-if (fs.existsSync(OUTPUT_SCHEMA)) {
-  rawSchema = fs.readFileSync(OUTPUT_SCHEMA, "utf-8");
-  console.log(`Using checked-in schema source from ${OUTPUT_SCHEMA}`);
-} else {
-  for (const file of ORDER) {
-    const filePath = path.join(MODULES_DIR, file);
-    if (fs.existsSync(filePath)) {
-      const content = fs.readFileSync(filePath, "utf-8");
-      rawSchema += `\n# --- ${file} ---\n\n`;
-      rawSchema += content.trim() + "\n";
-    } else {
-      console.warn(`Warning: ${file} not found in ${MODULES_DIR}`);
-    }
+let allOk = true;
+for (const field of REQUIRED_FIELDS) {
+  if (!schema.includes(field)) {
+    console.error(`  ✗ MISSING: '${field}'`);
+    allOk = false;
+  } else {
+    console.log(`  ✓ ${field}`);
   }
 }
 
-if (!rawSchema.trim()) {
-  console.error("Error: Generated schema is empty!");
+if (!allOk) {
+  console.error("\nError: Schema is missing required fields listed above.");
   process.exit(1);
 }
 
 // ---------------------------------------------------------------------------
-// Merge all `extend type X { ... }` blocks into the base `type X { ... }`.
-//
-// AppSync's startSchemaCreation API silently ignores `extend type` blocks —
-// only the base `type X { }` definition is applied. By merging here, the
-// generated schema works with BOTH CloudFormation and the AppSync API.
+// 3. Guard against extend type blocks (AppSync startSchemaCreation ignores them)
 // ---------------------------------------------------------------------------
-function mergeExtendTypes(schema) {
-  // Collect all extension bodies keyed by type name
-  const extensions = {};
-  const extendRegex = /extend\s+type\s+(\w+)\s*\{([\s\S]*?)\}/g;
-  let match;
-  while ((match = extendRegex.exec(schema)) !== null) {
-    const typeName = match[1];
-    const body = match[2].trim();
-    if (!extensions[typeName]) extensions[typeName] = [];
-    if (body) extensions[typeName].push(body);
-  }
-
-  // Remove all extend blocks from the schema
-  let merged = schema.replace(/extend\s+type\s+\w+\s*\{[\s\S]*?\}/g, "");
-
-  // Inject extension fields into the matching base type blocks
-  for (const [typeName, bodies] of Object.entries(extensions)) {
-    const baseTypeRegex = new RegExp(
-      `(type\\s+${typeName}\\s*(?:implements[^{]+)?\\{)([\\s\\S]*?)(\\})`,
-      "g",
-    );
-    merged = merged.replace(baseTypeRegex, (fullMatch, open, body, close) => {
-      const extraFields = bodies.join("\n  ");
-      return `${open}${body}  ${extraFields}\n${close}`;
-    });
-  }
-
-  // Remove blank lines that accumulate from stripped extend blocks
-  merged = merged.replace(/\n{3,}/g, "\n\n");
-
-  return merged;
-}
-
-const finalSchema = mergeExtendTypes(rawSchema).trim() + "\n";
-
-// ---------------------------------------------------------------------------
-// Verify the merged schema has the required fields
-// ---------------------------------------------------------------------------
-const required = [
-  "dashboardOverview",
-  "superAdminOverview",
-  "listPlatformAuditLogs",
-  "getPlatformAuditLog",
-];
-for (const field of required) {
-  if (!finalSchema.includes(field)) {
-    console.error(
-      `Error: Required field '${field}' missing from merged schema!`,
-    );
-    process.exit(1);
-  }
-  console.log(`  ✓ ${field}`);
-}
-
-// Ensure no extend type blocks remain
-if (/\bextend\s+type\b/.test(finalSchema)) {
-  console.error("Error: extend type blocks remain in merged schema!");
+if (/\bextend\s+type\b/.test(schema)) {
+  console.error("Error: 'extend type' blocks found — AppSync silently ignores them.");
+  console.error("Merge all extensions into the base type definition.");
   process.exit(1);
 }
-console.log("  ✓ No extend type blocks (AppSync-safe)");
+console.log("  ✓ No extend type blocks");
 
 // ---------------------------------------------------------------------------
-// Write outputs
+// 4. Write CDK copy
 // ---------------------------------------------------------------------------
-fs.writeFileSync(OUTPUT_SCHEMA, finalSchema, "utf-8");
-console.log(`\nSuccessfully generated schema at ${OUTPUT_SCHEMA}`);
-
 if (!fs.existsSync(CDK_SCHEMA_DIR)) {
   fs.mkdirSync(CDK_SCHEMA_DIR, { recursive: true });
 }
-fs.writeFileSync(CDK_SCHEMA_FILE, finalSchema, "utf-8");
-console.log(`Successfully copied schema to ${CDK_SCHEMA_FILE}`);
+fs.writeFileSync(CDK_SCHEMA, schema, "utf-8");
+console.log(`\nCopied schema to ${CDK_SCHEMA}`);
+console.log("\n✅  Schema build complete. Both files are in sync.");
+console.log("   Commit both:\n   git add graphql/schema.graphql aws-infrastructure/lib/schema/schema.graphql");

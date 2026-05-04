@@ -14,26 +14,15 @@ export const devConfig: EnvConfig = {
 
   // Network
   enableNat: false, // No NAT in dev — use VPC Endpoints + stubs for external APIs
-  enableEc2RestApi: true,
-  enableEc2Postgres: true,
-  restApiSubnetId: "subnet-0981f0e5c706bd982",
-  restApiSubnetAz: "ap-south-1b",
-  restApiSubnetRouteTableId: "rtb-0f1b4b91acd13b4d4",
-  ec2DbSubnetId: "subnet-0981f0e5c706bd982",
-  ec2DbSubnetAz: "ap-south-1b",
-  ec2DbSubnetRouteTableId: "rtb-0f1b4b91acd13b4d4",
 
-  // Database
+  // EC2 REST API and EC2 Postgres are disabled for dev:
+  // - Backend runs as Lambda (AppSync + domain Lambdas via CDK)
+  // - Database is MongoDB Atlas (no EC2 Postgres needed)
+  enableEc2RestApi: false,
+  enableEc2Postgres: false,
+
+  // Database (MongoDB Atlas — no RDS needed)
   enableDatabase: false,
-  dbInstanceClass: "t4g.micro",
-  dbMultiAz: false,
-  dbBackupRetentionDays: 1,
-  dbDeletionProtection: false,
-  dbStorageEncrypted: true,
-  restApiInstanceClass: "t4g.small",
-  restApiVolumeSizeGb: 20,
-  ec2DbInstanceClass: "t4g.small",
-  ec2DbVolumeSizeGb: 30,
 
   // AppSync
   enableWaf: false,

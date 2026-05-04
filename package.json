@@ -1,8 +1,27 @@
 {
+  "name": "vebgenix-backend",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "apps/workers/*"
+  ],
   "scripts": {
-    "build:schema": "node scripts/build-schema.mjs"
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "dev": "turbo run dev",
+    "build:schema": "node scripts/build-schema.mjs",
+    "clean": "turbo run clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.2.2"
   },
   "dependencies": {
     "aws-amplify": "^6.16.2"
+  },
+  "packageManager": "npm@10.0.0",
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

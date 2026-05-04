@@ -11,11 +11,12 @@ export class GithubOidcStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: GithubOidcStackProps) {
     super(scope, id, props);
 
-    // Create the GitHub OIDC Identity Provider in AWS
-    const githubProvider = new iam.OpenIdConnectProvider(this, 'GithubOidcProvider', {
-      url: 'https://token.actions.githubusercontent.com',
-      clientIds: ['sts.amazonaws.com'],
-    });
+    // Import the existing GitHub OIDC Identity Provider (one provider per URL is allowed per AWS account)
+    const githubProvider = iam.OpenIdConnectProvider.fromOpenIdConnectProviderArn(
+      this,
+      'GithubOidcProvider',
+      `arn:aws:iam::${this.account}:oidc-provider/token.actions.githubusercontent.com`,
+    );
 
     // Strategy 1: The Deployment Role for the Backend (CDK) Repository
     const backendRole = new iam.Role(this, 'GithubDeployRoleBackend', {

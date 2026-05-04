@@ -1,0 +1,22 @@
+{
+  "name": "@vebgenix/admin-cleanup-service",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vebgenix/auth": "*",
+    "@vebgenix/db": "*",
+    "@vebgenix/errors": "*",
+    "@vebgenix/permissions": "*",
+    "@vebgenix/tenant": "*",
+    "mongoose": "^8.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}
