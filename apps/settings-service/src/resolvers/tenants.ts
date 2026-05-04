@@ -1,4 +1,4 @@
-import { Tenant, TenantFeature, Profile, generateTenantId } from '@vebgenix/db';
+import { Tenant, TenantFeature, Profile, AuthUser, generateTenantId } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
@@ -13,6 +13,61 @@ function maskEmail(email: string): string {
 /** Generate a 6-digit OTP */
 function generateOtp(): string {
   return String(Math.floor(100_000 + Math.random() * 900_000));
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeSubdomain(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function toFeatureItems(features: Record<string, unknown> | string[] | undefined) {
+  if (Array.isArray(features)) {
+    return features.map(key => ({ key, enabled: true }));
+  }
+  if (!features) return [];
+  return Object.entries(features).map(([key, enabled]) => ({ key, enabled: Boolean(enabled) }));
+}
+
+function toDateString(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') return value;
+  return new Date().toISOString();
+}
+
+/** Serialize a Tenant DB document to GraphQL shape (maps tenantId to id). */
+function toGql(doc: Record<string, unknown> | null, features?: Record<string, unknown> | string[]) {
+  if (!doc) return null;
+  const { _id, ...rest } = doc as Record<string, unknown>;
+  const slug = rest.slug as string | undefined;
+  return {
+    ...rest,
+    id: rest.tenantId ?? String(_id),
+    fullDomain: rest.fullDomain ?? (slug ? `${slug}.vebgenix.com` : rest.domain),
+    isActive: rest.isActive ?? true,
+    onboardingComplete: rest.onboardingComplete ?? false,
+    features: toFeatureItems(features ?? (rest.features as Record<string, unknown> | undefined)),
+    createdAt: toDateString(rest.createdAt),
+  };
+}
+
+async function assertTenantNameAvailable(name: string): Promise<void> {
+  const existing = await Tenant.findOne({
+    name: new RegExp(`^${escapeRegex(name)}$`, 'i'),
+  }).lean();
+  if (existing) throw new AppError('CONFLICT', `Tenant with name "${name}" already exists`);
+}
+
+async function assertTenantSlugAvailable(slug: string): Promise<void> {
+  const existing = await Tenant.findOne({ slug }).lean();
+  if (existing) throw new AppError('CONFLICT', `Tenant with subdomain "${slug}" already exists`);
 }
 
 export async function resolveTenants(
@@ -30,7 +85,8 @@ export async function resolveTenants(
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const filter: Record<string, unknown> = {};
       if (args.isActive !== undefined) filter.isActive = args.isActive === 'true' || args.isActive === true;
-      return Tenant.find(filter).sort({ name: 1 }).lean();
+      const docs = await Tenant.find(filter).sort({ name: 1 }).lean();
+      return { items: docs.map(d => toGql(d as Record<string, unknown>)), nextToken: null };
     }
 
     case 'getTenant':
@@ -39,15 +95,14 @@ export async function resolveTenants(
       if (!ctx.isPlatformAdmin && id !== tenantId) {
         throw new AppError('FORBIDDEN', 'Cannot view another tenant');
       }
-      return Tenant.findOne({ tenantId: id }).lean();
+      return toGql(await Tenant.findOne({ tenantId: id }).lean() as Record<string, unknown> | null);
     }
 
     // ── Subdomain validation ──────────────────────────────────────────────────
 
     case 'validateSubdomain':
     case 'GET:/api/platform/validate-subdomain': {
-      const raw        = (args.subdomain as string ?? '').toLowerCase().trim();
-      const normalized = raw.replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const normalized = normalizeSubdomain((args.subdomain as string) ?? '');
       const fullDomain = `${normalized}.vebgenix.com`;
       const existing   = await Tenant.findOne({ slug: normalized }).lean();
       const available  = !existing;
@@ -69,10 +124,16 @@ export async function resolveTenants(
     case 'POST:/api/platform/tenants': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const input      = (args.input as Record<string, unknown>) ?? args;
+      const name       = String(input.name ?? '').trim();
+      const slug       = normalizeSubdomain(String(input.slug ?? name));
+      if (!name) throw new AppError('BAD_REQUEST', 'Tenant name is required');
+      if (!slug) throw new AppError('BAD_REQUEST', 'Tenant subdomain is required');
+      await assertTenantNameAvailable(name);
+      await assertTenantSlugAvailable(slug);
       const newTenantId = generateTenantId(input.type as string | undefined);
-      const tenant     = await Tenant.create({ ...input, tenantId: newTenantId, isActive: true });
+      const tenant     = await Tenant.create({ ...input, name, slug, tenantId: newTenantId, isActive: true });
       await TenantFeature.create({ tenantId: newTenantId });
-      return tenant;
+      return toGql(tenant.toObject() as unknown as Record<string, unknown>);
     }
 
     // ── Provision tenant (full automated workflow) ────────────────────────────
@@ -81,23 +142,27 @@ export async function resolveTenants(
     case 'POST:/api/platform/tenants/provision': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const input = (args.input as Record<string, unknown>) ?? args;
-      const {
-        organizationName,
-        subdomain,
-        features   = [],
-        adminName,
-        adminEmail,
-      } = input as {
+      const raw = input as {
         organizationName: string;
         subdomain:        string;
         features:         string[];
         adminName:        string;
         adminEmail:       string;
       };
+      const organizationName = String(raw.organizationName ?? '').trim();
+      const subdomain        = normalizeSubdomain(String(raw.subdomain ?? ''));
+      const features         = Array.isArray(raw.features) ? raw.features : [];
+      const adminName        = String(raw.adminName ?? '').trim();
+      const adminEmail       = String(raw.adminEmail ?? '').trim().toLowerCase();
 
-      // 1. Ensure subdomain is free
-      const slugTaken = await Tenant.findOne({ slug: subdomain }).lean();
-      if (slugTaken) throw new AppError('CONFLICT', `Subdomain "${subdomain}" is already taken`);
+      if (!organizationName) throw new AppError('BAD_REQUEST', 'Tenant name is required');
+      if (!subdomain) throw new AppError('BAD_REQUEST', 'Tenant subdomain is required');
+      if (!adminName) throw new AppError('BAD_REQUEST', 'Admin name is required');
+      if (!adminEmail) throw new AppError('BAD_REQUEST', 'Admin email is required');
+
+      // 1. Fail early with clear AppSync errors before creating tenant/Cognito data.
+      await assertTenantNameAvailable(organizationName);
+      await assertTenantSlugAvailable(subdomain);
 
       // 2. Create tenant with prefixed ID
       const newTenantId = generateTenantId('org');
@@ -118,6 +183,7 @@ export async function resolveTenants(
 
       // 4. Create Cognito admin user — Cognito sends the invite email automatically
       let inviteSent = false;
+      let cognitoSub: string | undefined;
       try {
         const {
           AdminCreateUserCommand,
@@ -125,7 +191,7 @@ export async function resolveTenants(
           CognitoIdentityProviderClient,
         } = await import('@aws-sdk/client-cognito-identity-provider');
         const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
-        await cognito.send(new AdminCreateUserCommand({
+        const createResp = await cognito.send(new AdminCreateUserCommand({
           UserPoolId:             process.env.COGNITO_USER_POOL_ID,
           Username:               adminEmail,
           DesiredDeliveryMediums: ['EMAIL'],
@@ -133,14 +199,15 @@ export async function resolveTenants(
             { Name: 'email',            Value: adminEmail },
             { Name: 'name',             Value: adminName  },
             { Name: 'custom:tenantId',  Value: newTenantId },
-            { Name: 'custom:role',      Value: 'ADMIN'    },
+            { Name: 'custom:role',      Value: 'SCHOOL_ADMIN' },
             { Name: 'email_verified',   Value: 'true'     },
           ],
         }));
+        cognitoSub = createResp.User?.Attributes?.find(a => a.Name === 'sub')?.Value;
         await cognito.send(new AdminAddUserToGroupCommand({
           UserPoolId: process.env.COGNITO_USER_POOL_ID,
           Username:   adminEmail,
-          GroupName:  'ADMIN',
+          GroupName:  'SCHOOL_ADMIN',
         }));
         inviteSent = true;
       } catch (err) {
@@ -148,18 +215,32 @@ export async function resolveTenants(
         // Don't rollback the tenant — admin can resend via resendTenantInvite
       }
 
-      // 5. Create the admin's Profile document
-      await Profile.create({
-        tenantId:    newTenantId,
-        email:       adminEmail,
-        fullName:    adminName,
-        personaRole: 'ADMIN',
-        isActive:    true,
-        isPrimaryOwner: true,
-        roleAssignments: [{ role: 'ADMIN', assignedAt: new Date() }],
-      });
+      // 5. Create AuthUser + Profile for the admin when Cognito user creation succeeded.
+      if (cognitoSub) {
+        const authUser = await AuthUser.findOneAndUpdate(
+          { $or: [{ cognitoSub }, { email: adminEmail }] },
+          { $set: { email: adminEmail, cognitoSub } },
+          { upsert: true, new: true, setDefaultsOnInsert: true },
+        );
+        await Profile.create({
+          tenantId:      newTenantId,
+          authUserId:    authUser._id,
+          email:         adminEmail,
+          fullName:      adminName,
+          personaRole:   'TENANT_ADMIN',
+          isActive:      true,
+          isAllCampuses: true,
+          isPrimaryOwner: true,
+        });
+      } else {
+        console.warn(`[settings/provisionTenant] Skipping admin profile for ${adminEmail}; Cognito user was not created`);
+      }
 
-      return { tenant: tenant.toObject(), adminEmail, inviteSent };
+      return {
+        tenant: toGql(tenant.toObject() as unknown as Record<string, unknown>, featureFlags),
+        adminEmail,
+        inviteSent,
+      };
     }
 
     // ── Update tenant ─────────────────────────────────────────────────────────
@@ -172,22 +253,22 @@ export async function resolveTenants(
       if (!ctx.isPlatformAdmin) authorize(ctx, 'tenant.settings.update');
       const input = (args.input as Record<string, unknown>) ?? args;
       const { isActive: _ia, slug: _sl, tenantId: _tid, ...safeInput } = input as Record<string, unknown>;
-      return Tenant.findOneAndUpdate(
+      return toGql(await Tenant.findOneAndUpdate(
         { tenantId: resolvedTenantId },
         { $set: safeInput },
         { new: true },
-      ).lean();
+      ).lean() as Record<string, unknown> | null);
     }
 
     case 'deactivateTenant':
     case 'DELETE:/api/platform/tenants/:id': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const id = (args.tenantId ?? args.id) as string;
-      return Tenant.findOneAndUpdate(
+      return toGql(await Tenant.findOneAndUpdate(
         { tenantId: id },
         { $set: { isActive: false } },
         { new: true },
-      ).lean();
+      ).lean() as Record<string, unknown> | null);
     }
 
     // ── Tenant deletion OTP flow ──────────────────────────────────────────────
