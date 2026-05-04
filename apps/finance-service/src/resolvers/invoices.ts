@@ -118,7 +118,7 @@ export async function resolveInvoices(
     case 'generatePaymentLink':
     case 'POST:/api/admin/finance/invoices/:id/payment-link': {
       authorize(ctx, 'finance.payment.create');
-      const { createRazorpayPaymentLink } = await import('../razorpay');
+      const { createRazorpayPaymentLink } = await import('../razorpay.js');
       const invoice = await FinanceRepo.findInvoiceById(tenantId, args.id as string);
       if (!invoice) throw new AppError('NOT_FOUND', 'Invoice not found');
       const amountPaise = Math.round(invoice.dueAmount * 100);
