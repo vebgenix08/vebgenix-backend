@@ -4,6 +4,7 @@ import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 import { RecordPayment } from '../use-cases/RecordPayment';
 import { createRazorpayOrder, verifyRazorpaySignature } from '../razorpay';
+import { Types } from 'mongoose';
 
 export async function resolvePayments(
   operation: string,
@@ -14,7 +15,7 @@ export async function resolvePayments(
   switch (operation) {
     case 'recordPayment':
     case 'POST:/api/admin/finance/payments':
-      return RecordPayment.execute(ctx, args as unknown as Parameters<typeof RecordPayment.execute>[1]);
+      return RecordPayment.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof RecordPayment.execute>[1]);
 
     case 'listPayments':
     case 'GET:/api/admin/finance/payments': {
@@ -46,13 +47,18 @@ export async function resolvePayments(
       });
       // Pre-create payment record in PENDING state
       const payment = await FinanceRepo.createPayment(tenantId, {
-        invoiceId:       invoice._id.toString() as never,
-        studentId:       invoice.studentId.toString() as never,
+        campusId:        invoice.campusId,
+        studentId:       invoice.studentId,
+        invoiceId:       new Types.ObjectId(invoice._id.toString()),
+        academicYearId:  invoice.academicYearId,
+        classId:         invoice.classId,
+        feeOrderId:      invoice.feeOrderId,
+        feeHeadPrefix:   invoice.feeHeadPrefix,
         amount:          amountToPay,
         method:          'ONLINE',
         status:          'PENDING',
         razorpayOrderId: order.id,
-        collectedBy:     ctx.membership!.profileId as never,
+        collectedBy:     new Types.ObjectId(ctx.membership!.profileId),
       });
       return { orderId: order.id, amount: order.amount, currency: order.currency, paymentId: payment._id };
     }
@@ -60,7 +66,8 @@ export async function resolvePayments(
     case 'verifyPaymentSignature':
     case 'POST:/api/finance/payments/verify': {
       authorize(ctx, 'finance.payment.create');
-      const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = args as Record<string, string>;
+      const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, string>;
+      const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = input;
       const valid = verifyRazorpaySignature(
         `${razorpayOrderId}|${razorpayPaymentId}`,
         razorpaySignature,
@@ -69,12 +76,7 @@ export async function resolvePayments(
       if (!valid) throw new AppError('BAD_REQUEST', 'Invalid payment signature');
       const payment = await FinanceRepo.findPaymentByRazorpayOrderId(razorpayOrderId);
       if (!payment) throw new AppError('NOT_FOUND', 'Payment record not found');
-      await FinanceRepo.updatePaymentStatus(payment._id.toString(), {
-        status:            'SUCCESS',
-        razorpayPaymentId,
-        razorpaySignature,
-      });
-      await FinanceRepo.updateInvoicePaid(tenantId, payment.invoiceId.toString(), payment.amount);
+      await RecordPayment.applyOnlineSuccess(tenantId, payment._id.toString(), razorpayPaymentId, razorpaySignature);
       return { success: true, paymentId: payment._id };
     }
 
@@ -98,33 +100,32 @@ export async function resolvePayments(
     case 'POST:/api/admin/finance/students/:studentId/collect': {
       // Collect payment across ALL outstanding invoices for a student (oldest first)
       authorize(ctx, 'finance.payment.create');
+      const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
       const studentId = (args.studentId ?? args.id) as string;
-      let remaining   = args.amount as number;
-      const method    = (args.method as string) ?? 'CASH';
+      let remaining   = input.amount as number;
+      const method    = (input.method as string) ?? 'CASH';
       if (!remaining || remaining <= 0) throw new AppError('BAD_REQUEST', 'amount must be > 0');
       const invoices = await FinanceRepo.listInvoices(tenantId, {
         studentId,
-        status: { $in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
+        status: { $in: ['PENDING', 'ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
       });
-      // Sort oldest first
-      invoices.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      (invoices as { createdAt: Date }[]).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       const payments = [];
       for (const inv of invoices) {
         if (remaining <= 0) break;
         const toPay = Math.min(remaining, inv.dueAmount);
-        const payment = await FinanceRepo.createPayment(tenantId, {
-          invoiceId:   inv._id.toString() as never,
-          studentId:   studentId as never,
+        const result = await RecordPayment.execute(ctx, {
+          invoiceId:   inv._id.toString(),
+          studentId:   inv.studentId.toString(),
+          campusId:    inv.campusId.toString(),
           amount:      toPay,
-          method:      method as never,
-          status:      'SUCCESS',
-          collectedBy: ctx.membership!.profileId as never,
+          method:      method as 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI' | 'CARD' | 'ONLINE',
+          remarks:     input.remarks as string | undefined,
         });
-        await FinanceRepo.updateInvoicePaid(tenantId, inv._id.toString(), toPay);
-        payments.push(payment);
+        payments.push(result.payment);
         remaining -= toPay;
       }
-      return { payments, totalCollected: (args.amount as number) - remaining, remainingAmount: remaining };
+      return { payments, totalCollected: (input.amount as number) - remaining, remainingAmount: remaining };
     }
 
     case 'getStudentDues':
@@ -133,9 +134,9 @@ export async function resolvePayments(
       const studentId = (args.studentId ?? args.id) as string;
       const overdueInvoices = await FinanceRepo.listInvoices(tenantId, {
         studentId,
-        status: { $in: ['PENDING', 'PARTIALLY_PAID', 'OVERDUE'] },
+        status: { $in: ['PENDING', 'ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
       });
-      const totalDue = overdueInvoices.reduce((s, i) => s + i.dueAmount, 0);
+      const totalDue = (overdueInvoices as { dueAmount: number }[]).reduce((s, i) => s + i.dueAmount, 0);
       return { studentId, invoices: overdueInvoices, totalDue };
     }
 

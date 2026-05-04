@@ -5,6 +5,7 @@ import { authorize } from '@vebgenix/permissions';
 import { getTenantId } from '@vebgenix/tenant';
 import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
+import { generateFeeOrderId, normalizeFeePrefix } from '../numbering';
 
 export interface InvoiceItemInput {
   feeHeadId:   string;
@@ -27,10 +28,8 @@ export interface CreateInvoiceInput {
   feeScheduleId?:  string;
   /** Internal flag — set to true by createOneOffCharge / bulkCreateCharge routes */
   isOneOff?:       boolean;
-}
-
-function generateInvoiceNumber(): string {
-  return `INV-${Date.now()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+  /** Override invoice/receipt prefix for one-off charges */
+  invoicePrefix?:  string;
 }
 
 /**
@@ -67,21 +66,26 @@ export class CreateInvoice {
 
     // ── Build canonical item list ─────────────────────────────────────────────
     const baseItems = input.items.map((item) => ({
-      feeHeadId:   new Types.ObjectId(item.feeHeadId),
-      feeHeadName: item.feeHeadName,
-      amount:      item.amount,
-      concession:  item.concession ?? 0,
-      netAmount:   item.amount - (item.concession ?? 0),
+      feeHeadId:     new Types.ObjectId(item.feeHeadId),
+      feeHeadName:   item.feeHeadName,
+      amount:        item.amount,
+      concession:    item.concession ?? 0,
+      netAmount:     item.amount - (item.concession ?? 0),
+      paidAmount:    0,
+      balanceAmount: item.amount - (item.concession ?? 0),
+      priorityOrder: 0,
     }));
 
-    const totalAmount     = baseItems.reduce((s, i) => s + i.amount,    0);
+    const totalAmount      = baseItems.reduce((s, i) => s + i.amount,    0);
     const concessionAmount = baseItems.reduce((s, i) => s + i.concession, 0);
     const netAmount        = totalAmount - concessionAmount;
 
+    // ── Determine prefix ──────────────────────────────────────────────────────
+    const prefix      = input.invoicePrefix ?? normalizeFeePrefix(input.items[0]?.feeHeadName ?? 'CHG');
+    const receiptPfx  = prefix;
+    const feeHeadPfx  = prefix.replace(/\//g, '_');
+
     // ── Installment plan expansion via FeeSchedule ───────────────────────────
-    // If a feeScheduleId is provided, create one invoice per schedule slot
-    // instead of a single lump-sum invoice.  Each slot contributes a portion
-    // of the total net amount (percentOfTotal) or a fixed amount (fixedAmount).
     if (input.feeScheduleId) {
       const schedules = await FinanceRepo.listFeeSchedules(tenantId, { _id: input.feeScheduleId });
       const schedule  = schedules[0];
@@ -90,10 +94,10 @@ export class CreateInvoice {
         throw new AppError('BAD_REQUEST', 'Fee schedule has no slots; cannot expand into installments');
       }
 
-      // Validate: slots must sum to 100 % (if using percentOfTotal) or ≤ netAmount
-      const usesPercent = schedule.slots.some((s) => s.percentOfTotal != null);
+      // Validate: slots must sum to 100 % (if using percentOfTotal)
+      const usesPercent = (schedule.slots as { percentOfTotal?: number }[]).some((s) => s.percentOfTotal != null);
       if (usesPercent) {
-        const totalPct = schedule.slots.reduce((sum, s) => sum + (s.percentOfTotal ?? 0), 0);
+        const totalPct = (schedule.slots as { percentOfTotal?: number }[]).reduce((sum, s) => sum + (s.percentOfTotal ?? 0), 0);
         if (Math.abs(totalPct - 100) > 0.01) {
           throw new AppError(
             'BAD_REQUEST',
@@ -105,29 +109,31 @@ export class CreateInvoice {
       const createdInvoices = [];
 
       for (const slot of schedule.slots) {
-        // Calculate this installment's net amount
         let slotNetAmount: number;
         if (slot.percentOfTotal != null) {
           slotNetAmount = Math.round(netAmount * (slot.percentOfTotal / 100) * 100) / 100;
         } else if (slot.fixedAmount != null) {
           slotNetAmount = slot.fixedAmount;
         } else {
-          // Fallback: split evenly across all slots
           slotNetAmount = Math.round((netAmount / schedule.slots.length) * 100) / 100;
         }
 
-        // Scale base items proportionally
-        const slotItems = scaleItems(baseItems, netAmount, slotNetAmount);
-        const slotTotal      = slotItems.reduce((s, i) => s + i.amount,    0);
-        const slotConcession = slotItems.reduce((s, i) => s + i.concession, 0);
+        const slotBaseItems = scaleItems(baseItems, netAmount, slotNetAmount);
+        const slotTotal      = slotBaseItems.reduce((s, i) => s + i.amount,    0);
+        const slotConcession = slotBaseItems.reduce((s, i) => s + i.concession, 0);
+
+        const feeOrderId = await generateFeeOrderId(tenantId, prefix, input.academicYearId);
 
         const invoice = await FinanceRepo.createInvoice(tenantId, {
           campusId:        new Types.ObjectId(input.campusId),
           studentId:       new Types.ObjectId(input.studentId),
           academicYearId:  new Types.ObjectId(input.academicYearId),
-          invoiceNumber:   generateInvoiceNumber(),
+          classId:         student.classId,
+          feeOrderId,
+          feeHeadPrefix:   feeHeadPfx,
+          invoiceNumber:   feeOrderId,
           status:          'ISSUED',
-          items:           slotItems,
+          items:           slotBaseItems,
           totalAmount:     slotTotal,
           concessionAmount: slotConcession,
           netAmount:       slotNetAmount,
@@ -136,8 +142,10 @@ export class CreateInvoice {
           dueDate:         slot.dueDate,
           issuedAt:        new Date(),
           issuedBy:        new Types.ObjectId(ctx.membership!.profileId),
-          installmentLabel: slot.name,        // e.g. "Term 1", "Q1 Installment"
-          feeScheduleId:   new Types.ObjectId(input.feeScheduleId),
+          installmentLabel: slot.name,
+          feeScheduleId:   new Types.ObjectId(input.feeScheduleId!),
+          invoicePrefix:   prefix,
+          receiptPrefix:   receiptPfx,
         });
 
         await AuditLogger.logTenantAction({
@@ -153,11 +161,16 @@ export class CreateInvoice {
     }
 
     // ── Single invoice (no schedule) ─────────────────────────────────────────
+    const feeOrderId = await generateFeeOrderId(tenantId, prefix, input.academicYearId);
+
     const invoice = await FinanceRepo.createInvoice(tenantId, {
       campusId:        new Types.ObjectId(input.campusId),
       studentId:       new Types.ObjectId(input.studentId),
       academicYearId:  new Types.ObjectId(input.academicYearId),
-      invoiceNumber:   generateInvoiceNumber(),
+      classId:         student.classId,
+      feeOrderId,
+      feeHeadPrefix:   feeHeadPfx,
+      invoiceNumber:   feeOrderId,
       status:          'ISSUED',
       items:           baseItems,
       totalAmount,
@@ -168,6 +181,8 @@ export class CreateInvoice {
       dueDate:         input.dueDate ? new Date(input.dueDate) : undefined,
       issuedAt:        new Date(),
       issuedBy:        new Types.ObjectId(ctx.membership!.profileId),
+      invoicePrefix:   prefix,
+      receiptPrefix:   receiptPfx,
     });
 
     await AuditLogger.logTenantAction({

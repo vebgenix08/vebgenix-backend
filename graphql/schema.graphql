@@ -209,30 +209,55 @@ input PublishTemplateVersionInput {
 
 # ─── Finance ──────────────────────────────────────────────────────────────────
 
+type FeeCategory {
+  id: ID!
+  name: String!
+  moduleType: String!
+  feeType: String!
+  invoicePrefix: String!
+  receiptPrefix: String!
+  defaultAllocationMethod: String!
+  isActive: Boolean!
+}
+
 type FeeHead {
   id: ID!
   name: String!
   type: String!
+  feeCategoryId: ID
+  code: String
+  isRefundable: Boolean
+  isMandatory: Boolean
+  priorityOrder: Int
 }
 
 type FeeStructure {
   id: ID!
   name: String!
+  feeCategoryId: ID
+  allocationMethod: String
 }
 
 input CreateFeeHeadInput {
   name: String!
   type: String!
+  feeCategoryId: ID
+  code: String
 }
 
 input CreateFeeStructureInput {
   name: String!
+  feeCategoryId: ID
 }
 
 # ─── Students ─────────────────────────────────────────────────────────────────
 
 type Student {
   id: ID!
+  applicationNo: String
+  admissionNo: String
+  firstName: String
+  lastName: String
   fullName: String!
   registrationNumber: String
   status: String!
@@ -636,7 +661,10 @@ type AttendanceRecord {
 
 type AttendanceStudentInfo {
   id: ID!
+  firstName: String
+  lastName: String
   fullName: String!
+  registrationNumber: String
   admissionNumber: String
 }
 
@@ -674,8 +702,7 @@ input AttendanceRecordInput {
 # ─── Query ────────────────────────────────────────────────────────────────────
 
 type Query {
-  _empty: String
-  health: String @aws_api_key
+  health: String
 
   # Dashboard
   dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
@@ -712,21 +739,30 @@ type Query {
   getApplicationReviews(applicationId: ID!): AWSJSON
   admissionsStats(campusId: ID, academicYearId: ID): AWSJSON
 
-  # Finance
-  listFeeHeads(isActive: Boolean): AWSJSON
-  listFeeStructures(campusId: ID, academicYearId: ID): AWSJSON
+  # Finance — Fee Categories
+  listFeeCategories(activeOnly: Boolean): AWSJSON
+  getFeeCategory(id: ID!): AWSJSON
+
+  # Finance — Fee Heads, Structures, Schedules
+  listFeeHeads(feeCategoryId: ID, isActive: Boolean): AWSJSON
+  getFeeHead(id: ID!): AWSJSON
+  listFeeStructures(campusId: ID, academicYearId: ID, feeCategoryId: ID): AWSJSON
   getFeeStructure(id: ID!): AWSJSON
   listFeeAssignments(studentId: ID, academicYearId: ID, limit: Int, nextToken: String): AWSJSON
   getFeeAssignment(id: ID!): AWSJSON
   getStudentFeeAssignment(studentId: ID!, academicYearId: ID): AWSJSON
-  listFeeSchedules(academicYearId: ID): AWSJSON
+  listFeeSchedules(academicYearId: ID, feeCategoryId: ID): AWSJSON
   listInstallmentPlans(isActive: Boolean): AWSJSON
+
+  # Finance — Invoices & Payments
   listInvoices(studentId: ID, status: String, limit: Int, nextToken: String): AWSJSON
   getInvoice(id: ID!): AWSJSON
   getStudentInvoices(studentId: ID!): AWSJSON
   listPayments(invoiceId: ID, studentId: ID, limit: Int, nextToken: String): AWSJSON
   getPayment(id: ID!): AWSJSON
   getFeeRevisions(invoiceId: ID!): AWSJSON
+
+  # Finance — Reports & Analytics
   dayBookReport(date: String, campusId: ID): AWSJSON
   feeCollectionAnalytics(campusId: ID, from: String, to: String): AWSJSON
   classFeeStats(classId: ID!, academicYearId: ID): AWSJSON
@@ -750,6 +786,16 @@ type Query {
   # Students
   listStudents(filter: StudentFilter, limit: Int, nextToken: String): StudentConnection!
   getStudent(id: ID!): AWSJSON
+
+  # Academic Enrollments & Numbering
+  listEnrollments(academicYearId: ID, campusId: ID, gradeId: ID, sectionId: ID, status: String): AWSJSON
+  listRegistrationBatches(academicYearId: ID, campusId: ID, gradeId: ID): AWSJSON
+  listRollNoBatches(academicYearId: ID, campusId: ID, gradeId: ID, sectionId: ID): AWSJSON
+
+  # Student Promotions
+  listPromotionBatches(fromAcademicYearId: ID, toAcademicYearId: ID, campusId: ID, fromGradeId: ID, status: String): AWSJSON
+  getPromotionBatch(id: ID!): AWSJSON
+  listPromotionBatchItems(id: ID!): AWSJSON
 
   # Attendance
   listAttendance(studentId: ID, sectionId: ID, from: String, to: String): AWSJSON
@@ -813,17 +859,11 @@ type Query {
   # Storage
   generateDownloadUrl(key: String!): AWSJSON
 
-  # Legacy placeholders (kept for backward compat)
-  _studentsEmpty: String
-  _feesEmpty: String
-  _templatesEmpty: String
 }
 
 # ─── Mutation ─────────────────────────────────────────────────────────────────
 
 type Mutation {
-  _empty: String
-
   # Identity
   createUser(input: CreateUserInput!): User!
   updateUser(input: UpdateUserInput!): User!
@@ -879,34 +919,45 @@ type Mutation {
   verifyDocument(applicationId: ID!, documentId: ID!, input: AWSJSON!): AWSJSON
   getUploadUrl(input: AWSJSON!): AWSJSON
 
-  # Finance
-  createFeeHead(input: CreateFeeHeadInput!): FeeHead!
+  # Finance — Fee Categories
+  createFeeCategory(input: AWSJSON!): AWSJSON
+  updateFeeCategory(id: ID!, input: AWSJSON!): AWSJSON
+  deleteFeeCategory(id: ID!): Boolean
+
+  # Finance — Fee Heads
+  createFeeHead(input: AWSJSON!): AWSJSON
   updateFeeHead(id: ID!, input: AWSJSON!): AWSJSON
   deleteFeeHead(id: ID!): Boolean
-  createFeeStructure(input: CreateFeeStructureInput!): FeeStructure!
+
+  # Finance — Fee Structures & Schedules
+  createFeeStructure(input: AWSJSON!): AWSJSON
   updateFeeStructure(id: ID!, input: AWSJSON!): AWSJSON
   deleteFeeStructure(id: ID!): Boolean
+  copyFeePatternToNextYear(input: AWSJSON!): AWSJSON
   createFeeAssignment(input: AWSJSON!): AWSJSON
   bulkAssignFeeStructure(input: AWSJSON!): AWSJSON
   createFeeSchedule(input: AWSJSON!): AWSJSON
   updateFeeSchedule(id: ID!, input: AWSJSON!): AWSJSON
   deleteFeeSchedule(id: ID!): Boolean
+  addScheduleSlot(id: ID!, slot: AWSJSON!): AWSJSON
+  deleteScheduleSlot(id: ID!, slotIndex: Int!): Boolean
   createInstallmentPlan(input: AWSJSON!): AWSJSON
   updateInstallmentPlan(id: ID!, input: AWSJSON!): AWSJSON
   deleteInstallmentPlan(id: ID!): Boolean
-  createInvoice(input: AWSJSON!): AWSJSON
+
+  # Finance — Invoices
   updateInvoice(id: ID!, input: AWSJSON!): AWSJSON
   cancelInvoice(id: ID!, reason: String): AWSJSON
   reviseInvoice(id: ID!, input: AWSJSON!): AWSJSON
-  recordPayment(input: AWSJSON!): AWSJSON
-  createPaymentOrder(invoiceId: ID!): AWSJSON
-  verifyPaymentSignature(input: AWSJSON!): AWSJSON
   createOneOffCharge(input: AWSJSON!): AWSJSON
   bulkCreateCharge(input: AWSJSON!): AWSJSON
+
+  # Finance — Payments & Receipts
+  recordPayment(input: AWSJSON!): AWSJSON
+  createPaymentOrder(invoiceId: ID!, amount: Float): AWSJSON
+  verifyPaymentSignature(input: AWSJSON!): AWSJSON
   collectPaymentByStudent(studentId: ID!, input: AWSJSON!): AWSJSON
   generatePaymentLink(invoiceId: ID!): AWSJSON
-  addScheduleSlot(scheduleId: ID!, input: AWSJSON!): AWSJSON
-  deleteScheduleSlot(scheduleId: ID!, slotIndex: Int!): Boolean
 
   # Academics — Classes & Sections
   createClass(input: AWSJSON!): AWSJSON
@@ -931,6 +982,22 @@ type Mutation {
   randomAssignStudentsToClass(classId: ID!, studentIds: [ID!]): RandomAssignResult!
   convertApplicationToStudent(applicationId: ID!): Student!
   enablePortalAccess(studentId: ID!, email: String!): PortalEnablementPayload!
+
+  # Academic Enrollments
+  assignStudentToSection(input: AWSJSON!): AWSJSON
+  transferStudentSection(input: AWSJSON!): AWSJSON
+
+  # Registration Numbers
+  generateRegistrationNumbers(input: AWSJSON!): AWSJSON
+  freezeRegistrationNumbers(input: AWSJSON!): AWSJSON
+
+  # Roll Numbers
+  generateRollNumbers(input: AWSJSON!): AWSJSON
+  freezeRollNumbers(input: AWSJSON!): AWSJSON
+
+  # Student Promotions
+  promoteStudents(input: AWSJSON!): AWSJSON
+  setStudentPromotionEligibility(input: AWSJSON!): AWSJSON
 
   # Attendance
   markSectionAttendance(input: BulkAttendanceInput!): [AttendanceRecord!]!

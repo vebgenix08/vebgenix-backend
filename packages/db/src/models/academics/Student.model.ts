@@ -1,6 +1,7 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
 export type StudentStatus = 'ACTIVE' | 'INACTIVE' | 'GRADUATED' | 'TRANSFERRED' | 'DROPPED';
+export type AdmissionStatus = 'ENQUIRY' | 'APPLIED' | 'ADMITTED' | 'ENROLLED' | 'REJECTED' | 'WITHDRAWN';
 
 export interface IGuardian {
   name: string;
@@ -16,6 +17,13 @@ export interface IStudent extends Document {
   academicYearId: Types.ObjectId;
   applicationId?: Types.ObjectId;
   registrationNumber: string;
+  admissionNo?: string;
+  applicationNo?: string;
+  admissionStatus: AdmissionStatus;
+  admissionConfirmedAt?: Date;
+  admissionConfirmedBy?: Types.ObjectId;
+  firstName: string;
+  lastName?: string;
   fullName: string;
   dateOfBirth?: Date;
   gender?: string;
@@ -28,6 +36,7 @@ export interface IStudent extends Document {
   programId?: Types.ObjectId;
   status: StudentStatus;
   authUserId?: Types.ObjectId;
+  transportRouteId?: string;
   guardians: IGuardian[];
   createdAt: Date;
   updatedAt: Date;
@@ -38,8 +47,15 @@ const StudentSchema = new Schema<IStudent>(
     tenantId:           { type: String, required: true },
     campusId:           { type: Schema.Types.ObjectId, required: true, ref: 'Campus' },
     academicYearId:     { type: Schema.Types.ObjectId, required: true, ref: 'AcademicYear' },
-    applicationId:      { type: Schema.Types.ObjectId, ref: 'Application' },
-    registrationNumber: { type: String, required: true },
+    applicationId:        { type: Schema.Types.ObjectId, ref: 'Application' },
+    registrationNumber:   { type: String, required: true },
+    admissionNo:          { type: String },
+    applicationNo:        { type: String },
+    admissionStatus:      { type: String, enum: ['ENQUIRY','APPLIED','ADMITTED','ENROLLED','REJECTED','WITHDRAWN'], default: 'ENROLLED' },
+    admissionConfirmedAt: { type: Date },
+    admissionConfirmedBy: { type: Schema.Types.ObjectId, ref: 'Profile' },
+    firstName:          { type: String, required: true },
+    lastName:           { type: String },
     fullName:           { type: String, required: true },
     dateOfBirth:        { type: Date },
     gender:             { type: String },
@@ -52,6 +68,7 @@ const StudentSchema = new Schema<IStudent>(
     programId:          { type: Schema.Types.ObjectId },
     status:             { type: String, enum: ['ACTIVE','INACTIVE','GRADUATED','TRANSFERRED','DROPPED'], default: 'ACTIVE' },
     authUserId:         { type: Schema.Types.ObjectId, ref: 'AuthUser' },
+    transportRouteId:   { type: String },
     guardians: [{
       name:       { type: String, required: true },
       relation:   { type: String, required: true },
@@ -66,8 +83,11 @@ const StudentSchema = new Schema<IStudent>(
 StudentSchema.index({ tenantId: 1 });
 StudentSchema.index({ tenantId: 1, createdAt: -1 });
 StudentSchema.index({ tenantId: 1, registrationNumber: 1 }, { unique: true });
+StudentSchema.index({ tenantId: 1, admissionNo: 1 }, { unique: true, sparse: true });
+StudentSchema.index({ tenantId: 1, applicationNo: 1 }, { sparse: true });
 StudentSchema.index({ tenantId: 1, campusId: 1, status: 1 });
 StudentSchema.index({ tenantId: 1, classId: 1, sectionId: 1 });
 StudentSchema.index({ tenantId: 1, email: 1 });
+StudentSchema.index({ tenantId: 1, firstName: 1, lastName: 1, dateOfBirth: 1 });
 
 export const Student = model<IStudent>('Student', StudentSchema);

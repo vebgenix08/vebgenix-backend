@@ -5,6 +5,7 @@ import { authorize } from '@vebgenix/permissions';
 import { getTenantId } from '@vebgenix/tenant';
 import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
+import { generateApplicationNo } from '../academicNumbering';
 
 export interface CreateApplicationInput {
   campusId:          string;
@@ -22,10 +23,6 @@ export interface CreateApplicationInput {
   guardianPhone?:    string;
   guardianRelation?: string;
   customFields?:     Record<string, unknown>;
-}
-
-function generateApplicationNumber(): string {
-  return `APP-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
 }
 
 export class CreateApplication {
@@ -52,12 +49,14 @@ export class CreateApplication {
     if (!resolvedName)  throw new AppError('BAD_REQUEST', 'studentName is required');
     if (!resolvedPhone) throw new AppError('BAD_REQUEST', 'phone is required');
 
+    const applicationNumber = await generateApplicationNo(tenantId, input.academicYearId);
+
     const application = await AdmissionsRepo.createApplication(tenantId, {
       campusId:          new Types.ObjectId(input.campusId),
       academicYearId:    new Types.ObjectId(input.academicYearId),
       enquiryId:         input.enquiryId ? new Types.ObjectId(input.enquiryId) : undefined,
       programId:         input.programId ? new Types.ObjectId(input.programId) : undefined,
-      applicationNumber: generateApplicationNumber(),
+      applicationNumber,
       status:            'DRAFT',
       studentName:       resolvedName,
       phone:             resolvedPhone,

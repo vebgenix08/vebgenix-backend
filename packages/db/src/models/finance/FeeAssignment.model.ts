@@ -1,6 +1,6 @@
 /**
- * FeeAssignment — links a fee structure to a student for a specific academic year.
- * One assignment per student per academic year. Amount can be revised.
+ * FeeAssignment — links one fee structure to a student for a specific academic year.
+ * A student can have multiple fee structures in the same academic year.
  */
 import { Schema, model, Document } from 'mongoose';
 
@@ -38,7 +38,8 @@ const FeeAssignmentSchema = new Schema<IFeeAssignment>({
 
 FeeAssignmentSchema.index({ tenantId: 1 });
 FeeAssignmentSchema.index({ tenantId: 1, createdAt: -1 });
-FeeAssignmentSchema.index({ tenantId: 1, studentId: 1, academicYearId: 1 }, { unique: true });
+FeeAssignmentSchema.index({ tenantId: 1, studentId: 1, academicYearId: 1 });
+FeeAssignmentSchema.index({ tenantId: 1, studentId: 1, academicYearId: 1, feeStructureId: 1 }, { unique: true });
 FeeAssignmentSchema.index({ tenantId: 1, academicYearId: 1, classId: 1 });
 FeeAssignmentSchema.index({ tenantId: 1, feeStructureId: 1 });
 

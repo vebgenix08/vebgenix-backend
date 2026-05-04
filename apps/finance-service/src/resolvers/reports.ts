@@ -14,7 +14,7 @@ export async function resolveReports(
       authorize(ctx, 'finance.reports.read');
       const from  = args.from ? new Date(args.from as string) : new Date(new Date().setHours(0, 0, 0, 0));
       const to    = args.to   ? new Date(args.to as string)   : new Date(new Date().setHours(23, 59, 59, 999));
-      return FinanceRepo.dayBookReport(tenantId, from, to);
+      return FinanceRepo.dayBookReport(tenantId, from, to, args.campusId as string | undefined);
     }
 
     case 'feeCollectionAnalytics':

@@ -2,6 +2,7 @@ import { AcademicsRepo, Attendance, Student } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
+import { Types } from 'mongoose';
 
 export async function resolveAttendance(
   operation: string,
@@ -17,14 +18,14 @@ export async function resolveAttendance(
     case 'GET:/api/tenant/sections/:sectionId/attendance':
       return AcademicsRepo.listAttendance(
         tenantId,
-        args.sectionId as string,
+        { sectionId: args.sectionId as string },
         new Date(args.date as string),
       );
 
     case 'listAttendance':
       return AcademicsRepo.listAttendance(
         tenantId,
-        args.classId as string,
+        { classId: args.classId as string },
         new Date(args.date as string),
       );
 
@@ -34,7 +35,7 @@ export async function resolveAttendance(
       const { studentId, from, to } = args as { studentId: string; from: string; to: string };
       return Attendance.find({
         tenantId,
-        studentId,
+        studentId: new Types.ObjectId(studentId),
         date: { $gte: new Date(from), $lte: new Date(to) },
       })
         .sort({ date: 1 })
@@ -47,26 +48,29 @@ export async function resolveAttendance(
     case 'markClassAttendance':                              // alias — same semantics
     case 'PUT:/api/tenant/sections/:sectionId/attendance': {
       authorize(ctx, 'academics.attendance.mark');
-      const { records } = args as {
+      const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
+      const { records } = input as {
         records: Array<{ studentId: string; status: string; remarks?: string }>;
       };
       if (!Array.isArray(records)) throw new AppError('BAD_REQUEST', 'records array required');
-      const date      = new Date(args.date as string);
-      const sectionId = args.sectionId as string;
-      const campusId  = args.campusId  as string | undefined;
+      const date      = new Date(input.date as string);
+      const sectionId = (input.sectionId ?? args.sectionId) as string;
+      const campusId  = (input.campusId  ?? args.campusId)  as string | undefined;
+      const sectionObjectId = new Types.ObjectId(sectionId);
+      const campusObjectId  = campusId ? new Types.ObjectId(campusId) : undefined;
       const ops = records.map(r => ({
         updateOne: {
-          filter: { tenantId, studentId: r.studentId, date },
+          filter: { tenantId, studentId: new Types.ObjectId(r.studentId), date },
           update: {
             $set: {
               tenantId,
-              studentId: r.studentId,
-              sectionId,
-              campusId,
+              studentId: new Types.ObjectId(r.studentId),
+              sectionId: sectionObjectId,
+              campusId:  campusObjectId,
               date,
               status:   r.status,
               remarks:  r.remarks,
-              markedBy: ctx.membership!.profileId,
+              markedBy: new Types.ObjectId(ctx.membership!.profileId),
             },
           },
           upsert: true,
@@ -85,6 +89,7 @@ export async function resolveAttendance(
       };
       const start = new Date((fromDate ?? from) as string);
       const end   = new Date((toDate   ?? to)   as string);
+      const sectionObjectId = new Types.ObjectId(sectionId);
 
       // Count total school days in range
       const totalDays = Math.max(
@@ -93,15 +98,16 @@ export async function resolveAttendance(
       );
 
       // Fetch all students in section for name info
-      const students = await Student.find({ tenantId, sectionId, status: 'ACTIVE' })
-        .select('_id fullName admissionNumber')
+      const students = await Student.find({ tenantId, sectionId: sectionObjectId, status: 'ACTIVE' })
+        .select('_id firstName lastName fullName registrationNumber')
         .lean();
       const studentMap = new Map(students.map(s => [s._id.toString(), s]));
 
       const rows = await Attendance.aggregate([
         {
           $match: {
-            tenantId, sectionId,
+            tenantId,
+            sectionId: sectionObjectId,
             date: { $gte: start, $lte: end },
           },
         },
@@ -122,8 +128,11 @@ export async function resolveAttendance(
           studentId: r._id,
           student: {
             id:              r._id,
+            firstName:       s?.firstName,
+            lastName:        s?.lastName,
             fullName:        s?.fullName ?? 'Unknown',
-            admissionNumber: (s as unknown as Record<string, unknown>)?.admissionNumber,
+            registrationNumber: s?.registrationNumber,
+            admissionNumber: s?.registrationNumber,
           },
           present:             r.present,
           absent:              r.absent,

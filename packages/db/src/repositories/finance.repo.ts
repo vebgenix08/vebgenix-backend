@@ -5,10 +5,18 @@ import { FeeAssignment, IFeeAssignment } from '../models/finance/FeeAssignment.m
 import { FeeSchedule, IFeeSchedule } from '../models/finance/FeeSchedule.model';
 import { InstallmentPlan, IInstallmentPlan } from '../models/finance/InstallmentPlan.model';
 import { FeeRevision, IFeeRevision } from '../models/finance/FeeRevision.model';
-import { Invoice, IInvoice } from '../models/finance/Invoice.model';
+import { Invoice, IInvoice, InvoiceStatus } from '../models/finance/Invoice.model';
 import { Payment, IPayment } from '../models/finance/Payment.model';
+import { FeeCategory, IFeeCategory } from '../models/finance/FeeCategory.model';
+import { PaymentAllocation, IPaymentAllocation } from '../models/finance/PaymentAllocation.model';
 
-export const FinanceRepo = {
+function toObjectId(id: string): Types.ObjectId {
+  return new Types.ObjectId(id);
+}
+
+// biome-ignore lint: large object — explicit type annotation suppresses TS7056
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const FinanceRepo: any = {
   // ── Fee Heads ─────────────────────────────────────────────────────────────
 
   async listFeeHeads(tenantId: string, activeOnly = true) {
@@ -83,7 +91,7 @@ export const FinanceRepo = {
 
   async createFeeAssignment(tenantId: string, data: Partial<IFeeAssignment>) {
     return FeeAssignment.findOneAndUpdate(
-      { tenantId, studentId: data.studentId, academicYearId: data.academicYearId },
+      { tenantId, studentId: data.studentId, academicYearId: data.academicYearId, feeStructureId: data.feeStructureId },
       { $setOnInsert: { ...data, tenantId } },
       { upsert: true, new: true },
     );
@@ -214,9 +222,15 @@ export const FinanceRepo = {
 
   // ── Reports ────────────────────────────────────────────────────────────────
 
-  async dayBookReport(tenantId: string, from: Date, to: Date) {
+  async dayBookReport(tenantId: string, from: Date, to: Date, campusId?: string) {
+    const matchStage: Record<string, unknown> = {
+      tenantId,
+      status: 'SUCCESS',
+      createdAt: { $gte: from, $lte: to },
+    };
+    if (campusId) matchStage.campusId = toObjectId(campusId);
     const payments = await Payment.aggregate([
-      { $match: { tenantId, status: 'SUCCESS', createdAt: { $gte: from, $lte: to } } },
+      { $match: matchStage },
       { $group: {
         _id:         '$method',
         totalAmount: { $sum: '$amount' },
@@ -231,7 +245,7 @@ export const FinanceRepo = {
 
   async feeCollectionAnalytics(tenantId: string, academicYearId?: string) {
     const matchStage: Record<string, unknown> = { tenantId };
-    if (academicYearId) matchStage.academicYearId = academicYearId;
+    if (academicYearId) matchStage.academicYearId = toObjectId(academicYearId);
     const [invoiceSummary, collectionByMonth] = await Promise.all([
       Invoice.aggregate([
         { $match: matchStage },
@@ -244,7 +258,7 @@ export const FinanceRepo = {
         }},
       ]),
       Payment.aggregate([
-        { $match: { tenantId, status: 'SUCCESS', ...(academicYearId ? { academicYearId } : {}) } },
+        { $match: { tenantId, status: 'SUCCESS', ...(academicYearId ? { academicYearId: toObjectId(academicYearId) } : {}) } },
         { $group: {
           _id:   { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
           total: { $sum: '$amount' },
@@ -258,8 +272,8 @@ export const FinanceRepo = {
 
   async classFeeStats(tenantId: string, classId?: string, academicYearId?: string) {
     const matchStage: Record<string, unknown> = { tenantId };
-    if (classId)        matchStage.classId        = classId;
-    if (academicYearId) matchStage.academicYearId = academicYearId;
+    if (classId)        matchStage.classId        = toObjectId(classId);
+    if (academicYearId) matchStage.academicYearId = toObjectId(academicYearId);
     return Invoice.aggregate([
       { $match: matchStage },
       { $group: {
@@ -283,5 +297,107 @@ export const FinanceRepo = {
     const totalPaid   = invoices.reduce((s, i) => s + i.paidAmount, 0);
     const totalDue    = invoices.reduce((s, i) => s + i.dueAmount, 0);
     return { invoices, payments, totalBilled, totalPaid, totalDue };
+  },
+
+  // ── Fee Categories ─────────────────────────────────────────────────────────
+
+  async listFeeCategories(tenantId: string, activeOnly = true) {
+    return FeeCategory.find({ tenantId, ...(activeOnly ? { isActive: true } : {}) }).sort({ name: 1 });
+  },
+
+  async findFeeCategoryById(tenantId: string, id: string): Promise<IFeeCategory | null> {
+    return FeeCategory.findOne({ tenantId, _id: new Types.ObjectId(id) });
+  },
+
+  async createFeeCategory(tenantId: string, data: Partial<IFeeCategory>) {
+    return FeeCategory.create({ ...data, tenantId });
+  },
+
+  async updateFeeCategory(tenantId: string, id: string, update: Partial<IFeeCategory>) {
+    return FeeCategory.findOneAndUpdate(
+      { tenantId, _id: new Types.ObjectId(id) },
+      { $set: update },
+      { new: true },
+    );
+  },
+
+  async deleteFeeCategoryById(tenantId: string, id: string) {
+    return FeeCategory.findOneAndUpdate(
+      { tenantId, _id: new Types.ObjectId(id) },
+      { $set: { isActive: false } },
+      { new: true },
+    );
+  },
+
+  // ── Payment Allocations ────────────────────────────────────────────────────
+
+  async createPaymentAllocations(tenantId: string, docs: Array<Partial<IPaymentAllocation>>) {
+    return PaymentAllocation.insertMany(docs.map(d => ({ ...d, tenantId })));
+  },
+
+  async listAllocationsByPayment(tenantId: string, paymentId: string) {
+    return PaymentAllocation.find({ tenantId, paymentId: new Types.ObjectId(paymentId) });
+  },
+
+  async listAllocationsByInvoice(tenantId: string, invoiceId: string) {
+    return PaymentAllocation.find({ tenantId, invoiceId: new Types.ObjectId(invoiceId) });
+  },
+
+  // ── Invoice item-level update after successful payment ────────────────────
+  // Loads the invoice in app code, computes updated item values, writes atomically.
+
+  async updateInvoiceAfterPayment(
+    tenantId: string,
+    invoiceId: string,
+    updatedItems: IInvoice['items'],
+    paidDelta: number,
+  ) {
+    const inv = await Invoice.findOne({ tenantId, _id: new Types.ObjectId(invoiceId) });
+    if (!inv) return null;
+    const newPaid = inv.paidAmount + paidDelta;
+    const newDue  = Math.max(0, inv.netAmount - newPaid);
+    const status: InvoiceStatus = newDue <= 0 ? 'PAID' : newPaid > 0 ? 'PARTIALLY_PAID' : inv.status as InvoiceStatus;
+    return Invoice.findOneAndUpdate(
+      { _id: inv._id },
+      { $set: { items: updatedItems, paidAmount: newPaid, dueAmount: newDue, status } },
+      { new: true },
+    );
+  },
+
+  // ── FeeHead (extended filter) ──────────────────────────────────────────────
+
+  async listFeeHeadsFiltered(tenantId: string, filters: { feeCategoryId?: string; activeOnly?: boolean } = {}) {
+    const q: Record<string, unknown> = { tenantId };
+    if (filters.feeCategoryId) q.feeCategoryId = new Types.ObjectId(filters.feeCategoryId);
+    if (filters.activeOnly !== false)  q.isActive = true;
+    return FeeHead.find(q).sort({ priorityOrder: 1, name: 1 });
+  },
+
+  // ── Fee collection analytics (extended with fee-head breakdown) ────────────
+
+  async feeHeadCollectionSummary(tenantId: string, academicYearId?: string) {
+    const match: Record<string, unknown> = { tenantId };
+    if (academicYearId) match.academicYearId = toObjectId(academicYearId);
+    return PaymentAllocation.aggregate([
+      {
+        $lookup: {
+          from: 'payments',
+          localField: 'paymentId',
+          foreignField: '_id',
+          as: 'payment',
+        },
+      },
+      { $unwind: '$payment' },
+      { $match: { ...match, 'payment.status': 'SUCCESS' } },
+      {
+        $group: {
+          _id:             '$feeHeadId',
+          feeHeadName:     { $first: '$feeHeadName' },
+          totalCollected:  { $sum: '$allocatedAmount' },
+          paymentCount:    { $sum: 1 },
+        },
+      },
+      { $sort: { totalCollected: -1 } },
+    ]);
   },
 };

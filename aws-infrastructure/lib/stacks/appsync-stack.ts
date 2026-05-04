@@ -318,7 +318,12 @@ export class AppSyncStack extends cdk.Stack {
 
     // ── Finance resolvers ───────────────────────────────────────────────────
     const finance = R(financeDs);
+    // Fee Categories
+    finance('Query',    'listFeeCategories');
+    finance('Query',    'getFeeCategory');
+    // Fee Heads, Structures, Schedules
     finance('Query',    'listFeeHeads');
+    finance('Query',    'getFeeHead');
     finance('Query',    'listFeeStructures');
     finance('Query',    'getFeeStructure');
     finance('Query',    'listFeeAssignments');
@@ -326,36 +331,58 @@ export class AppSyncStack extends cdk.Stack {
     finance('Query',    'getStudentFeeAssignment');
     finance('Query',    'listFeeSchedules');
     finance('Query',    'listInstallmentPlans');
+    // Invoices & Payments
     finance('Query',    'listInvoices');
     finance('Query',    'getInvoice');
     finance('Query',    'getStudentInvoices');
     finance('Query',    'listPayments');
     finance('Query',    'getPayment');
     finance('Query',    'getFeeRevisions');
+    finance('Query',    'listReceipts');
+    finance('Query',    'getReceipt');
+    // Reports & Analytics
     finance('Query',    'dayBookReport');
     finance('Query',    'feeCollectionAnalytics');
     finance('Query',    'classFeeStats');
     finance('Query',    'studentFinancialSummary');
+    finance('Query',    'getFeeAssignmentQueue');
+    finance('Query',    'getAssignableFeeStructures');
+    finance('Query',    'getStudentDues');
+    // Fee Category mutations
+    finance('Mutation', 'createFeeCategory');
+    finance('Mutation', 'updateFeeCategory');
+    finance('Mutation', 'deleteFeeCategory');
+    // Fee Head mutations
     finance('Mutation', 'createFeeHead');
     finance('Mutation', 'updateFeeHead');
     finance('Mutation', 'deleteFeeHead');
+    // Fee Structure & Schedule mutations
     finance('Mutation', 'createFeeStructure');
     finance('Mutation', 'updateFeeStructure');
     finance('Mutation', 'deleteFeeStructure');
+    finance('Mutation', 'copyFeePatternToNextYear');
     finance('Mutation', 'createFeeAssignment');
     finance('Mutation', 'bulkAssignFeeStructure');
     finance('Mutation', 'createFeeSchedule');
     finance('Mutation', 'updateFeeSchedule');
     finance('Mutation', 'deleteFeeSchedule');
+    finance('Mutation', 'addScheduleSlot');
+    finance('Mutation', 'deleteScheduleSlot');
     finance('Mutation', 'createInstallmentPlan');
+    finance('Mutation', 'updateInstallmentPlan');
     finance('Mutation', 'deleteInstallmentPlan');
-    finance('Mutation', 'createInvoice');
+    // Invoice mutations
     finance('Mutation', 'updateInvoice');
     finance('Mutation', 'cancelInvoice');
     finance('Mutation', 'reviseInvoice');
+    finance('Mutation', 'createOneOffCharge');
+    finance('Mutation', 'bulkCreateCharge');
+    // Payment mutations
     finance('Mutation', 'recordPayment');
     finance('Mutation', 'createPaymentOrder');
     finance('Mutation', 'verifyPaymentSignature');
+    finance('Mutation', 'collectPaymentByStudent');
+    finance('Mutation', 'generatePaymentLink');
 
     // ── Academics resolvers ─────────────────────────────────────────────────
     const academics = R(academicsDs);
@@ -369,6 +396,12 @@ export class AppSyncStack extends cdk.Stack {
     academics('Query',    'listSectionCourses');
     academics('Query',    'listStudents');
     academics('Query',    'getStudent');
+    academics('Query',    'listEnrollments');
+    academics('Query',    'listRegistrationBatches');
+    academics('Query',    'listRollNoBatches');
+    academics('Query',    'listPromotionBatches');
+    academics('Query',    'getPromotionBatch');
+    academics('Query',    'listPromotionBatchItems');
     academics('Query',    'listAttendance');
     academics('Query',    'getSectionAttendance');
     academics('Query',    'getSectionAttendanceSummary');
@@ -399,6 +432,14 @@ export class AppSyncStack extends cdk.Stack {
     academics('Mutation', 'bulkAssignStudentsToClass');
     academics('Mutation', 'randomAssignStudentsToClass');
     academics('Mutation', 'convertApplicationToStudent');
+    academics('Mutation', 'assignStudentToSection');
+    academics('Mutation', 'transferStudentSection');
+    academics('Mutation', 'generateRegistrationNumbers');
+    academics('Mutation', 'freezeRegistrationNumbers');
+    academics('Mutation', 'generateRollNumbers');
+    academics('Mutation', 'freezeRollNumbers');
+    academics('Mutation', 'promoteStudents');
+    academics('Mutation', 'setStudentPromotionEligibility');
     academics('Mutation', 'markSectionAttendance');
     academics('Mutation', 'createExam');
     academics('Mutation', 'updateExam');
@@ -500,20 +541,6 @@ export class AppSyncStack extends cdk.Stack {
     users('Mutation', 'uploadTenantLogo');
     users('Mutation', 'resendInvite');
     users('Mutation', 'acceptInvite');
-
-    // ── Finance extra resolvers ─────────────────────────────────────────────
-    finance('Mutation', 'createOneOffCharge');
-    finance('Mutation', 'bulkCreateCharge');
-    finance('Mutation', 'collectPaymentByStudent');
-    finance('Mutation', 'generatePaymentLink');
-    finance('Mutation', 'updateInstallmentPlan');
-    finance('Mutation', 'addScheduleSlot');
-    finance('Mutation', 'deleteScheduleSlot');
-    finance('Query',    'listReceipts');
-    finance('Query',    'getReceipt');
-    finance('Query',    'getFeeAssignmentQueue');
-    finance('Query',    'getAssignableFeeStructures');
-    finance('Query',    'getStudentDues');
 
     // ── Academics extra resolvers ───────────────────────────────────────────
     academics('Query',    'getExamStats');

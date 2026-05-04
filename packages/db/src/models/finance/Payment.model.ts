@@ -8,6 +8,10 @@ export interface IPayment extends Document {
   campusId: Types.ObjectId;
   studentId: Types.ObjectId;
   invoiceId: Types.ObjectId;
+  academicYearId: Types.ObjectId;
+  classId?: Types.ObjectId;
+  feeOrderId: string;
+  feeHeadPrefix: string;
   receiptNumber?: string;
   amount: number;
   method: PaymentMethod;
@@ -29,6 +33,10 @@ const PaymentSchema = new Schema<IPayment>(
     campusId:           { type: Schema.Types.ObjectId, required: true, ref: 'Campus' },
     studentId:          { type: Schema.Types.ObjectId, required: true, ref: 'Student' },
     invoiceId:          { type: Schema.Types.ObjectId, required: true, ref: 'Invoice' },
+    academicYearId:     { type: Schema.Types.ObjectId, required: true, ref: 'AcademicYear' },
+    classId:            { type: Schema.Types.ObjectId, ref: 'Class' },
+    feeOrderId:         { type: String, required: true },
+    feeHeadPrefix:      { type: String, required: true, uppercase: true, trim: true },
     receiptNumber:      { type: String },
     amount:             { type: Number, required: true },
     method:             { type: String, enum: ['CASH','CHEQUE','BANK_TRANSFER','UPI','CARD','ONLINE'], required: true },
@@ -47,7 +55,10 @@ const PaymentSchema = new Schema<IPayment>(
 PaymentSchema.index({ tenantId: 1 });
 PaymentSchema.index({ tenantId: 1, createdAt: -1 });
 PaymentSchema.index({ tenantId: 1, invoiceId: 1 });
+PaymentSchema.index({ tenantId: 1, feeOrderId: 1 });
 PaymentSchema.index({ tenantId: 1, studentId: 1, status: 1 });
+PaymentSchema.index({ tenantId: 1, academicYearId: 1, status: 1 });
+PaymentSchema.index({ tenantId: 1, campusId: 1, createdAt: -1 });
 PaymentSchema.index({ tenantId: 1, receiptNumber: 1 }, { unique: true, sparse: true });
 PaymentSchema.index({ razorpayOrderId: 1 }, { sparse: true });
 PaymentSchema.index({ razorpayPaymentId: 1 }, { sparse: true });

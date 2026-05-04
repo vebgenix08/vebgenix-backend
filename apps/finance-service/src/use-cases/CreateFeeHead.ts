@@ -10,6 +10,11 @@ export interface CreateFeeHeadInput {
   name: string;
   type: 'RECURRING' | 'ONE_TIME' | 'OPTIONAL';
   description?: string;
+  feeCategoryId: string;
+  code?: string;
+  isRefundable?: boolean;
+  isMandatory?: boolean;
+  priorityOrder?: number;
 }
 
 export class CreateFeeHead {
@@ -17,13 +22,24 @@ export class CreateFeeHead {
     authorize(ctx, 'finance.manage');
     const tenantId = getTenantId(ctx);
 
-    const existing = await FinanceRepo.listFeeHeads(tenantId);
-    if (existing.some(f => f.name.toLowerCase() === input.name.toLowerCase())) {
+    if (!input.feeCategoryId) {
+      throw new AppError('BAD_REQUEST', 'feeCategoryId is required');
+    }
+
+    const existing = await FinanceRepo.listFeeHeadsFiltered(tenantId, { activeOnly: false });
+    if ((existing as { name: string }[]).some(f => f.name.toLowerCase() === input.name.toLowerCase())) {
       throw new AppError('CONFLICT', `Fee head "${input.name}" already exists`);
     }
 
+    const code = input.code ? input.code.toUpperCase() : undefined;
+
     const feeHead = await FinanceRepo.createFeeHead(tenantId, {
       ...input,
+      feeCategoryId: new Types.ObjectId(input.feeCategoryId),
+      code,
+      isRefundable:  input.isRefundable  ?? false,
+      isMandatory:   input.isMandatory   ?? true,
+      priorityOrder: input.priorityOrder ?? 0,
       createdBy: new Types.ObjectId(ctx.membership!.profileId),
     });
 

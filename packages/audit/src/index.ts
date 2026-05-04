@@ -30,7 +30,7 @@ export const AuditLogger = {
     if (!tenantId || !profileId) return;
     try {
       await AuditLog.create({
-        tenantId: new Types.ObjectId(tenantId),
+        tenantId,
         userId:   new Types.ObjectId(profileId),
         userEmail: params.ctx.email,
         action:    params.action,

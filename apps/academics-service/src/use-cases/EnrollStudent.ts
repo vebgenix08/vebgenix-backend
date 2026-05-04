@@ -5,6 +5,7 @@ import { authorize } from '@vebgenix/permissions';
 import { getTenantId } from '@vebgenix/tenant';
 import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
+import { generateAdmissionNo, formatNumberPadded } from '../academicNumbering';
 
 export interface EnrollStudentInput {
   applicationId?:  string;
@@ -25,8 +26,8 @@ export interface EnrollStudentInput {
   force?:          boolean;
 }
 
-function generateRegistrationNumber(): string {
-  return `REG-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export class EnrollStudent {
@@ -57,11 +58,18 @@ export class EnrollStudent {
         });
       }
 
-      // Hard identity match: name + DOB (match against fullName containing firstName)
+      // Hard identity match: first/last name + DOB, with fullName fallback for older records.
       if (input.firstName && input.dateOfBirth) {
+        const nameConditions: Record<string, unknown>[] = [
+          {
+            firstName: new RegExp(`^${escapeRegex(input.firstName)}$`, 'i'),
+            ...(input.lastName ? { lastName: new RegExp(`^${escapeRegex(input.lastName)}$`, 'i') } : {}),
+          },
+          { fullName: new RegExp(`^${escapeRegex(fullName || input.firstName)}$`, 'i') },
+        ];
         const byIdentity = await Student.find({
           tenantId,
-          fullName:    new RegExp(input.firstName, 'i'),
+          $or:         nameConditions,
           dateOfBirth: new Date(input.dateOfBirth),
           status:      { $ne: 'INACTIVE' },
         }).lean();
@@ -82,14 +90,27 @@ export class EnrollStudent {
     }
 
     // ── Create student record ────────────────────────────────────────────────
+    const linkedApplication = input.applicationId
+      ? await AdmissionsRepo.findApplicationById(tenantId, input.applicationId)
+      : null;
+    const admissionNo = await generateAdmissionNo(tenantId, input.academicYearId);
+
     const student = await AcademicsRepo.createStudent(tenantId, {
-      campusId:           new Types.ObjectId(input.campusId),
-      academicYearId:     new Types.ObjectId(input.academicYearId),
-      applicationId:      input.applicationId ? new Types.ObjectId(input.applicationId) : undefined,
-      programId:          input.programId     ? new Types.ObjectId(input.programId)     : undefined,
-      classId:            input.classId       ? new Types.ObjectId(input.classId)       : undefined,
-      sectionId:          input.sectionId     ? new Types.ObjectId(input.sectionId)     : undefined,
-      registrationNumber: generateRegistrationNumber(),
+      campusId:            new Types.ObjectId(input.campusId),
+      academicYearId:      new Types.ObjectId(input.academicYearId),
+      applicationId:       input.applicationId ? new Types.ObjectId(input.applicationId) : undefined,
+      programId:           input.programId     ? new Types.ObjectId(input.programId)     : undefined,
+      classId:             input.classId       ? new Types.ObjectId(input.classId)       : undefined,
+      sectionId:           input.sectionId     ? new Types.ObjectId(input.sectionId)     : undefined,
+      // registrationNumber is the legacy unique field; value matches admissionNo (same permanent ID)
+      registrationNumber:  admissionNo,
+      admissionNo,
+      applicationNo:       linkedApplication?.applicationNumber,
+      admissionStatus:     'ENROLLED',
+      admissionConfirmedAt: new Date(),
+      admissionConfirmedBy: new Types.ObjectId(ctx.membership!.profileId),
+      firstName:          input.firstName,
+      lastName:           input.lastName,
       fullName,
       phone:              input.phone,
       email:              input.email,
@@ -100,13 +121,63 @@ export class EnrollStudent {
       guardians:          input.guardians ?? [],
     });
 
+    // ── Create academic enrollment when class is provided ────────────────────
+    if (input.classId) {
+      const rollNoBatch = input.sectionId
+        ? await AcademicsRepo.findOrCreateRollNoBatch(
+            tenantId, input.academicYearId, input.campusId, input.classId, input.sectionId,
+          )
+        : null;
+
+      let rollNo: string | undefined;
+      let rollNoStatus: 'PENDING' | 'ASSIGNED' = 'PENDING';
+
+      if (rollNoBatch && (rollNoBatch.status === 'FROZEN' || rollNoBatch.status === 'GENERATED')) {
+        const nextRollNo = rollNoBatch.lastRollNo + 1;
+        rollNo = formatNumberPadded(nextRollNo, 3);
+        rollNoStatus = 'ASSIGNED';
+        await AcademicsRepo.updateRollNoBatch(tenantId, rollNoBatch._id.toString(), { lastRollNo: nextRollNo });
+      }
+
+      const regBatch = await AcademicsRepo.findOrCreateRegistrationBatch(
+        tenantId, input.academicYearId, input.campusId, input.classId,
+      );
+
+      let registrationNo: string | undefined;
+      let registrationNoStatus: 'PENDING' | 'ASSIGNED' = 'PENDING';
+
+      if (regBatch.status === 'FROZEN') {
+        const nextRegNo = regBatch.lastRegistrationNo + 1;
+        registrationNo = formatNumberPadded(nextRegNo, 3);
+        registrationNoStatus = 'ASSIGNED';
+        await AcademicsRepo.updateRegistrationBatch(tenantId, regBatch._id.toString(), { lastRegistrationNo: nextRegNo });
+      }
+
+      await AcademicsRepo.createEnrollment(tenantId, {
+        studentId:            new Types.ObjectId(student._id.toString()),
+        academicYearId:       new Types.ObjectId(input.academicYearId),
+        campusId:             new Types.ObjectId(input.campusId),
+        gradeId:              new Types.ObjectId(input.classId),
+        sectionId:            input.sectionId ? new Types.ObjectId(input.sectionId) : undefined,
+        programId:            input.programId ? new Types.ObjectId(input.programId) : undefined,
+        joiningDate:          new Date(),
+        joiningType:          'FRESH',
+        registrationNo,
+        registrationNoStatus,
+        rollNo,
+        rollNoStatus,
+        status:               'ACTIVE',
+        createdBy:            new Types.ObjectId(ctx.membership!.profileId),
+      });
+    }
+
     // ── Mark linked application ENROLLED ─────────────────────────────────────
     if (input.applicationId) {
       await AdmissionsRepo.updateApplication(tenantId, input.applicationId, { status: 'ENROLLED' });
 
       // ── Mark source enquiry CONVERTED (non-fatal) ─────────────────────────
       try {
-        const app = await AdmissionsRepo.findApplicationById(tenantId, input.applicationId);
+        const app = linkedApplication ?? await AdmissionsRepo.findApplicationById(tenantId, input.applicationId);
         const enquiryId = (app as unknown as Record<string, unknown>)?.enquiryId;
         if (enquiryId) {
           await AdmissionsRepo.updateEnquiry(tenantId, enquiryId.toString(), { status: 'CONVERTED' });

@@ -35,13 +35,16 @@ export async function resolveInvoices(
 
     case 'createInvoice':
     case 'POST:/api/admin/finance/invoices':
-      return CreateInvoice.execute(ctx, args as unknown as Parameters<typeof CreateInvoice.execute>[1]);
+      // Direct invoice creation is disabled — use createFeeAssignment to create invoices
+      // from a fee structure, or createOneOffCharge for ad-hoc charges.
+      throw new AppError('BAD_REQUEST', 'Direct invoice creation is not allowed. Use createFeeAssignment or createOneOffCharge.');
 
     case 'updateInvoice':
     case 'PATCH:/api/admin/finance/invoices/:id': {
       authorize(ctx, 'finance.invoice.update');
-      const { id, ...update } = args as Record<string, unknown>;
-      return FinanceRepo.updateInvoice(tenantId, id as string, update);
+      const update = { ...(((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>) };
+      delete update.id;
+      return FinanceRepo.updateInvoice(tenantId, args.id as string, update);
     }
 
     case 'cancelInvoice':
@@ -60,8 +63,9 @@ export async function resolveInvoices(
       authorize(ctx, 'finance.invoice.update');
       const invoice = await FinanceRepo.findInvoiceById(tenantId, args.id as string);
       if (!invoice) throw new AppError('NOT_FOUND', 'Invoice not found');
+      const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
       const previousAmount = invoice.netAmount;
-      const newAmount      = args.newAmount as number;
+      const newAmount      = input.newAmount as number;
       const difference     = newAmount - previousAmount;
       // Record revision audit trail
       await FinanceRepo.createFeeRevision(tenantId, {
@@ -71,7 +75,7 @@ export async function resolveInvoices(
         previousAmount,
         newAmount,
         difference,
-        reason: args.reason as string,
+        reason: input.reason as string,
       });
       return FinanceRepo.updateInvoice(tenantId, args.id as string, {
         netAmount: newAmount,
@@ -88,7 +92,7 @@ export async function resolveInvoices(
     case 'POST:/api/admin/finance/invoices/one-off': {
       authorize(ctx, 'finance.invoice.create');
       return CreateInvoice.execute(ctx, {
-        ...(args as object),
+        ...(((args.input as Record<string, unknown>) ?? args) as object),
         isOneOff: true,
       } as Parameters<typeof CreateInvoice.execute>[1]);
     }
@@ -96,7 +100,8 @@ export async function resolveInvoices(
     case 'bulkCreateCharge':
     case 'POST:/api/admin/finance/invoices/bulk': {
       authorize(ctx, 'finance.invoice.create');
-      const { studentIds, ...invoiceTemplate } = args as { studentIds: string[] } & Record<string, unknown>;
+      const input = ((args.input as Record<string, unknown>) ?? args) as { studentIds: string[] } & Record<string, unknown>;
+      const { studentIds, ...invoiceTemplate } = input;
       if (!Array.isArray(studentIds) || studentIds.length === 0) {
         throw new AppError('BAD_REQUEST', 'studentIds array is required');
       }

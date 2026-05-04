@@ -76,7 +76,11 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const byName = await Student.aggregate([
           { $match: { tenantId } },
           { $group: {
-            _id:   { firstName: '$firstName', lastName: '$lastName', dateOfBirth: '$dateOfBirth' },
+            _id:   {
+              firstName: { $ifNull: ['$firstName', '$fullName'] },
+              lastName:  { $ifNull: ['$lastName', ''] },
+              dateOfBirth: '$dateOfBirth',
+            },
             count: { $sum: 1 },
             ids:   { $push: '$_id' },
             registrationNumbers: { $push: '$registrationNumber' },
@@ -90,7 +94,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
             _id:   '$phone',
             count: { $sum: 1 },
             ids:   { $push: '$_id' },
-            names: { $push: { $concat: ['$firstName', ' ', '$lastName'] } },
+            names: { $push: { $ifNull: ['$fullName', { $concat: ['$firstName', ' ', { $ifNull: ['$lastName', ''] }] }] } },
           }},
           { $match: { count: { $gt: 1 } } },
           { $sort:  { count: -1 } },

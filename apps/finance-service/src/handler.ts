@@ -1,9 +1,9 @@
 /**
  * Finance Service Lambda — thin router
  *
- * Handles: fee heads, fee structures, fee assignments, fee schedules,
- *          installment plans, fee revisions, invoices, payments, Razorpay,
- *          receipts, day book report, financial analytics.
+ * Handles: fee categories, fee heads, fee structures, fee assignments,
+ *          fee schedules, installment plans, fee revisions, invoices,
+ *          payments, Razorpay, receipts, day book report, financial analytics.
  *
  * Invoked by:
  *   - AppSync (Cognito User Pool authorizer)
@@ -15,6 +15,7 @@ import { resolveContext } from '@vebgenix/auth';
 import { AppError, isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 import { verifyRazorpaySignature } from './razorpay';
+import { resolveFeeCategories } from './resolvers/feeCategories';
 import { resolveFeeHeads } from './resolvers/feeHeads';
 import { resolveFeeStructures } from './resolvers/feeStructures';
 import { resolveFeeAssignments } from './resolvers/feeAssignments';
@@ -23,6 +24,7 @@ import { resolveInstallmentPlans } from './resolvers/installmentPlans';
 import { resolveInvoices } from './resolvers/invoices';
 import { resolvePayments } from './resolvers/payments';
 import { resolveReports } from './resolvers/reports';
+import { RecordPayment } from './use-cases/RecordPayment';
 
 function parseEvent(event: Record<string, unknown>) {
   if (event.info) {
@@ -58,12 +60,12 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const orderId       = paymentEntity.order_id as string;
         const payment       = await FinanceRepo.findPaymentByRazorpayOrderId(orderId);
         if (payment) {
-          await FinanceRepo.updatePaymentStatus(payment._id.toString(), {
-            status:            'SUCCESS',
-            razorpayPaymentId: paymentEntity.id as string,
-            razorpaySignature: signature,
-          });
-          await FinanceRepo.updateInvoicePaid(payment.tenantId.toString(), payment.invoiceId.toString(), payment.amount);
+          await RecordPayment.applyOnlineSuccess(
+            payment.tenantId.toString(),
+            payment._id.toString(),
+            paymentEntity.id as string,
+            signature,
+          );
         }
       }
       return { statusCode: 200, body: 'OK' };
@@ -75,6 +77,9 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
     // Delegate to resolver groups (first non-undefined wins)
     let result: unknown;
+
+    result = await resolveFeeCategories(operation, args, ctx, tenantId);
+    if (result !== undefined) return result;
 
     result = await resolveFeeHeads(operation, args, ctx, tenantId);
     if (result !== undefined) return result;

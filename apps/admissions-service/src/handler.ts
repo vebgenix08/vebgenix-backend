@@ -125,7 +125,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'createApplication':
       case 'POST:/api/admissions/applications':
-        return CreateApplication.execute(ctx, args as Parameters<typeof CreateApplication.execute>[1]);
+        return CreateApplication.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateApplication.execute>[1]);
 
       case 'submitApplication':
       case 'POST:/api/admissions/applications/:id/submit': {

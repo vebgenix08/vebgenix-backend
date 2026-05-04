@@ -1,4 +1,4 @@
-import { AcademicsRepo, Student } from '@vebgenix/db';
+import { AcademicsRepo, AdmissionsRepo, Student } from '@vebgenix/db';
 import { Types } from 'mongoose';
 import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
@@ -22,14 +22,59 @@ export async function resolveStudents(
 
     case 'enrollStudent':
     case 'POST:/api/admin/students':
-      return EnrollStudent.execute(ctx, args as unknown as Parameters<typeof EnrollStudent.execute>[1]);
+      return EnrollStudent.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof EnrollStudent.execute>[1]);
 
-    case 'convertApplicationToStudent':
-      return EnrollStudent.execute(ctx, args as unknown as Parameters<typeof EnrollStudent.execute>[1]);
+    case 'convertApplicationToStudent': {
+      const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
+      const applicationId = (input.applicationId ?? args.applicationId ?? args.id) as string | undefined;
+      if (!applicationId) throw new AppError('BAD_REQUEST', 'applicationId is required');
+
+      const application = await AdmissionsRepo.findApplicationById(tenantId, applicationId);
+      if (!application) throw new AppError('NOT_FOUND', 'Application not found');
+      if (application.status === 'ENROLLED') throw new AppError('CONFLICT', 'Application is already enrolled');
+      if (application.status !== 'APPROVED') {
+        throw new AppError('CONFLICT', `Application must be APPROVED before conversion. Current status is ${application.status}`);
+      }
+
+      const nameParts = application.studentName.trim().split(/\s+/).filter(Boolean);
+      const firstName = nameParts.shift() ?? application.studentName;
+      const lastName = nameParts.length > 0 ? nameParts.join(' ') : undefined;
+      const guardians = application.guardianName && application.guardianPhone
+        ? [{
+            name: application.guardianName,
+            relation: application.guardianRelation ?? 'Guardian',
+            phone: application.guardianPhone,
+          }]
+        : undefined;
+
+      return EnrollStudent.execute(ctx, {
+        applicationId,
+        campusId:       application.campusId.toString(),
+        academicYearId: application.academicYearId.toString(),
+        programId:      application.programId?.toString(),
+        firstName,
+        lastName,
+        phone:          application.phone,
+        email:          application.email,
+        dateOfBirth:    application.dateOfBirth?.toISOString(),
+        gender:         application.gender,
+        address:        application.address,
+        guardians,
+      });
+    }
 
     case 'updateStudent':
-    case 'PATCH:/api/admin/students/:studentId':
-      return AcademicsRepo.updateStudent(tenantId, (args.studentId ?? args.id) as string, args as object);
+    case 'PATCH:/api/admin/students/:studentId': {
+      const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
+      const update: Record<string, unknown> = { ...input };
+      if (update.firstName || update.lastName) {
+        const existing = await AcademicsRepo.findStudentById(tenantId, (args.studentId ?? args.id) as string);
+        const firstName = (update.firstName ?? existing?.firstName) as string | undefined;
+        const lastName  = (update.lastName  ?? existing?.lastName)  as string | undefined;
+        if (firstName) update.fullName = [firstName, lastName].filter(Boolean).join(' ');
+      }
+      return AcademicsRepo.updateStudent(tenantId, (args.studentId ?? args.id) as string, update);
+    }
 
     case 'updateStudentStatus':
     case 'PATCH:/api/admin/students/:studentId/status':
@@ -43,11 +88,18 @@ export async function resolveStudents(
     case 'assignStudentClass':
     case 'PATCH:/api/tenant/students/:studentId/assign-class':
       authorize(ctx, 'academics.students.assign');
-      return AcademicsRepo.updateStudent(
-        tenantId,
-        (args.studentId ?? args.id) as string,
-        { classId: args.classId as never, sectionId: args.sectionId as never },
-      );
+      {
+        const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
+        const update: Record<string, unknown> = {
+          classId: new Types.ObjectId(input.classId as string),
+        };
+        if (input.sectionId) update.sectionId = new Types.ObjectId(input.sectionId as string);
+        return AcademicsRepo.updateStudent(
+          tenantId,
+          (args.studentId ?? args.id) as string,
+          update,
+        );
+      }
 
     case 'bulkAssignStudentsToClass':
     case 'POST:/api/tenant/students/bulk-assign-class': {
@@ -58,8 +110,8 @@ export async function resolveStudents(
       if (!Array.isArray(studentIds) || studentIds.length === 0) {
         throw new AppError('BAD_REQUEST', 'studentIds must be a non-empty array');
       }
-      const update: Record<string, unknown> = { classId };
-      if (sectionId) update.sectionId = sectionId;
+      const update: Record<string, unknown> = { classId: new Types.ObjectId(classId) };
+      if (sectionId) update.sectionId = new Types.ObjectId(sectionId);
       const result = await Student.updateMany(
         { tenantId, _id: { $in: studentIds.map(id => new Types.ObjectId(id)) } },
         { $set: update },
@@ -75,7 +127,7 @@ export async function resolveStudents(
         throw new AppError('BAD_REQUEST', 'classIds required');
       }
       const filter: Record<string, unknown> = { tenantId, status: 'ACTIVE', classId: { $exists: false } };
-      if (args.campusId) filter.campusId = args.campusId;
+      if (args.campusId) filter.campusId = new Types.ObjectId(args.campusId as string);
       const students = await Student.find(filter).lean();
       if (students.length === 0) return { assignedCount: 0 };
       const bulkOps = students.map((s, i) => ({
@@ -95,7 +147,7 @@ export async function resolveStudents(
 
     case 'listSectionStudents':
     case 'GET:/api/tenant/sections/:sectionId/students':
-      return Student.find({ tenantId, sectionId: args.sectionId, status: 'ACTIVE' })
+      return Student.find({ tenantId, sectionId: new Types.ObjectId(args.sectionId as string), status: 'ACTIVE' })
         .sort({ fullName: 1 })
         .lean();
 
