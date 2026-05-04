@@ -50,3 +50,6 @@ apps/*/dist/
 
 # Claude Code local data (worktrees, session files, etc.)
 .claude/
+
+# Postman collections (local dev tooling — not source artefacts)
+postman/
