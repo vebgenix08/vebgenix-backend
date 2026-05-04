@@ -49,8 +49,10 @@ const authStack = new AuthStack(app, `VebgenixAuth-${config.stage}`, {
   runtimeDepsLayer: runtimeDepsStack.layer,
   ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
 });
-authStack.addDependency(networkStack);
 authStack.addDependency(runtimeDepsStack);
+if (config.enableNat) {
+  authStack.addDependency(networkStack);
+}
 
 // 4. Storage: Private S3 Bucket
 const storageStack = new StorageStack(app, `VebgenixStorage-${config.stage}`, {
@@ -65,8 +67,10 @@ const asyncStack = new AsyncStack(app, `VebgenixAsync-${config.stage}`, {
   runtimeDepsLayer: runtimeDepsStack.layer,
   ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
 });
-asyncStack.addDependency(networkStack);
 asyncStack.addDependency(runtimeDepsStack);
+if (config.enableNat) {
+  asyncStack.addDependency(networkStack);
+}
 
 // 6. Monitoring: CloudWatch Alarms + Budget
 new MonitoringStack(app, `VebgenixMonitoring-${config.stage}`, {
@@ -86,9 +90,17 @@ const appSyncStack = new AppSyncStack(app, `VebgenixAppSync-${config.stage}`, {
   documentsBucket: storageStack.bucket,
 });
 appSyncStack.addDependency(authStack);
-appSyncStack.addDependency(networkStack);
 appSyncStack.addDependency(asyncStack);
 appSyncStack.addDependency(runtimeDepsStack);
+if (config.enableNat) {
+  appSyncStack.addDependency(networkStack);
+} else {
+  // Existing deployments may still import sgLambda from Network. Update the
+  // consuming stacks first, then let Network remove the now-unused export.
+  networkStack.addDependency(authStack);
+  networkStack.addDependency(asyncStack);
+  networkStack.addDependency(appSyncStack);
+}
 
 // 8. Frontend: S3 Bucket + CloudFront Distribution
 const frontendStack = new FrontendStack(app, `VebgenixFrontend-${config.stage}`, {
