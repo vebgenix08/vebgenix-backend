@@ -1,16 +1,163 @@
-import { Tenant, TenantFeature, Profile, AuthUser, generateTenantId } from '@vebgenix/db';
+import {
+  AuthUser,
+  Campus,
+  Profile,
+  Tenant,
+  TenantFeature,
+  generateTenantId,
+} from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
+import mongoose, { Types } from 'mongoose';
 
-/** Mask an email for display: john.doe@example.com → j***@e*****.com */
+type FeatureFlags = Record<string, boolean>;
+type PlainDoc = Record<string, unknown>;
+
+type ProvisionCampusInput = {
+  name?: string;
+  code?: string;
+  type?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  phone?: string;
+  email?: string;
+};
+
+type ProvisionPrimaryAdminInput = {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+};
+
+const VALID_CAMPUS_TYPES = new Set(['SCHOOL', 'PU', 'DEGREE', 'POLYTECHNIC', 'OTHER']);
+
+const TENANT_ADMIN_ROLE_NAME = 'TENANT_ADMIN';
+
+const TENANT_ADMIN_PERMISSIONS = [
+  'academics.allocations.create',
+  'academics.allocations.delete',
+  'academics.allocations.update',
+  'academics.attendance.mark',
+  'academics.classes.create',
+  'academics.classes.delete',
+  'academics.classes.update',
+  'academics.enrollment.create',
+  'academics.enrollment.read',
+  'academics.enrollment.transfer',
+  'academics.exams.delete',
+  'academics.exams.read',
+  'academics.exams.update',
+  'academics.promotion.create',
+  'academics.promotion.read',
+  'academics.registration.freeze',
+  'academics.registration.generate',
+  'academics.registration.read',
+  'academics.results.create',
+  'academics.results.delete',
+  'academics.results.publish',
+  'academics.results.read',
+  'academics.results.update',
+  'academics.rollno.freeze',
+  'academics.rollno.generate',
+  'academics.rollno.read',
+  'academics.sections.create',
+  'academics.sections.delete',
+  'academics.sections.update',
+  'academics.students.assign',
+  'academics.subjects.create',
+  'academics.subjects.delete',
+  'academics.subjects.update',
+  'academics.timetable.manage',
+  'academics.timetable.read',
+  'admin.cleanup.read',
+  'admin.cleanup.write',
+  'admissions.application.approve',
+  'admissions.application.create',
+  'admissions.application.read',
+  'admissions.application.review',
+  'admissions.application.update',
+  'admissions.enquiry.create',
+  'admissions.enquiry.delete',
+  'admissions.enquiry.read',
+  'admissions.enquiry.update',
+  'comms.announcements.create',
+  'comms.announcements.delete',
+  'comms.announcements.read',
+  'comms.announcements.update',
+  'comms.events.create',
+  'comms.events.delete',
+  'comms.events.read',
+  'comms.events.update',
+  'comms.leave.approve',
+  'comms.leave.read',
+  'finance.fee_assignment.create',
+  'finance.fee_assignment.read',
+  'finance.fee_category.create',
+  'finance.fee_category.delete',
+  'finance.fee_category.read',
+  'finance.fee_category.update',
+  'finance.fee_head.delete',
+  'finance.fee_head.read',
+  'finance.fee_head.update',
+  'finance.fee_pattern.copy',
+  'finance.fee_schedule.create',
+  'finance.fee_schedule.delete',
+  'finance.fee_schedule.read',
+  'finance.fee_schedule.update',
+  'finance.fee_structure.delete',
+  'finance.fee_structure.read',
+  'finance.fee_structure.update',
+  'finance.installment_plan.create',
+  'finance.installment_plan.delete',
+  'finance.installment_plan.read',
+  'finance.installment_plan.update',
+  'finance.invoice.create',
+  'finance.invoice.read',
+  'finance.invoice.update',
+  'finance.invoices.create',
+  'finance.manage',
+  'finance.payment.create',
+  'finance.payment.read',
+  'finance.payments.record',
+  'finance.reports.read',
+  'identity.roles.assign',
+  'identity.staff.read',
+  'identity.staff.update',
+  'identity.users.delete',
+  'identity.users.update',
+  'settings.academic_year.create',
+  'settings.academic_year.update',
+  'settings.programs.create',
+  'settings.programs.delete',
+  'settings.programs.update',
+  'settings.templates.create',
+  'settings.templates.delete',
+  'settings.templates.publish',
+  'settings.templates.update',
+  'staff.invite',
+  'students.certificates.approve',
+  'students.certificates.create',
+  'students.enroll',
+  'students.portal.manage',
+  'students.status.update',
+  'tenant.campuses.create',
+  'tenant.campuses.delete',
+  'tenant.campuses.update',
+  'tenant.settings.update',
+  'users.create',
+  'users.delete',
+  'users.update',
+];
+
 function maskEmail(email: string): string {
   const [local, domain] = email.split('@');
   const [domainName, ...tldParts] = (domain ?? '').split('.');
   return `${local[0] ?? ''}***@${domainName?.[0] ?? ''}*****.${tldParts.join('.')}`;
 }
 
-/** Generate a 6-digit OTP */
 function generateOtp(): string {
   return String(Math.floor(100_000 + Math.random() * 900_000));
 }
@@ -28,7 +175,26 @@ function normalizeSubdomain(value: string): string {
     .replace(/^-|-$/g, '');
 }
 
-function toFeatureItems(features: Record<string, unknown> | string[] | undefined) {
+function normalizeCampusCode(value: unknown): string {
+  const code = String(value ?? 'MAIN')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return code || 'MAIN';
+}
+
+function normalizeCampusType(value: unknown): string {
+  const type = String(value ?? 'SCHOOL').trim().toUpperCase();
+  return VALID_CAMPUS_TYPES.has(type) ? type : 'OTHER';
+}
+
+function normalizeEmail(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function toFeatureItems(features: FeatureFlags | string[] | undefined) {
   if (Array.isArray(features)) {
     return features.map(key => ({ key, enabled: true }));
   }
@@ -42,10 +208,9 @@ function toDateString(value: unknown): string {
   return new Date().toISOString();
 }
 
-/** Serialize a Tenant DB document to GraphQL shape (maps tenantId to id). */
-function toGql(doc: Record<string, unknown> | null, features?: Record<string, unknown> | string[]) {
+function toGql(doc: PlainDoc | null, features?: FeatureFlags | string[]) {
   if (!doc) return null;
-  const { _id, ...rest } = doc as Record<string, unknown>;
+  const { _id, ...rest } = doc;
   const slug = rest.slug as string | undefined;
   return {
     ...rest,
@@ -53,9 +218,64 @@ function toGql(doc: Record<string, unknown> | null, features?: Record<string, un
     fullDomain: rest.fullDomain ?? (slug ? `${slug}.vebgenix.com` : rest.domain),
     isActive: rest.isActive ?? true,
     onboardingComplete: rest.onboardingComplete ?? false,
-    features: toFeatureItems(features ?? (rest.features as Record<string, unknown> | undefined)),
+    features: toFeatureItems(features ?? (rest.features as FeatureFlags | undefined)),
     createdAt: toDateString(rest.createdAt),
   };
+}
+
+function toCampusGql(doc: PlainDoc | null) {
+  if (!doc) return null;
+  return {
+    ...doc,
+    id: String(doc._id ?? doc.id),
+    isActive: doc.isActive ?? true,
+  };
+}
+
+function toAdminGql(profile: PlainDoc | null) {
+  if (!profile) return null;
+  const roles = Array.isArray(profile.roles) ? profile.roles as PlainDoc[] : [];
+  const tenantAdminRole = roles.find(role => role.roleName === TENANT_ADMIN_ROLE_NAME) ?? roles[0];
+  return {
+    id: String(profile._id ?? profile.id),
+    email: profile.email,
+    fullName: profile.fullName,
+    roleName: tenantAdminRole?.roleName ?? TENANT_ADMIN_ROLE_NAME,
+    permissions: Array.isArray(tenantAdminRole?.permissions)
+      ? tenantAdminRole.permissions
+      : TENANT_ADMIN_PERMISSIONS,
+  };
+}
+
+function featureFlagsFromList(features: unknown): FeatureFlags {
+  if (!Array.isArray(features)) return {};
+  return features.reduce<FeatureFlags>((acc, key) => {
+    const featureKey = String(key ?? '').trim();
+    if (featureKey) acc[featureKey] = true;
+    return acc;
+  }, {});
+}
+
+function isMongoDuplicateError(err: unknown): boolean {
+  return typeof err === 'object'
+    && err !== null
+    && 'code' in err
+    && (err as { code?: number }).code === 11000;
+}
+
+function toProvisioningError(err: unknown): AppError {
+  if (err instanceof AppError) return err;
+  if (isMongoDuplicateError(err)) {
+    return new AppError('CONFLICT', 'Tenant setup already exists for one of the provided values');
+  }
+  const name = typeof err === 'object' && err !== null && 'name' in err
+    ? String((err as { name?: unknown }).name)
+    : '';
+  if (name === 'UsernameExistsException') {
+    return new AppError('CONFLICT', 'Primary admin email already exists in Cognito');
+  }
+  console.error('[settings/provisionTenant] provisioning failed:', err);
+  return new AppError('BAD_REQUEST', 'Tenant provisioning failed');
 }
 
 async function assertTenantNameAvailable(name: string): Promise<void> {
@@ -70,6 +290,22 @@ async function assertTenantSlugAvailable(slug: string): Promise<void> {
   if (existing) throw new AppError('CONFLICT', `Tenant with subdomain "${slug}" already exists`);
 }
 
+async function assertAdminEmailAvailable(email: string): Promise<void> {
+  const existing = await AuthUser.findOne({ email }).lean();
+  if (existing) throw new AppError('CONFLICT', `User with email "${email}" already exists`);
+}
+
+async function deleteCognitoUser(username: string): Promise<void> {
+  if (!process.env.COGNITO_USER_POOL_ID) return;
+  const { AdminDeleteUserCommand, CognitoIdentityProviderClient } =
+    await import('@aws-sdk/client-cognito-identity-provider');
+  const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+  await cognito.send(new AdminDeleteUserCommand({
+    UserPoolId: process.env.COGNITO_USER_POOL_ID,
+    Username: username,
+  }));
+}
+
 export async function resolveTenants(
   operation: string,
   args: Record<string, unknown>,
@@ -77,16 +313,31 @@ export async function resolveTenants(
   tenantId: string,
 ): Promise<unknown> {
   switch (operation) {
-
-    // ── List / Get ────────────────────────────────────────────────────────────
-
     case 'listTenants':
     case 'GET:/api/platform/tenants': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const filter: Record<string, unknown> = {};
       if (args.isActive !== undefined) filter.isActive = args.isActive === 'true' || args.isActive === true;
       const docs = await Tenant.find(filter).sort({ name: 1 }).lean();
-      return { items: docs.map(d => toGql(d as Record<string, unknown>)), nextToken: null };
+      const tenantIds = docs
+        .map(doc => String((doc as PlainDoc).tenantId ?? ''))
+        .filter(Boolean);
+      const featureDocs = tenantIds.length
+        ? await TenantFeature.find({ tenantId: { $in: tenantIds } }).lean()
+        : [];
+      const featureMap = new Map(
+        featureDocs.map(doc => [
+          String((doc as PlainDoc).tenantId),
+          (doc as PlainDoc).features as FeatureFlags | undefined,
+        ]),
+      );
+      return {
+        items: docs.map(doc => {
+          const plain = doc as PlainDoc;
+          return toGql(plain, featureMap.get(String(plain.tenantId)));
+        }),
+        nextToken: null,
+      };
     }
 
     case 'getTenant':
@@ -95,169 +346,220 @@ export async function resolveTenants(
       if (!ctx.isPlatformAdmin && id !== tenantId) {
         throw new AppError('FORBIDDEN', 'Cannot view another tenant');
       }
-      return toGql(await Tenant.findOne({ tenantId: id }).lean() as Record<string, unknown> | null);
+      const tenant = await Tenant.findOne({ tenantId: id }).lean() as PlainDoc | null;
+      const features = await TenantFeature.findOne({ tenantId: id }).lean() as PlainDoc | null;
+      return toGql(tenant, features?.features as FeatureFlags | undefined);
     }
-
-    // ── Subdomain validation ──────────────────────────────────────────────────
 
     case 'validateSubdomain':
     case 'GET:/api/platform/validate-subdomain': {
       const normalized = normalizeSubdomain((args.subdomain as string) ?? '');
       const fullDomain = `${normalized}.vebgenix.com`;
-      const existing   = await Tenant.findOne({ slug: normalized }).lean();
-      const available  = !existing;
+      const existing = await Tenant.findOne({ slug: normalized }).lean();
+      const available = !existing;
       let suggestion: string | undefined;
       if (!available) {
-        // Append a short numeric suffix until we find a free slot
         for (let i = 2; i <= 9; i++) {
           const candidate = `${normalized}${i}`;
           const taken = await Tenant.findOne({ slug: candidate }).lean();
-          if (!taken) { suggestion = `${candidate}.vebgenix.com`; break; }
+          if (!taken) {
+            suggestion = `${candidate}.vebgenix.com`;
+            break;
+          }
         }
       }
       return { available, normalized, fullDomain, suggestion };
     }
 
-    // ── Create tenant (manual) ────────────────────────────────────────────────
-
     case 'createTenant':
     case 'POST:/api/platform/tenants': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
-      const input      = (args.input as Record<string, unknown>) ?? args;
-      const name       = String(input.name ?? '').trim();
-      const slug       = normalizeSubdomain(String(input.slug ?? name));
+      const input = (args.input as Record<string, unknown>) ?? args;
+      const name = String(input.name ?? '').trim();
+      const slug = normalizeSubdomain(String(input.slug ?? name));
       if (!name) throw new AppError('BAD_REQUEST', 'Tenant name is required');
       if (!slug) throw new AppError('BAD_REQUEST', 'Tenant subdomain is required');
       await assertTenantNameAvailable(name);
       await assertTenantSlugAvailable(slug);
       const newTenantId = generateTenantId(input.type as string | undefined);
-      const tenant     = await Tenant.create({ ...input, name, slug, tenantId: newTenantId, isActive: true });
+      const tenant = await Tenant.create({ ...input, name, slug, tenantId: newTenantId, isActive: true });
       await TenantFeature.create({ tenantId: newTenantId });
-      return toGql(tenant.toObject() as unknown as Record<string, unknown>);
+      return toGql(tenant.toObject() as unknown as PlainDoc);
     }
-
-    // ── Provision tenant (full automated workflow) ────────────────────────────
 
     case 'provisionTenant':
     case 'POST:/api/platform/tenants/provision': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const input = (args.input as Record<string, unknown>) ?? args;
-      const raw = input as {
-        organizationName: string;
-        subdomain:        string;
-        features:         string[];
-        adminName:        string;
-        adminEmail:       string;
-      };
-      const organizationName = String(raw.organizationName ?? '').trim();
-      const subdomain        = normalizeSubdomain(String(raw.subdomain ?? ''));
-      const features         = Array.isArray(raw.features) ? raw.features : [];
-      const adminName        = String(raw.adminName ?? '').trim();
-      const adminEmail       = String(raw.adminEmail ?? '').trim().toLowerCase();
+      const primaryCampus = (input.primaryCampus ?? {}) as ProvisionCampusInput;
+      const primaryAdmin = (input.primaryAdmin ?? {}) as ProvisionPrimaryAdminInput;
+      const organizationName = String(input.organizationName ?? '').trim();
+      const subdomain = normalizeSubdomain(String(input.subdomain ?? ''));
+      const featureFlags = featureFlagsFromList(input.features);
+      const adminName = String(primaryAdmin.fullName ?? input.adminName ?? '').trim();
+      const adminEmail = normalizeEmail(primaryAdmin.email ?? input.adminEmail);
+      const adminPhone = String(primaryAdmin.phone ?? '').trim() || undefined;
+      const campusName = String(primaryCampus.name ?? organizationName).trim();
+      const campusCode = normalizeCampusCode(primaryCampus.code);
+      const campusType = normalizeCampusType(primaryCampus.type);
 
       if (!organizationName) throw new AppError('BAD_REQUEST', 'Tenant name is required');
       if (!subdomain) throw new AppError('BAD_REQUEST', 'Tenant subdomain is required');
-      if (!adminName) throw new AppError('BAD_REQUEST', 'Admin name is required');
-      if (!adminEmail) throw new AppError('BAD_REQUEST', 'Admin email is required');
+      if (!campusName) throw new AppError('BAD_REQUEST', 'Primary campus name is required');
+      if (!adminName) throw new AppError('BAD_REQUEST', 'Primary admin full name is required');
+      if (!adminEmail || !adminEmail.includes('@')) {
+        throw new AppError('BAD_REQUEST', 'Valid primary admin email is required');
+      }
 
-      // 1. Fail early with clear AppSync errors before creating tenant/Cognito data.
       await assertTenantNameAvailable(organizationName);
       await assertTenantSlugAvailable(subdomain);
+      await assertAdminEmailAvailable(adminEmail);
 
-      // 2. Create tenant with prefixed ID
+      if (!process.env.COGNITO_USER_POOL_ID) {
+        throw new AppError('BAD_REQUEST', 'Cognito user pool is not configured');
+      }
+
       const newTenantId = generateTenantId('org');
-      const tenant = await Tenant.create({
-        tenantId:  newTenantId,
-        name:      organizationName,
-        slug:      subdomain,
-        isActive:  true,
-        onboardingComplete: false,
-      });
+      let cognitoUsername: string | undefined;
+      let mongoCommitted = false;
 
-      // 3. Set up feature flags from the requested features list
-      const featureFlags = (features as string[]).reduce<Record<string, boolean>>(
-        (acc, key) => { acc[key] = true; return acc; },
-        {},
-      );
-      await TenantFeature.create({ tenantId: newTenantId, features: featureFlags });
-
-      // 4. Create Cognito admin user — Cognito sends the invite email automatically
-      let inviteSent = false;
-      let cognitoSub: string | undefined;
       try {
         const {
-          AdminCreateUserCommand,
           AdminAddUserToGroupCommand,
+          AdminCreateUserCommand,
           CognitoIdentityProviderClient,
         } = await import('@aws-sdk/client-cognito-identity-provider');
         const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
         const createResp = await cognito.send(new AdminCreateUserCommand({
-          UserPoolId:             process.env.COGNITO_USER_POOL_ID,
-          Username:               adminEmail,
+          UserPoolId: process.env.COGNITO_USER_POOL_ID,
+          Username: adminEmail,
           DesiredDeliveryMediums: ['EMAIL'],
           UserAttributes: [
-            { Name: 'email',            Value: adminEmail },
-            { Name: 'name',             Value: adminName  },
-            { Name: 'custom:tenantId',  Value: newTenantId },
-            { Name: 'custom:role',      Value: 'SCHOOL_ADMIN' },
-            { Name: 'email_verified',   Value: 'true'     },
+            { Name: 'email', Value: adminEmail },
+            { Name: 'name', Value: adminName },
+            { Name: 'custom:tenantId', Value: newTenantId },
+            { Name: 'custom:role', Value: 'SCHOOL_ADMIN' },
+            { Name: 'email_verified', Value: 'true' },
+            ...(adminPhone ? [{ Name: 'phone_number', Value: adminPhone }] : []),
           ],
         }));
-        cognitoSub = createResp.User?.Attributes?.find(a => a.Name === 'sub')?.Value;
+        cognitoUsername = adminEmail;
+        const cognitoSub = createResp.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value;
+        if (!cognitoSub) {
+          throw new AppError('BAD_REQUEST', 'Cognito did not return a user id');
+        }
         await cognito.send(new AdminAddUserToGroupCommand({
           UserPoolId: process.env.COGNITO_USER_POOL_ID,
-          Username:   adminEmail,
-          GroupName:  'SCHOOL_ADMIN',
+          Username: adminEmail,
+          GroupName: 'SCHOOL_ADMIN',
         }));
-        inviteSent = true;
+
+        let tenantDoc: PlainDoc | null = null;
+        let campusDoc: PlainDoc | null = null;
+        let profileDoc: PlainDoc | null = null;
+        const adminRoleId = new Types.ObjectId();
+        const session = await mongoose.startSession();
+        try {
+          await session.withTransaction(async () => {
+            const [tenant] = await Tenant.create([{
+              tenantId: newTenantId,
+              name: organizationName,
+              slug: subdomain,
+              isActive: true,
+              onboardingComplete: false,
+            }], { session });
+            const [featureDoc] = await TenantFeature.create([{
+              tenantId: newTenantId,
+              features: featureFlags,
+              updatedBy: ctx.userId,
+            }], { session });
+            const [campus] = await Campus.create([{
+              tenantId: newTenantId,
+              name: campusName,
+              code: campusCode,
+              type: campusType,
+              address: primaryCampus.address,
+              city: primaryCampus.city,
+              state: primaryCampus.state,
+              country: primaryCampus.country,
+              phone: primaryCampus.phone,
+              email: primaryCampus.email,
+              isActive: true,
+            }], { session });
+            const [authUser] = await AuthUser.create([{
+              cognitoSub,
+              email: adminEmail,
+              phone: adminPhone,
+              isActive: true,
+              isPlatformAdmin: false,
+            }], { session });
+            const [profile] = await Profile.create([{
+              tenantId: newTenantId,
+              authUserId: authUser._id,
+              email: adminEmail,
+              fullName: adminName,
+              phone: adminPhone,
+              personaRole: TENANT_ADMIN_ROLE_NAME,
+              isActive: true,
+              isAllCampuses: true,
+              isPrimaryOwner: true,
+              campusAccess: [{
+                campusId: campus._id,
+                campusName: campus.name,
+              }],
+              roles: [{
+                roleId: adminRoleId,
+                roleName: TENANT_ADMIN_ROLE_NAME,
+                permissions: TENANT_ADMIN_PERMISSIONS,
+              }],
+            }], { session });
+
+            tenantDoc = tenant.toObject() as unknown as PlainDoc;
+            campusDoc = campus.toObject() as unknown as PlainDoc;
+            profileDoc = profile.toObject() as unknown as PlainDoc;
+            (tenantDoc as PlainDoc).features = (featureDoc.toObject() as unknown as PlainDoc).features;
+          });
+          mongoCommitted = true;
+        } finally {
+          await session.endSession();
+        }
+
+        return {
+          tenant: toGql(tenantDoc, featureFlags),
+          campus: toCampusGql(campusDoc),
+          primaryAdmin: toAdminGql(profileDoc),
+          adminRole: {
+            roleName: TENANT_ADMIN_ROLE_NAME,
+            permissions: TENANT_ADMIN_PERMISSIONS,
+          },
+          adminEmail,
+          inviteSent: true,
+        };
       } catch (err) {
-        console.error('[settings/provisionTenant] Cognito invite failed:', err);
-        // Don't rollback the tenant — admin can resend via resendTenantInvite
+        if (cognitoUsername && !mongoCommitted) {
+          try {
+            await deleteCognitoUser(cognitoUsername);
+          } catch (deleteErr) {
+            console.warn('[settings/provisionTenant] failed to clean up Cognito user:', deleteErr);
+          }
+        }
+        throw toProvisioningError(err);
       }
-
-      // 5. Create AuthUser + Profile for the admin when Cognito user creation succeeded.
-      if (cognitoSub) {
-        const authUser = await AuthUser.findOneAndUpdate(
-          { $or: [{ cognitoSub }, { email: adminEmail }] },
-          { $set: { email: adminEmail, cognitoSub } },
-          { upsert: true, new: true, setDefaultsOnInsert: true },
-        );
-        await Profile.create({
-          tenantId:      newTenantId,
-          authUserId:    authUser._id,
-          email:         adminEmail,
-          fullName:      adminName,
-          personaRole:   'TENANT_ADMIN',
-          isActive:      true,
-          isAllCampuses: true,
-          isPrimaryOwner: true,
-        });
-      } else {
-        console.warn(`[settings/provisionTenant] Skipping admin profile for ${adminEmail}; Cognito user was not created`);
-      }
-
-      return {
-        tenant: toGql(tenant.toObject() as unknown as Record<string, unknown>, featureFlags),
-        adminEmail,
-        inviteSent,
-      };
     }
-
-    // ── Update tenant ─────────────────────────────────────────────────────────
 
     case 'updateTenant':
     case 'PATCH:/api/platform/tenants/:id':
     case 'PATCH:/api/admin/settings/tenant': {
-      const id               = (args.tenantId ?? args.id) as string | undefined;
+      const id = (args.tenantId ?? args.id) as string | undefined;
       const resolvedTenantId = id ?? tenantId;
       if (!ctx.isPlatformAdmin) authorize(ctx, 'tenant.settings.update');
       const input = (args.input as Record<string, unknown>) ?? args;
-      const { isActive: _ia, slug: _sl, tenantId: _tid, ...safeInput } = input as Record<string, unknown>;
+      const { isActive: _isActive, slug: _slug, tenantId: _inputTenantId, ...safeInput } = input;
       return toGql(await Tenant.findOneAndUpdate(
         { tenantId: resolvedTenantId },
         { $set: safeInput },
         { new: true },
-      ).lean() as Record<string, unknown> | null);
+      ).lean() as PlainDoc | null);
     }
 
     case 'deactivateTenant':
@@ -268,45 +570,37 @@ export async function resolveTenants(
         { tenantId: id },
         { $set: { isActive: false } },
         { new: true },
-      ).lean() as Record<string, unknown> | null);
+      ).lean() as PlainDoc | null);
     }
-
-    // ── Tenant deletion OTP flow ──────────────────────────────────────────────
 
     case 'requestTenantDeletion':
     case 'POST:/api/platform/tenants/:id/request-deletion': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
-      const id     = (args.tenantId ?? args.id) as string;
+      const id = (args.tenantId ?? args.id) as string;
       const tenant = await Tenant.findOne({ tenantId: id }).lean();
       if (!tenant) throw new AppError('NOT_FOUND', 'Tenant not found');
 
-      // Find primary admin to send OTP to
       const adminProfile = await Profile.findOne({
-        tenantId:       id,
+        tenantId: id,
         isPrimaryOwner: true,
-        isActive:       true,
+        isActive: true,
       }).lean();
-      const adminEmail = (adminProfile as unknown as Record<string, unknown> | null)?.email as string
-        ?? ctx.email;
+      const adminEmail = (adminProfile as PlainDoc | null)?.email as string ?? ctx.email;
       if (!adminEmail) throw new AppError('BAD_REQUEST', 'No admin email found for this tenant');
 
-      const otp       = generateOtp();
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+      const otp = generateOtp();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-      // Store OTP on tenant document
       await Tenant.findOneAndUpdate(
         { tenantId: id },
         { $set: { deletionOtp: otp, deletionOtpExpiresAt: expiresAt } },
       );
 
-      // Send OTP via Cognito (re-use admin user mechanism) or log for now
-      // In production, wire this to your email/SES worker via EventBridge
       console.info(`[settings/requestTenantDeletion] OTP for tenant ${id}: ${otp} (expires ${expiresAt.toISOString()})`);
 
-      const EXPIRES_SECONDS = 15 * 60;
       return {
-        sent:        true,
-        expiresIn:   EXPIRES_SECONDS,
+        sent: true,
+        expiresIn: 15 * 60,
         maskedEmail: maskEmail(adminEmail),
       };
     }
@@ -314,27 +608,27 @@ export async function resolveTenants(
     case 'confirmTenantDeletion':
     case 'POST:/api/platform/tenants/:id/confirm-deletion': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
-      const id  = (args.tenantId ?? args.id) as string;
+      const id = (args.tenantId ?? args.id) as string;
       const otp = args.otp as string;
 
-      const tenant = await Tenant.findOne({ tenantId: id }) as unknown as Record<string, unknown> | null;
+      const tenant = await Tenant.findOne({ tenantId: id })
+        .select('+deletionOtp +deletionOtpExpiresAt') as unknown as PlainDoc | null;
       if (!tenant) throw new AppError('NOT_FOUND', 'Tenant not found');
 
-      const storedOtp   = tenant.deletionOtp         as string | undefined;
-      const expiresAt   = tenant.deletionOtpExpiresAt as Date   | undefined;
+      const storedOtp = tenant.deletionOtp as string | undefined;
+      const expiresAt = tenant.deletionOtpExpiresAt as Date | undefined;
 
       if (!storedOtp || storedOtp !== otp) {
         throw new AppError('BAD_REQUEST', 'Invalid OTP');
       }
       if (!expiresAt || new Date() > new Date(expiresAt)) {
-        throw new AppError('BAD_REQUEST', 'OTP has expired — request a new one');
+        throw new AppError('BAD_REQUEST', 'OTP has expired; request a new one');
       }
 
-      // Clear OTP and mark tenant as deleted (soft delete)
       await Tenant.findOneAndUpdate(
         { tenantId: id },
         {
-          $set:   { isActive: false, deletedAt: new Date(), deletedBy: ctx.userId },
+          $set: { isActive: false, deletedAt: new Date(), deletedBy: ctx.userId },
           $unset: { deletionOtp: '', deletionOtpExpiresAt: '' },
         },
       );

@@ -103,6 +103,7 @@ export class AppSyncStack extends cdk.Stack {
         'cognito-idp:AdminUpdateUserAttributes',
         'cognito-idp:AdminDisableUser',
         'cognito-idp:AdminEnableUser',
+        'cognito-idp:AdminDeleteUser',
         'cognito-idp:AdminGetUser',
         'cognito-idp:AdminInitiateAuth',
         'cognito-idp:ListUsersInGroup',
@@ -484,8 +485,20 @@ export class AppSyncStack extends cdk.Stack {
     const tenants = R(tenantsDs);
     tenants('Query',    'listTenants');
     tenants('Query',    'getTenant');
+    tenants('Query',    'validateSubdomain');
+    tenants('Query',    'listAvailableFeatures');
+    tenants('Query',    'listTenantUsers');
     tenants('Mutation', 'createTenant');
+    tenants('Mutation', 'provisionTenant');
     tenants('Mutation', 'deactivateTenant');
+    tenants('Mutation', 'requestTenantDeletion');
+    tenants('Mutation', 'confirmTenantDeletion');
+    tenants('Mutation', 'createFirstAdmin');
+    tenants('Mutation', 'finalizeOnboarding');
+    tenants('Mutation', 'finalizeTenant');
+    tenants('Mutation', 'resendTenantInvite');
+    tenants('Mutation', 'provisionTenantUser');
+    tenants('Mutation', 'deleteTenantUser');
 
     // ── Dashboard resolvers ─────────────────────────────────────────────────
     const dashboard = R(settingsDs);
@@ -555,20 +568,6 @@ export class AppSyncStack extends cdk.Stack {
     academics('Mutation', 'enableStudentPortal');
     academics('Mutation', 'enableGuardianPortal');
     academics('Mutation', 'markClassAttendance');
-
-    // ── Settings extra resolvers ────────────────────────────────────────────
-    settings('Query',    'validateSubdomain');
-    settings('Query',    'listAvailableFeatures');
-    settings('Mutation', 'provisionTenant');
-    settings('Mutation', 'requestTenantDeletion');
-    settings('Mutation', 'confirmTenantDeletion');
-    settings('Mutation', 'createFirstAdmin');
-    settings('Mutation', 'finalizeOnboarding');
-    settings('Mutation', 'finalizeTenant');
-    settings('Mutation', 'resendTenantInvite');
-    settings('Mutation', 'provisionTenantUser');
-    settings('Mutation', 'deleteTenantUser');
-    settings('Query',    'listTenantUsers');
 
     // ── Admin cleanup resolvers ─────────────────────────────────────────────
     const cleanup = R(cleanupDs);

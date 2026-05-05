@@ -115,18 +115,54 @@ type SubdomainValidation {
   suggestion:  String
 }
 
+input ProvisionCampusInput {
+  name:    String
+  code:    String
+  type:    String
+  address: String
+  city:    String
+  state:   String
+  country: String
+  phone:   String
+  email:   String
+}
+
+input ProvisionPrimaryAdminInput {
+  fullName: String!
+  email:    String!
+  phone:    String
+}
+
 input ProvisionTenantInput {
   organizationName: String!
   subdomain:        String!
   features:         [String!]!
-  adminName:        String!
-  adminEmail:       String!
+  primaryCampus:    ProvisionCampusInput
+  primaryAdmin:     ProvisionPrimaryAdminInput
+  adminName:        String
+  adminEmail:       String
+}
+
+type ProvisionTenantAdmin {
+  id:          ID!
+  email:       String!
+  fullName:    String!
+  roleName:    String!
+  permissions: [String!]!
+}
+
+type ProvisionTenantRole {
+  roleName:    String!
+  permissions: [String!]!
 }
 
 type ProvisionTenantResult {
-  tenant:     Tenant!
-  adminEmail: String!
-  inviteSent: Boolean!
+  tenant:       Tenant!
+  campus:       Campus
+  primaryAdmin: ProvisionTenantAdmin
+  adminRole:    ProvisionTenantRole
+  adminEmail:   String!
+  inviteSent:   Boolean!
 }
 
 type TenantDeletionOtpResult {
