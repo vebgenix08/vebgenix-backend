@@ -919,6 +919,7 @@ type Mutation {
   resendInvite(staffId: ID!): Boolean
 
   # Tenants
+  syncTenantAdminPermissions: AWSJSON
   createTenant(input: CreateTenantInput!): Tenant!
   updateTenant(input: UpdateTenantInput!): Tenant!
   deactivateTenant(id: ID!): Boolean

@@ -97,6 +97,48 @@
       "name": "⚙️ Settings",
       "item": [
         {
+          "name": "Sync Tenant Admin Permissions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{id_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{appsync_url}}",
+              "host": [
+                "{{appsync_url}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation { syncTenantAdminPermissions }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const r = pm.response.json();",
+                  "pm.test(\"syncTenantAdminPermissions 200\", () => pm.response.to.have.status(200));",
+                  "const raw = r.data && r.data.syncTenantAdminPermissions;",
+                  "let d; try { d = typeof raw === \"string\" ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                  "pm.test(\"sync result present\", () => pm.expect(d).to.exist);",
+                  "if (d) console.log(\"Sync result:\", JSON.stringify(d));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Create Academic Year",
           "request": {
             "method": "POST",

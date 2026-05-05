@@ -636,6 +636,25 @@ export async function resolveTenants(
       return true;
     }
 
+    case 'syncTenantAdminPermissions':
+    case 'POST:/api/admin/settings/sync-permissions': {
+      // Re-stamps the current TENANT_ADMIN_PERMISSIONS onto every TENANT_ADMIN role
+      // within this tenant — fixes profiles provisioned before new permissions were added.
+      const result = await Profile.updateMany(
+        {
+          tenantId,
+          'roles.roleName': TENANT_ADMIN_ROLE_NAME,
+        },
+        {
+          $set: { 'roles.$[role].permissions': TENANT_ADMIN_PERMISSIONS },
+        },
+        {
+          arrayFilters: [{ 'role.roleName': TENANT_ADMIN_ROLE_NAME }],
+        },
+      );
+      return { updated: result.modifiedCount, message: `Synced ${result.modifiedCount} profile(s) to current permission set` };
+    }
+
     default:
       return undefined;
   }
