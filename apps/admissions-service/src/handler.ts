@@ -81,7 +81,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'createEnquiry':
       case 'POST:/api/admissions/enquiries':
-        return CreateEnquiry.execute(ctx, args as Parameters<typeof CreateEnquiry.execute>[1]);
+        return CreateEnquiry.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateEnquiry.execute>[1]);
 
       case 'updateEnquiry':
       case 'PATCH:/api/admissions/enquiries/:id': {

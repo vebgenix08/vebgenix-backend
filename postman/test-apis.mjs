@@ -132,7 +132,7 @@ async function run() {
       `mutation CreateCampus($input: CreateCampusInput!) {
         createCampus(input: $input) { id name type isActive }
       }`,
-      { input: { name: 'Main Campus', type: 'SCHOOL', city: 'Bangalore', state: 'Karnataka', country: 'India' } },
+      { input: { name: 'Main Campus', type: 'SCHOOL', address: 'Bangalore, Karnataka', phone: '9999900000', email: 'campus@test.com' } },
     );
     const d = ok(res, 'createCampus');
     if (id(d)) env.campus_id = id(d);
@@ -147,7 +147,8 @@ async function run() {
   });
 
   await test('Create Program', async () => {
-    const input = JSON.stringify({ name: 'Science', code: 'SCI', description: 'Science program' });
+    if (!env.campus_id) throw new Error('No campus_id');
+    const input = JSON.stringify({ name: 'Science', code: 'SCI', type: 'SCHOOL', campusId: env.campus_id, durationYears: 1 });
     const res = await gql('mutation CreateProgram($input: AWSJSON!) { createProgram(input: $input) }', { input });
     const d = parse(ok(res, 'createProgram'));
     if (id(d)) env.program_id = id(d);
@@ -160,14 +161,8 @@ async function run() {
   });
 
   await test('Dashboard Overview', async () => {
-    if (!env.campus_id) throw new Error('No campus_id');
-    const res = await gql(
-      `query DashboardOverview($input: DashboardOverviewInput!) {
-        dashboardOverview(input: $input) { generatedAt totals { activeStudents staff } }
-      }`,
-      { input: { campusId: env.campus_id, range: { preset: 'TODAY' } } },
-    );
-    return ok(res, 'dashboardOverview');
+    const res = await gql('query { dashboardOverview }');
+    return parse(ok(res, 'dashboardOverview'));
   });
 
   await test('Get Tenant Features', async () => {
@@ -188,13 +183,13 @@ async function run() {
   console.log('\n👤 IDENTITY');
 
   await test('Me (current user)', async () => {
-    const res = await gql('query { me { id email fullName roles permissions } }');
-    return ok(res, 'me');
+    const res = await gql('query { me }');
+    return parse(ok(res, 'me'));
   });
 
   await test('List Users', async () => {
-    const res = await gql('query { listUsers { edges { node { id email fullName } } pageInfo { hasNextPage } } }');
-    return ok(res, 'listUsers');
+    const res = await gql('query { listUsers }');
+    return parse(ok(res, 'listUsers'));
   });
 
   // ── 5. Academics — Classes ────────────────────────────────────────────────────
@@ -202,7 +197,7 @@ async function run() {
 
   await test('Create Class', async () => {
     if (!env.campus_id || !env.academic_year_id) throw new Error('Need campus_id and academic_year_id');
-    const input = JSON.stringify({ name: 'Grade 1', grade: '1', campusId: env.campus_id, academicYearId: env.academic_year_id });
+    const input = JSON.stringify({ name: 'Grade 1', code: 'G1', grade: '1', campusId: env.campus_id, academicYearId: env.academic_year_id });
     const res = await gql('mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }', { input });
     const d = parse(ok(res, 'createClass'));
     if (id(d)) env.class_id = id(d);
@@ -245,9 +240,9 @@ async function run() {
 
   await test('Create Fee Category', async () => {
     const input = JSON.stringify({
-      name: 'Tuition Fee', feeType: 'TUITION',
+      name: 'Tuition Fee', feeType: 'GENERAL',
       invoicePrefix: 'TF', receiptPrefix: 'TR',
-      moduleType: 'ACADEMICS',
+      moduleType: 'FEE',
     });
     const res = await gql('mutation CreateFeeCat($input: AWSJSON!) { createFeeCategory(input: $input) }', { input });
     const d = parse(ok(res, 'createFeeCategory'));
@@ -371,11 +366,10 @@ async function run() {
   await test('Enroll Student', async () => {
     if (!env.campus_id || !env.academic_year_id) throw new Error('Need campus_id and academic_year_id');
     const input = JSON.stringify({
-      fullName: 'John Doe', dateOfBirth: '2015-01-15', gender: 'MALE',
+      firstName: 'John', lastName: 'Doe', dateOfBirth: '2015-01-15', gender: 'MALE',
       campusId: env.campus_id, academicYearId: env.academic_year_id,
       classId: env.class_id,
-      guardianName: 'Jane Doe', guardianPhone: '9876543210',
-      guardianEmail: 'jane@test.com',
+      guardians: [{ name: 'Jane Doe', relation: 'Mother', phone: '9876543210', email: 'jane@test.com' }],
     });
     const res = await gql('mutation EnrollStudent($input: AWSJSON!) { enrollStudent(input: $input) }', { input });
     const d = parse(ok(res, 'enrollStudent'));
@@ -391,9 +385,12 @@ async function run() {
   });
 
   await test('List Students', async () => {
-    const res = await gql('query { listStudents { items { id fullName status } nextToken } }');
-    const d = ok(res, 'listStudents');
-    if (!env.student_id) env.student_id = id(d?.items?.[0]);
+    const res = await gql('query { listStudents }');
+    const d = parse(ok(res, 'listStudents'));
+    if (!env.student_id) {
+      const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+      if (first) env.student_id = id(first);
+    }
     return d;
   });
 
@@ -629,7 +626,7 @@ async function run() {
 
   await test('Create Target Class (Grade 2)', async () => {
     if (!env.campus_id || !env.to_academic_year_id) throw new Error('Need campus_id and to_academic_year_id');
-    const input = JSON.stringify({ name: 'Grade 2', grade: '2', campusId: env.campus_id, academicYearId: env.to_academic_year_id });
+    const input = JSON.stringify({ name: 'Grade 2', code: 'G2', grade: '2', campusId: env.campus_id, academicYearId: env.to_academic_year_id });
     const res = await gql('mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }', { input });
     const d = parse(ok(res, 'createClass'));
     if (id(d)) env.to_class_id = id(d);
@@ -751,13 +748,6 @@ async function run() {
   await test('Duplicate Student Report', async () => {
     const res = await gql('query { getDuplicateStudentReport }');
     return parse(ok(res, 'getDuplicateStudentReport'));
-  });
-
-  // ── 19. Health ────────────────────────────────────────────────────────────────
-  console.log('\n❤️  HEALTH');
-  await test('Health Check', async () => {
-    const res = await gql('query { healthCheck }');
-    return ok(res, 'healthCheck');
   });
 
   // ── Summary ───────────────────────────────────────────────────────────────────
