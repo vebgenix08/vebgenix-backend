@@ -1105,6 +1105,10 @@ type Mutation {
   mergeStudents(input: AWSJSON!): AWSJSON
   bulkDeleteInactiveEnquiries(input: AWSJSON): AWSJSON
 
+  # Password reset (no auth required)
+  forgotPassword(email: String!): AWSJSON
+  confirmForgotPassword(email: String!, code: String!, newPassword: String!): AWSJSON
+
   # Invites
   acceptInvite(token: String!, password: String): AcceptInvitePayload!
 

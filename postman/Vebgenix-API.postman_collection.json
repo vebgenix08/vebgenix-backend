@@ -90,7 +90,70 @@
               }
             }
           ]
+        },
+
+        {
+          "name": "Forgot Password (Send Reset Code)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ForgotPassword($email: String!) { forgotPassword(email: $email) }\",\n  \"variables\": { \"email\": \"dhanushags08@gmail.com\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.forgotPassword;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('forgotPassword returned', () => pm.expect(d).to.exist);",
+                  "if (d) console.log('Reset code sent:', JSON.stringify(d));"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Confirm Forgot Password (Set New Password)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ConfirmForgotPassword($email: String!, $code: String!, $newPassword: String!) { confirmForgotPassword(email: $email, code: $code, newPassword: $newPassword) }\",\n  \"variables\": {\n    \"email\": \"dhanushags08@gmail.com\",\n    \"code\": \"{{reset_code}}\",\n    \"newPassword\": \"Qwerty@1234\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.confirmForgotPassword;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('confirmForgotPassword returned', () => pm.expect(d).to.exist);",
+                  "if (d) console.log('Password reset result:', JSON.stringify(d));"
+                ]
+              }
+            }
+          ]
         }
+
       ]
     },
     {

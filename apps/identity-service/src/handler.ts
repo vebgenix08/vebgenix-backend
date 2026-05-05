@@ -44,8 +44,36 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
   try {
     await ensureDB();
 
-    const ctx                  = await resolveContext(event);
     const { operation, args } = parseEvent(event);
+
+    // ── Public password-reset routes (no auth) ─────────────────────────────
+    if (operation === 'forgotPassword' || operation === 'POST:/api/auth/forgot-password') {
+      const email = args.email as string;
+      if (!email) throw new AppError('BAD_REQUEST', 'email is required');
+      const { ForgotPasswordCommand, CognitoIdentityProviderClient } = await import('@aws-sdk/client-cognito-identity-provider');
+      const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+      await cognitoClient.send(new ForgotPasswordCommand({
+        ClientId: process.env.COGNITO_CLIENT_ID,
+        Username: email,
+      }));
+      return { success: true, message: 'If an account exists for this email, a reset code has been sent.' };
+    }
+
+    if (operation === 'confirmForgotPassword' || operation === 'POST:/api/auth/confirm-forgot-password') {
+      const { email, code, newPassword } = args as { email: string; code: string; newPassword: string };
+      if (!email || !code || !newPassword) throw new AppError('BAD_REQUEST', 'email, code, and newPassword are required');
+      const { ConfirmForgotPasswordCommand, CognitoIdentityProviderClient } = await import('@aws-sdk/client-cognito-identity-provider');
+      const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+      await cognitoClient.send(new ConfirmForgotPasswordCommand({
+        ClientId:         process.env.COGNITO_CLIENT_ID,
+        Username:         email,
+        ConfirmationCode: code,
+        Password:         newPassword,
+      }));
+      return { success: true, message: 'Password reset successfully. You can now sign in with your new password.' };
+    }
+
+    const ctx = await resolveContext(event);
 
     switch (operation) {
 
