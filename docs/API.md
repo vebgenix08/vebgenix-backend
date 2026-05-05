@@ -1,9 +1,9 @@
 # Vebgenix Backend — Complete API Reference
 
-> **Product:** Vebgenix — Multi-tenant SaaS ERP for colleges and schools  
+> **Product:** Vebgenix — Multi-tenant SaaS ERP for schools and colleges  
 > **Architecture:** AWS Lambda + AppSync GraphQL + MongoDB Atlas  
-> **Auth:** AWS Cognito (no local auth)  
-> **Last updated:** 2026-05-03
+> **Auth:** AWS Cognito (ID token, no Bearer prefix on AppSync)  
+> **Last updated:** 2026-05-05
 
 ---
 
@@ -13,19 +13,21 @@
 2. [Authentication](#2-authentication)
 3. [Multi-Tenancy](#3-multi-tenancy)
 4. [Environment Variables](#4-environment-variables)
-5. [Deployment](#5-deployment)
+5. [API — Settings](#5-api--settings)
 6. [API — Identity](#6-api--identity)
 7. [API — Admissions](#7-api--admissions)
 8. [API — Finance](#8-api--finance)
 9. [API — Academics](#9-api--academics)
-10. [API — Settings](#10-api--settings)
-11. [API — Comms](#11-api--comms)
-12. [API — Results (Public)](#12-api--results-public)
-13. [API — Storage](#13-api--storage)
-14. [API — Admin Cleanup](#14-api--admin-cleanup-deduplication)
+10. [API — Promotions](#10-api--promotions)
+11. [API — Communications](#11-api--communications)
+12. [API — Storage](#12-api--storage)
+13. [API — Results (Public)](#13-api--results-public)
+14. [API — Audit & Cleanup](#14-api--audit--cleanup)
 15. [Async Workers](#15-async-workers)
-16. [Error Codes](#16-error-codes)
-17. [Postman Collection](#17-postman-collection)
+16. [Error Handling](#16-error-handling)
+17. [Permissions Reference](#17-permissions-reference)
+18. [Postman Collection](#18-postman-collection)
+19. [End-to-End Workflow](#19-end-to-end-workflow)
 
 ---
 
@@ -35,45 +37,45 @@
 Browser / Mobile App
        │
        ▼
-┌──────────────────────────────────────────────────────────────────┐
-│  CloudFront  (CDN + WAF)                                         │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  CloudFront  (CDN + WAF)                                     │
+└──────────────────────────────────────────────────────────────┘
        │
-   ┌───┴───────────────────┐
-   │                       │
-   ▼                       ▼
-AppSync GraphQL API    API Gateway REST
-(Cognito User Pool     (EC2 proxy server)
+   ┌───┴───────────────────────┐
+   │                           │
+   ▼                           ▼
+AppSync GraphQL API        API Gateway REST
+(Cognito User Pool         (Bearer token via JWKS)
  Authorizer)
-   │                       │
-   └──────────┬────────────┘
-              │
-              ▼
-    Lambda Resolvers (one per domain)
-    ┌────────────────────────────────────────────────────────┐
-    │ identity-service   admissions-service   finance-service│
-    │ academics-service  settings-service     comms-service  │
-    │ storage-service    results-service                     │
-    └────────────────────────────────────────────────────────┘
-              │
-              ▼
-    MongoDB Atlas (multi-tenant, tenantId on every document)
-              │
-              ▼
-    EventBridge → SQS → Workers (email, background jobs)
+   │                           │
+   └────────────┬──────────────┘
+                │
+                ▼
+      Lambda Resolvers (one per domain)
+      ┌─────────────────────────────────────────────┐
+      │ identity    admissions    finance            │
+      │ academics   settings      comms              │
+      │ storage     results       admin-cleanup      │
+      └─────────────────────────────────────────────┘
+                │
+                ▼
+      MongoDB Atlas  (tenantId on every document)
+                │
+                ▼
+      EventBridge → SQS → Workers (email, background jobs)
 ```
 
 **Key points:**
-- AppSync verifies Cognito tokens before the Lambda is called — `event.identity.claims` is trusted directly inside Lambda
-- API Gateway REST uses `Authorization: Bearer <CognitoAccessToken>` — the Lambda verifies via JWKS
-- All Lambdas share the same `@vebgenix/db` package — one Mongoose connection pool per container
-- Every DB document carries `tenantId` — cross-tenant access is impossible at the application layer
+- AppSync verifies Cognito tokens — Lambda receives trusted `event.identity.claims`
+- All Lambdas share the `@vebgenix/db` package (one Mongoose connection pool per container)
+- Every DB document carries `tenantId` — cross-tenant access is blocked at the application layer
+- Errors are thrown (not returned) — AppSync formats them as `{ errors: [{ message, extensions }] }`
 
 ---
 
 ## 2. Authentication
 
-### Token flow (Cognito)
+### Get a token (Cognito)
 
 ```
 POST https://cognito-idp.<region>.amazonaws.com/
@@ -84,7 +86,7 @@ Content-Type: application/x-amz-json-1.1
   "AuthFlow": "USER_PASSWORD_AUTH",
   "ClientId": "<COGNITO_CLIENT_ID>",
   "AuthParameters": {
-    "USERNAME": "user@example.com",
+    "USERNAME": "admin@school.com",
     "PASSWORD": "P@ssw0rd!"
   }
 }
@@ -103,725 +105,105 @@ Content-Type: application/x-amz-json-1.1
 }
 ```
 
-Use `AccessToken` in all API requests.
-
 ### Refresh token
 
-```
-POST https://cognito-idp.<region>.amazonaws.com/
-X-Amz-Target: AWSCognitoIdentityProviderService.InitiateAuth
-
+```json
 {
   "AuthFlow": "REFRESH_TOKEN_AUTH",
   "ClientId": "<COGNITO_CLIENT_ID>",
-  "AuthParameters": {
-    "REFRESH_TOKEN": "<refresh_token>"
-  }
+  "AuthParameters": { "REFRESH_TOKEN": "<refresh_token>" }
 }
 ```
 
-### API Gateway requests
+### Request headers (AppSync / GraphQL)
+
+```
+Authorization: <IdToken>          ← No "Bearer" prefix — AppSync specific
+Content-Type: application/json
+x-tenant-id: <tenantId>           ← Required for all tenant-scoped requests
+```
+
+### Request headers (REST — API Gateway)
 
 ```
 Authorization: Bearer <AccessToken>
-x-tenant-id: <tenantId>         ← Required for all tenant-scoped requests
 Content-Type: application/json
+x-tenant-id: <tenantId>
 ```
 
-### AppSync requests
+### GraphQL request shape
 
-AppSync uses `Authorization: <AccessToken>` header (no `Bearer` prefix — AppSync handles it).
+All AppSync requests are `POST` to `https://<appsync_url>/graphql`:
 
-### Invited staff flow
+```json
+{
+  "query": "mutation EnrollStudent($input: AWSJSON!) { enrollStudent(input: $input) }",
+  "variables": { "input": "<stringified-JSON>" }
+}
+```
 
-1. Admin calls `inviteStaff` → Lambda calls `cognito-idp:AdminCreateUser`
-2. Cognito sends email with temporary password
-3. Staff sets new password on first login
-4. PostConfirmation trigger syncs `cognitoSub` to MongoDB
+> **Note:** AppSync scalar `AWSJSON` means the `input` variable value must be a **JSON string**, not an object.
 
 ---
 
 ## 3. Multi-Tenancy
 
-Every resource in the database is scoped to a `tenantId`. The flow:
-
-1. Cognito token contains `custom:tenantId` claim (set on user creation)
-2. Lambda extracts `tenantId` from the claim (AppSync) or `x-tenant-id` header (REST)
-3. Every MongoDB query includes `{ tenantId }` — cross-tenant access is blocked at application layer
-4. Compound indexes on all models enforce tenant isolation at DB level
-
-**Super Admin (platform admin):**
-- `isPlatformAdmin: true` on their AuthUser record
-- Can access all tenants' data
-- Identified by absence of `custom:tenantId` claim + `isPlatformAdmin` flag in DB
+1. Cognito token carries `custom:tenantId` (set at user creation)
+2. Lambda extracts it from claims (AppSync) or `x-tenant-id` header (REST)
+3. Every MongoDB query includes `{ tenantId }` filter
+4. Compound indexes enforce tenant isolation at DB level
 
 ---
 
 ## 4. Environment Variables
 
-| Variable | Description | Where set |
-|----------|-------------|-----------|
-| `MONGODB_URI` | MongoDB Atlas connection string | AWS Secrets Manager → `vebgenix/<stage>/mongodb` key `uri` |
-| `COGNITO_USER_POOL_ID` | Cognito User Pool ID | CDK stack environment |
-| `COGNITO_CLIENT_ID` | Cognito App Client ID | CDK stack environment |
-| `COGNITO_REGION` | AWS region | CDK stack environment |
-| `RAZORPAY_KEY_ID` | Razorpay key ID | Secrets Manager → `vebgenix/<stage>/razorpay` key `keyId` |
-| `RAZORPAY_KEY_SECRET` | Razorpay key secret | Secrets Manager → `vebgenix/<stage>/razorpay` key `keySecret` |
-| `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook secret | Secrets Manager → `vebgenix/<stage>/razorpay` key `webhookSecret` |
-| `EVENT_BUS_NAME` | EventBridge bus name | CDK stack environment |
-| `DOCUMENTS_BUCKET` | S3 bucket for documents | CDK stack environment |
-| `APP_BASE_URL` | Frontend base URL (for public result links) | CDK stack environment |
-| `STAGE` | `dev` or `prod` | CDK stack environment |
-
-**Local dev (`.env`):**
-```env
-MONGODB_URI=mongodb+srv://ags:<password>@applicationerp.tgbsmr6.mongodb.net/vebgenix_dev
-COGNITO_USER_POOL_ID=ap-south-1_XXXXXXXXX
-COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
-COGNITO_REGION=ap-south-1
-RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxx
-RAZORPAY_KEY_SECRET=xxxxxxxxxxxxxxxxxxxxxxxx
-APP_BASE_URL=http://localhost:3000
-STAGE=dev
-```
+| Variable | Description |
+|----------|-------------|
+| `MONGODB_URI` | MongoDB Atlas connection string |
+| `COGNITO_USER_POOL_ID` | Cognito User Pool ID |
+| `COGNITO_CLIENT_ID` | Cognito App Client ID |
+| `COGNITO_REGION` | AWS region (`ap-south-1`) |
+| `RAZORPAY_KEY_ID` | Razorpay key ID |
+| `RAZORPAY_KEY_SECRET` | Razorpay HMAC secret |
+| `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook signing secret |
+| `EVENT_BUS_NAME` | EventBridge bus name |
+| `DOCUMENTS_BUCKET` | S3 bucket for uploads |
+| `APP_BASE_URL` | Frontend base URL (public result links) |
+| `STAGE` | `dev` or `prod` |
 
 ---
 
-## 5. Deployment
+## 5. API — Settings
 
-### Prerequisites
-- Node.js 20+
-- AWS CDK CLI (`npm install -g aws-cdk`)
-- AWS credentials configured
-- MongoDB Atlas cluster with Secrets Manager entry
+> **Required roles:** ADMIN, TENANT_ADMIN
 
-### First-time setup
+### Academic Years
 
-```bash
-# Install all workspace packages
-npm install
+| Operation | GraphQL / REST | Description |
+|-----------|---------------|-------------|
+| `createAcademicYear` | `mutation CreateAcademicYear($input: CreateAcademicYearInput!)` | Create a new academic year |
+| `setActiveAcademicYear` | `mutation SetActiveAcademicYear($id: ID!)` | Mark as active; deactivates all others |
+| `listAcademicYears` | `query { listAcademicYears { id name startDate endDate isActive } }` | List all years for tenant |
+| `getAcademicYear` | `query GetAcademicYear($id: ID!)` | Get single year |
+| `updateAcademicYear` | `mutation UpdateAcademicYear($id: ID!, $input: AWSJSON!)` | Update year fields |
 
-# Bootstrap CDK (once per account/region)
-cd aws-infrastructure
-cdk bootstrap aws://<account>/<region>
-
-# Deploy dev
-cdk deploy --all --context stage=dev
-
-# Deploy prod
-cdk deploy --all --context stage=prod
+**Create input:**
+```json
+{
+  "name": "2025-26",
+  "startDate": "2025-06-01",
+  "endDate": "2026-05-31"
+}
 ```
-
-### Secrets Manager setup (before first deploy)
-
-```bash
-# MongoDB URI
-aws secretsmanager create-secret \
-  --name "vebgenix/dev/mongodb" \
-  --secret-string '{"uri":"mongodb+srv://ags:<pw>@applicationerp.tgbsmr6.mongodb.net/vebgenix_dev"}'
-
-# Razorpay
-aws secretsmanager create-secret \
-  --name "vebgenix/dev/razorpay" \
-  --secret-string '{"keyId":"rzp_test_xxx","keySecret":"xxx","webhookSecret":"xxx"}'
-```
-
-### CDK stacks
-
-| Stack | Contents |
-|-------|----------|
-| `VpcStack` | VPC, subnets, security groups |
-| `AuthStack` | Cognito User Pool + PostConfirmation trigger |
-| `StorageStack` | S3 documents bucket, CloudFront |
-| `AppSyncStack` | GraphQL API + all 8 Lambda resolvers |
-| `AsyncStack` | SQS queues + email/jobs worker Lambdas + EventBridge rules |
-
----
-
-## 6. API — Identity
-
-**Base path:** `/api/identity` (REST) | AppSync resolvers
-
-### GET /api/me
-Returns the current user's profile.
 
 **Response:**
 ```json
 {
-  "_id": "...",
-  "email": "admin@college.com",
-  "firstName": "John",
-  "lastName": "Doe",
-  "personaRole": "ADMIN",
-  "tenantId": "...",
-  "campusAccess": [{ "campusId": "...", "role": "ADMIN" }],
-  "isActive": true
-}
-```
-
----
-
-### GET /api/admin/users
-List all users (staff + admin, excludes students).
-
-**Query params:** `campusId`, `isActive`
-
----
-
-### POST /api/admin/users
-Create a user.
-
-```json
-{
-  "email": "teacher@college.com",
-  "firstName": "Jane",
-  "lastName": "Smith",
-  "personaRole": "TEACHER",
-  "campusId": "..."
-}
-```
-
----
-
-### PATCH /api/admin/users/:id
-Update user profile.
-
----
-
-### DELETE /api/admin/users/:id
-Deactivate user (soft delete). Sets `isActive: false`.
-
----
-
-### POST /api/admin/users/:id/reactivate
-Re-enable a deactivated user.
-
----
-
-### POST /api/admin/staff
-Invite staff via Cognito (sends email with temporary password).
-
-```json
-{
-  "email": "staff@college.com",
-  "firstName": "Mark",
-  "lastName": "Lee",
-  "staffType": "TEACHING",
-  "campusId": "...",
-  "role": "TEACHER"
-}
-```
-
----
-
-### GET /api/admin/staff
-List all staff members (`personaRole: STAFF | TEACHER`).
-
-**Query params:** `campusId`
-
----
-
-### Campus Access
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/users/:id/campus-access` | List campus access for user |
-| `POST` | `/api/admin/users/:id/campus-access` | Grant campus access |
-| `DELETE` | `/api/admin/users/:id/campus-access/:campusId` | Revoke campus access |
-
-**Grant body:**
-```json
-{ "campusId": "...", "role": "VIEWER" }
-```
-
----
-
-### Roles
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/admin/users/:id/roles` | Assign role |
-| `DELETE` | `/api/admin/users/:id/roles/:role` | Remove role |
-
-**Assign body:**
-```json
-{ "role": "FINANCE_MANAGER", "campusId": "..." }
-```
-
----
-
-### POST /api/admin/users/bulk-deactivate
-Deactivate multiple users at once.
-
-```json
-{ "userIds": ["...", "...", "..."] }
-```
-
----
-
-## 7. API — Admissions
-
-**Base path:** `/api/admissions` (REST) | AppSync resolvers
-
-### Public Enquiry (no auth)
-
-### POST /api/public/admissions/enquiries
-Submit an enquiry from the public admission form.
-
-```json
-{
-  "tenantId": "...",
-  "campusId": "...",
-  "studentName": "Alice Kumar",
-  "email": "alice@gmail.com",
-  "phone": "9876543210",
-  "programId": "...",
-  "notes": "Interested in B.Tech CSE"
-}
-```
-
-**Response:** `{ "success": true, "id": "..." }`
-
----
-
-### Enquiries (requires auth)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admissions/enquiries` | List enquiries |
-| `GET`  | `/api/admissions/enquiries/:id` | Get single enquiry |
-| `POST` | `/api/admissions/enquiries` | Create enquiry |
-| `PATCH`| `/api/admissions/enquiries/:id` | Update enquiry |
-| `DELETE`| `/api/admissions/enquiries/:id` | Delete enquiry |
-| `POST` | `/api/admissions/duplicate-check` | Check duplicate by phone/email |
-
-**List query params:** `status`, `campusId`, `programId`
-
-**Duplicate check body:**
-```json
-{ "phone": "9876543210", "email": "alice@gmail.com" }
-```
-
-**Response:** enquiry document or `null`
-
----
-
-### Applications
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admissions/applications` | List applications |
-| `GET`  | `/api/admissions/applications/approval-queue` | Pending review queue |
-| `GET`  | `/api/admissions/applications/:id` | Get application |
-| `GET`  | `/api/admissions/applications/:id/reviews` | Get review history |
-| `POST` | `/api/admissions/applications` | Create application |
-| `POST` | `/api/admissions/applications/:id/submit` | Submit for review |
-| `POST` | `/api/admissions/applications/:id/review` | Add review decision |
-| `POST` | `/api/admissions/applications/:id/approve` | Approve |
-| `POST` | `/api/admissions/applications/:id/reject` | Reject |
-| `POST` | `/api/admissions/applications/:id/withdraw` | Withdraw |
-
-**Review body:**
-```json
-{
-  "decision": "UNDER_REVIEW",
-  "remarks": "Documents need verification",
-  "reviewedBy": "..."
-}
-```
-
-**Document verification:**
-```
-POST /api/admissions/applications/:id/documents/:docKey/verify
-```
-
----
-
-### GET /api/admissions/stats
-Returns counts: totalEnquiries, newEnquiries, totalApplications, pendingApplications, approvedApplications.
-
----
-
-## 8. API — Finance
-
-**Base path:** `/api/admin/finance` (REST) | AppSync resolvers
-
-### Fee Heads
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/finance/fee-heads` | List fee heads |
-| `POST` | `/api/admin/finance/fee-heads` | Create fee head |
-| `PATCH`| `/api/admin/finance/fee-heads/:id` | Update fee head |
-| `DELETE`| `/api/admin/finance/fee-heads/:id` | Deactivate fee head |
-
-**Create body:**
-```json
-{
-  "name": "Tuition Fee",
-  "type": "TUITION",
-  "description": "Main tuition fee"
-}
-```
-
----
-
-### Fee Structures
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/finance/fee-structures` | List (filter: `academicYearId`, `programId`) |
-| `GET`  | `/api/admin/finance/fee-structures/:id` | Get single |
-| `POST` | `/api/admin/finance/fee-structures` | Create |
-| `PATCH`| `/api/admin/finance/fee-structures/:id` | Update |
-| `DELETE`| `/api/admin/finance/fee-structures/:id` | Delete |
-
-**Create body:**
-```json
-{
-  "name": "B.Tech Year 1 - 2025",
-  "academicYearId": "...",
-  "programId": "...",
-  "campusId": "...",
-  "lineItems": [
-    { "feeHeadId": "...", "amount": 50000 },
-    { "feeHeadId": "...", "amount": 5000 }
-  ],
-  "totalAmount": 55000
-}
-```
-
----
-
-### Fee Assignments
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/finance/fee-assignments` | List (filter: `studentId`, `academicYearId`, `classId`) |
-| `GET`  | `/api/admin/finance/fee-assignments/:id` | Get single |
-| `GET`  | `/api/admin/finance/students/:studentId/fee-assignment` | Get for student |
-| `POST` | `/api/admin/finance/fee-assignments` | Assign fee structure to student |
-| `POST` | `/api/admin/finance/fee-assignments/bulk` | Bulk assign by classId or studentIds |
-
-**Bulk assign body:**
-```json
-{
-  "feeStructureId": "...",
-  "academicYearId": "...",
-  "classId": "..."
-}
-```
-
----
-
-### Fee Schedules
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/finance/fee-schedules` | List |
-| `POST` | `/api/admin/finance/fee-schedules` | Create |
-| `PATCH`| `/api/admin/finance/fee-schedules/:id` | Update |
-| `DELETE`| `/api/admin/finance/fee-schedules/:id` | Delete |
-
----
-
-### Installment Plans
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/finance/installment-plans` | List |
-| `POST` | `/api/admin/finance/installment-plans` | Create |
-| `DELETE`| `/api/admin/finance/installment-plans/:id` | Delete |
-
----
-
-### Invoices
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/finance/invoices` | List (filter: `studentId`, `status`, `campusId`) |
-| `GET`  | `/api/admin/finance/invoices/:id` | Get invoice |
-| `GET`  | `/api/admin/finance/students/:studentId/invoices` | All invoices for student |
-| `POST` | `/api/admin/finance/invoices` | Create invoice |
-| `PATCH`| `/api/admin/finance/invoices/:id` | Update invoice |
-| `POST` | `/api/admin/finance/invoices/:id/cancel` | Cancel invoice |
-| `POST` | `/api/admin/finance/invoices/:id/revise` | Revise amount (creates audit trail) |
-| `GET`  | `/api/admin/finance/invoices/:id/revisions` | Revision history |
-
-**Create body:**
-```json
-{
-  "studentId": "...",
-  "academicYearId": "...",
-  "campusId": "...",
-  "lineItems": [{ "feeHeadId": "...", "amount": 55000, "description": "Year 1 fees" }],
-  "grossAmount": 55000,
-  "discount": 5000,
-  "netAmount": 50000,
-  "dueDate": "2025-06-30"
-}
-```
-
-**Revise body:**
-```json
-{ "newAmount": 48000, "reason": "Scholarship applied" }
-```
-
----
-
-### Payments
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/finance/payments` | List (filter: `invoiceId`, `studentId`, `status`) |
-| `GET`  | `/api/admin/finance/payments/:id` | Get payment |
-| `POST` | `/api/admin/finance/payments` | Record offline payment |
-| `POST` | `/api/finance/payments/create-order` | Create Razorpay order |
-| `POST` | `/api/finance/payments/verify` | Verify Razorpay signature |
-| `POST` | `/api/webhook/razorpay` | Razorpay webhook (no auth) |
-
-**Record offline payment:**
-```json
-{
-  "invoiceId": "...",
-  "studentId": "...",
-  "amount": 50000,
-  "method": "CASH",
-  "collectedBy": "..."
-}
-```
-
-**Create Razorpay order:**
-```json
-{ "invoiceId": "...", "amount": 50000 }
-```
-
-**Response:** `{ "orderId": "order_xxx", "amount": 5000000, "currency": "INR" }`
-
-**Verify signature:**
-```json
-{
-  "razorpayOrderId": "order_xxx",
-  "razorpayPaymentId": "pay_xxx",
-  "razorpaySignature": "xxx"
-}
-```
-
----
-
-### Reports
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/finance/reports/day-book` | Day book (query: `from`, `to`) |
-| `GET`  | `/api/admin/finance/reports/collection-analytics` | Monthly collection (query: `academicYearId`) |
-| `GET`  | `/api/admin/finance/reports/class-stats` | Fee stats by class (query: `classId`, `academicYearId`) |
-| `GET`  | `/api/admin/finance/students/:studentId/summary` | Student financial summary |
-
----
-
-## 9. API — Academics
-
-**Base path:** `/api/admin/academics` (REST) | AppSync resolvers
-
-### Classes
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/academics/classes` | List classes |
-| `GET`  | `/api/admin/academics/classes/:id` | Get class |
-| `POST` | `/api/admin/academics/classes` | Create class |
-| `PATCH`| `/api/admin/academics/classes/:id` | Update class |
-| `DELETE`| `/api/admin/academics/classes/:id` | Delete class |
-
-**Create body:**
-```json
-{
-  "name": "Class 10",
-  "code": "CL10",
-  "campusId": "...",
-  "academicYearId": "...",
-  "programId": "..."
-}
-```
-
----
-
-### Sections
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/academics/sections` | List all sections |
-| `GET`  | `/api/admin/academics/sections/:id` | Get section |
-| `GET`  | `/api/admin/academics/sections/:id/students` | Students in section |
-| `POST` | `/api/admin/academics/sections` | Create section |
-| `PATCH`| `/api/admin/academics/sections/:id` | Update section |
-| `DELETE`| `/api/admin/academics/sections/:id` | Delete section |
-| `PATCH`| `/api/admin/academics/sections/:id/incharge` | Set class incharge |
-| `POST` | `/api/admin/academics/sections/:id/courses` | Assign subject to section |
-| `DELETE`| `/api/admin/academics/sections/:id/courses/:subjectId` | Remove subject |
-
----
-
-### Subjects
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/academics/subjects` | List subjects |
-| `GET`  | `/api/admin/academics/subjects/:id` | Get subject |
-| `POST` | `/api/admin/academics/subjects` | Create subject |
-| `PATCH`| `/api/admin/academics/subjects/:id` | Update subject |
-| `DELETE`| `/api/admin/academics/subjects/:id` | Delete subject |
-
----
-
-### Students
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/academics/students` | List students (filter: `campusId`, `classId`, `sectionId`, `status`) |
-| `GET`  | `/api/admin/academics/students/:id` | Get student |
-| `POST` | `/api/admin/academics/students` | Enroll student |
-| `PATCH`| `/api/admin/academics/students/:id` | Update student |
-| `PATCH`| `/api/admin/academics/students/:id/status` | Update status (ACTIVE/INACTIVE/GRADUATED/etc.) |
-| `PATCH`| `/api/admin/academics/students/:id/class` | Assign to class/section |
-| `POST` | `/api/admin/academics/students/from-application` | Convert approved application to student |
-| `POST` | `/api/admin/academics/students/bulk-assign` | Bulk assign to class |
-| `POST` | `/api/admin/academics/students/random-assign` | Auto-distribute across sections |
-
-**Enroll body:**
-```json
-{
-  "firstName": "Ravi",
-  "lastName": "Kumar",
-  "dateOfBirth": "2007-05-15",
-  "gender": "MALE",
-  "phone": "9876543210",
-  "email": "ravi@gmail.com",
-  "campusId": "...",
-  "classId": "...",
-  "sectionId": "...",
-  "academicYearId": "..."
-}
-```
-
----
-
-### Attendance
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/academics/attendance` | List attendance records |
-| `GET`  | `/api/admin/academics/sections/:id/attendance` | Section attendance for a date |
-| `GET`  | `/api/admin/academics/sections/:id/attendance/summary` | Summary report |
-| `POST` | `/api/admin/academics/sections/:id/attendance` | Mark bulk attendance |
-
-**Mark attendance body:**
-```json
-{
-  "date": "2025-06-15",
-  "subjectId": "...",
-  "records": [
-    { "studentId": "...", "status": "PRESENT" },
-    { "studentId": "...", "status": "ABSENT" },
-    { "studentId": "...", "status": "LATE" }
-  ]
-}
-```
-
-**Summary query params:** `from`, `to`
-
----
-
-### Exams & Marks
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/academics/exams` | List exams |
-| `GET`  | `/api/admin/academics/exams/:id` | Get exam |
-| `POST` | `/api/admin/academics/exams` | Create exam |
-| `PATCH`| `/api/admin/academics/exams/:id` | Update exam |
-| `DELETE`| `/api/admin/academics/exams/:id` | Delete exam |
-| `POST` | `/api/admin/academics/exams/:id/marks` | Enter/submit marks |
-| `POST` | `/api/admin/academics/exams/:id/publish` | Publish results |
-| `GET`  | `/api/admin/academics/results` | List all result records |
-| `GET`  | `/api/admin/academics/exams/:id/results` | Results for one exam |
-
-**Enter marks body:**
-```json
-{
-  "marks": [
-    { "studentId": "...", "marksObtained": 85, "grade": "A" },
-    { "studentId": "...", "marksObtained": 72, "grade": "B" }
-  ]
-}
-```
-
----
-
-### Timetable
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/academics/sections/:id/timetable` | Section weekly timetable |
-| `GET`  | `/api/admin/academics/teachers/:id/timetable` | Teacher schedule |
-| `GET`  | `/api/admin/academics/teachers/:id/workload` | Teacher workload summary |
-| `PUT`  | `/api/admin/academics/sections/:id/timetable` | Replace section timetable |
-
-**Replace timetable body:**
-```json
-{
-  "academicYearId": "...",
-  "slots": [
-    { "dayOfWeek": "MONDAY", "periodNumber": 1, "startTime": "09:00", "endTime": "09:50", "subjectId": "...", "teacherId": "..." }
-  ]
-}
-```
-
----
-
-### Certificates
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/academics/certificates` | List certificates |
-| `POST` | `/api/admin/academics/certificates` | Issue certificate request |
-| `POST` | `/api/admin/academics/certificates/:id/approve` | Approve certificate |
-
-**Issue body:**
-```json
-{
-  "studentId": "...",
-  "type": "BONAFIDE",
-  "reason": "Bank loan application"
-}
-```
-
----
-
-## 10. API — Settings
-
-**Base path:** `/api/admin/settings` (REST) | AppSync resolvers
-
-### Tenant Settings
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `PATCH`| `/api/admin/settings/tenant` | Update own tenant info |
-| `GET`  | `/api/admin/settings/features` | Get feature flags |
-| `PATCH`| `/api/admin/settings/features` | Update feature flags (admin) |
-
-**Feature flags body:**
-```json
-{
-  "features": {
-    "admissions": true,
-    "finance": true,
-    "academics": true,
-    "timetable": true,
-    "certificates": false,
-    "leave": true
-  }
+  "id": "683804abc123...",
+  "name": "2025-26",
+  "startDate": "2025-06-01",
+  "endDate": "2026-05-31",
+  "isActive": false
 }
 ```
 
@@ -829,430 +211,1240 @@ Returns counts: totalEnquiries, newEnquiries, totalApplications, pendingApplicat
 
 ### Campuses
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/settings/campuses` | List campuses |
-| `GET`  | `/api/admin/settings/campuses/:id` | Get campus |
-| `POST` | `/api/admin/settings/campuses` | Create campus |
-| `PATCH`| `/api/admin/settings/campuses/:id` | Update campus |
-| `DELETE`| `/api/admin/settings/campuses/:id` | Deactivate campus |
+| Operation | Description |
+|-----------|-------------|
+| `createCampus(input: AWSJSON!)` | Create campus — returns `{ id, name, code, type, isActive }` |
+| `listCampuses` | List active campuses |
+| `getCampus(id: ID!)` | Get single campus |
+| `updateCampus(id: ID!, input: AWSJSON!)` | Update campus fields |
+| `deactivateCampus(id: ID!)` | Soft-delete campus |
+
+**Create input:**
+```json
+{
+  "name": "Main Campus",
+  "code": "MAIN",
+  "type": "SCHOOL"
+}
+```
+
+**Campus types:** `SCHOOL` `PU` `DEGREE` `POLYTECHNIC` `OTHER`
 
 ---
 
 ### Programs
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/settings/programs` | List programs |
-| `GET`  | `/api/admin/settings/programs/:id` | Get program |
-| `POST` | `/api/admin/settings/programs` | Create program |
-| `PATCH`| `/api/admin/settings/programs/:id` | Update program |
-| `DELETE`| `/api/admin/settings/programs/:id` | Deactivate program |
+| Operation | Description |
+|-----------|-------------|
+| `createProgram(input: AWSJSON!)` | Create program — returns `{ id, name, code, type }` |
+| `listPrograms` | List all programs |
+| `getProgram(id: ID!)` | Get single program |
+| `updateProgram(id: ID!, input: AWSJSON!)` | Update |
+| `deleteProgram(id: ID!)` | Soft-delete |
 
-**Create body:**
+**Create input:**
 ```json
 {
-  "name": "Bachelor of Technology",
-  "code": "BTECH",
-  "type": "UNDERGRADUATE",
-  "durationYears": 4,
-  "campusId": "..."
+  "name": "School Program",
+  "code": "SCH",
+  "type": "SCHOOL",
+  "durationYears": 12
 }
 ```
 
----
-
-### Academic Years
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/settings/academic-years` | List academic years |
-| `GET`  | `/api/admin/settings/academic-years/:id` | Get year |
-| `POST` | `/api/admin/settings/academic-years` | Create |
-| `PATCH`| `/api/admin/settings/academic-years/:id` | Update |
-| `POST` | `/api/admin/settings/academic-years/:id/activate` | Set as active year |
+**Program types:** `DEGREE` `DIPLOMA` `CERTIFICATE` `PG` `PHD` `SCHOOL`
 
 ---
 
-### Templates
+### Tenant Features
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/settings/templates` | List templates (filter: `type`) |
-| `GET`  | `/api/admin/settings/templates/:id` | Get template |
-| `POST` | `/api/admin/settings/templates` | Create template |
-| `PATCH`| `/api/admin/settings/templates/:id` | Update template |
-| `POST` | `/api/admin/settings/templates/:id/publish` | Publish a version |
-| `DELETE`| `/api/admin/settings/templates/:id` | Delete template |
+| Operation | Description |
+|-----------|-------------|
+| `getTenantFeatures` | Get feature flags for tenant |
+| `updateTenantFeatures(input: AWSJSON!)` | Enable/disable modules |
+
+**Input:**
+```json
+{
+  "admissions": true,
+  "finance": true,
+  "academics": true,
+  "communications": true,
+  "timetable": false
+}
+```
 
 ---
 
 ### Dashboard
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/dashboard` | Tenant dashboard (students, staff, admissions counts) |
-| `GET`  | `/api/platform/stats` | Super admin: all tenants stats |
-| `GET`  | `/api/platform/dashboard` | Super admin: overview |
+| Operation | Description |
+|-----------|-------------|
+| `dashboardOverview` | Tenant-level stats (students, staff, fees collected) |
+| `listAuditLogs(limit: Int)` | Tenant audit trail |
+| `listTemplates` | Certificate/document templates |
 
 ---
 
-### Platform Admin (Super Admin only)
+## 6. API — Identity
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/platform/tenants` | List all tenants |
-| `GET`  | `/api/platform/tenants/:id` | Get tenant |
-| `POST` | `/api/platform/tenants` | Create tenant |
-| `PATCH`| `/api/platform/tenants/:id` | Update tenant |
-| `DELETE`| `/api/platform/tenants/:id` | Deactivate tenant |
-| `PATCH`| `/api/platform/tenants/:id/features` | Set feature flags for tenant |
-| `GET`  | `/api/platform/audit-logs` | Platform audit log |
-| `GET`  | `/api/platform/audit-logs/:id` | Single audit log entry |
+> **Required roles:** ADMIN, TENANT_ADMIN
+
+### Current user
+
+```graphql
+query { me }
+```
+
+**Response:**
+```json
+{
+  "userId": "...",
+  "email": "admin@school.com",
+  "firstName": "Dhanush",
+  "lastName": "AG",
+  "personaRole": "ADMIN",
+  "membership": {
+    "tenantId": "...",
+    "campusId": "...",
+    "role": "ADMIN"
+  },
+  "isActive": true
+}
+```
 
 ---
 
-### Audit Logs
+### Users
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/audit-logs` | Tenant audit log (filter: `entityType`, `profileId`) |
+| Operation | Description |
+|-----------|-------------|
+| `listUsers` | List all staff/admin users |
+| `getUser(id: ID!)` | Get user by ID |
+| `inviteStaff(input: AWSJSON!)` | Invite staff — sends Cognito invite email |
+| `updateUser(id: ID!, input: AWSJSON!)` | Update user fields |
+| `deactivateUser(id: ID!)` | Soft-deactivate |
 
-**Query params:** `limit` (max 200), `offset`
+**Invite staff input:**
+```json
+{
+  "email": "teacher@school.com",
+  "firstName": "Jane",
+  "lastName": "Smith",
+  "role": "TEACHER",
+  "campusId": "<campus_id>"
+}
+```
 
 ---
 
-## 11. API — Comms
+## 7. API — Admissions
 
-**Base path:** `/api/admin` (REST) | AppSync resolvers
+> **Required roles:** ADMIN, ADMISSIONS_OFFICER
+
+### Enquiries
+
+| Operation | Description |
+|-----------|-------------|
+| `createEnquiry(input: AWSJSON!)` | Log a new admission enquiry |
+| `listEnquiries` | List enquiries (filter: `status`, `campusId`) |
+| `updateEnquiry(id: ID!, input: AWSJSON!)` | Update enquiry status |
+
+**Create input:**
+```json
+{
+  "studentName": "Rahul Sharma",
+  "phone": "9876543210",
+  "email": "rahul@example.com",
+  "campusId": "<campus_id>",
+  "academicYearId": "<academic_year_id>",
+  "source": "WALK_IN",
+  "notes": "Interested in Grade 10"
+}
+```
+
+**Sources:** `WALK_IN` `PHONE` `EMAIL` `WEBSITE` `REFERRAL` `SOCIAL_MEDIA`
+
+---
+
+### Applications
+
+| Operation | Description |
+|-----------|-------------|
+| `listApplications` | List applications (filter: `status`, `academicYearId`) |
+| `getApplication(id: ID!)` | Get single application |
+| `createApplication(input: AWSJSON!)` | Create application from enquiry |
+| `reviewApplication(id: ID!, input: AWSJSON!)` | Move to UNDER_REVIEW |
+| `approveApplication(id: ID!)` | Approve — enables `convertApplicationToStudent` |
+| `rejectApplication(id: ID!, reason: String)` | Reject |
+| `admissionsStats` | Stats: total enquiries, applications, admissions by month |
+
+**Application statuses:** `ENQUIRY` → `UNDER_REVIEW` → `APPROVED` → `ENROLLED` or `REJECTED`
+
+---
+
+## 8. API — Finance
+
+> **Required roles:** ADMIN, FINANCE_MANAGER, CASHIER (payments only)
+
+### Fee Categories
+
+Fee categories group fee heads and define invoice/receipt number prefixes.
+
+| Operation | Description |
+|-----------|-------------|
+| `createFeeCategory(input: AWSJSON!)` | Create category |
+| `getFeeCategory(id: ID!)` | Get single |
+| `updateFeeCategory(id: ID!, input: AWSJSON!)` | Update |
+| `listFeeCategories` | List all |
+| `deleteFeeCategory(id: ID!)` | Delete |
+
+**Create input:**
+```json
+{
+  "name": "General Fees",
+  "moduleType": "FEE",
+  "feeType": "GENERAL",
+  "invoicePrefix": "GF/INV",
+  "receiptPrefix": "GF/REC",
+  "defaultAllocationMethod": "PRO_RATA"
+}
+```
+
+**Allocation methods:** `PRO_RATA` `PRIORITY_WISE` `MANUAL`
+**Fee types:** `GENERAL` `EXAM` `ADMISSION` `TRANSPORT` `HOSTEL` `MISC`
+
+---
+
+### Fee Heads
+
+Fee heads are individual chargeable line items (Tuition Fee, Lab Fee, etc.).
+
+| Operation | Description |
+|-----------|-------------|
+| `createFeeHead(input: AWSJSON!)` | Create fee head |
+| `updateFeeHead(id: ID!, input: AWSJSON!)` | Update |
+| `listFeeHeads` | List all (filter: `feeCategoryId`, `isActive`) |
+| `deleteFeeHead(id: ID!)` | Delete |
+
+**Create input:**
+```json
+{
+  "name": "Tuition Fee",
+  "prefix": "TF",
+  "type": "RECURRING",
+  "feeCategoryId": "<fee_category_id>",
+  "isMandatory": true,
+  "isRefundable": false,
+  "priorityOrder": 1
+}
+```
+
+**Types:** `RECURRING` `ONE_TIME` `OPTIONAL`
+
+---
+
+### Fee Schedules
+
+Fee schedules define payment installment plans.
+
+| Operation | Description |
+|-----------|-------------|
+| `createFeeSchedule(input: AWSJSON!)` | Create schedule with slots |
+| `updateFeeSchedule(id: ID!, input: AWSJSON!)` | Update |
+| `listFeeSchedules` | List all |
+| `deleteFeeSchedule(id: ID!)` | Delete |
+
+**Create input:**
+```json
+{
+  "name": "Annual Plan 2025-26",
+  "academicYearId": "<academic_year_id>",
+  "campusId": "<campus_id>",
+  "feeCategoryId": "<fee_category_id>",
+  "collectionType": "PARTIAL_ALLOWED",
+  "allowPartialPayment": true,
+  "graceDays": 5,
+  "slots": [
+    { "name": "Term 1", "dueDate": "2025-07-31", "percentOfTotal": 50 },
+    { "name": "Term 2", "dueDate": "2025-12-31", "percentOfTotal": 50 }
+  ]
+}
+```
+
+**Collection types:** `FULL_ONLY` `PARTIAL_ALLOWED` `PARTIAL_WITH_MINIMUM_AMOUNT` `PARTIAL_WITH_MINIMUM_PERCENTAGE`
+
+---
+
+### Fee Structures
+
+A fee structure is the master template of fees for a class in an academic year.
+
+| Operation | Description |
+|-----------|-------------|
+| `createFeeStructure(input: AWSJSON!)` | Create structure |
+| `getFeeStructure(id: ID!)` | Get single |
+| `updateFeeStructure(id: ID!, input: AWSJSON!)` | Update |
+| `listFeeStructures(academicYearId: ID)` | List all |
+| `copyFeePattern(input: AWSJSON!)` | Copy last year's structures to new year |
+| `deleteFeeStructure(id: ID!)` | Delete |
+
+**Create input:**
+```json
+{
+  "name": "Grade 10 Annual Fee 2025-26",
+  "campusId": "<campus_id>",
+  "academicYearId": "<academic_year_id>",
+  "classId": "<class_id>",
+  "feeCategoryId": "<fee_category_id>",
+  "feeScheduleId": "<fee_schedule_id>",
+  "allocationMethod": "PRO_RATA",
+  "components": [
+    {
+      "feeHeadId": "<fee_head_id>",
+      "feeHeadName": "Tuition Fee",
+      "amount": 50000,
+      "isOptional": false,
+      "priorityOrder": 1
+    },
+    {
+      "feeHeadId": "<lab_fee_head_id>",
+      "feeHeadName": "Lab Fee",
+      "amount": 5000,
+      "isOptional": false,
+      "priorityOrder": 2
+    }
+  ]
+}
+```
+
+**Copy pattern input:**
+```json
+{
+  "fromAcademicYearId": "<current_year_id>",
+  "toAcademicYearId": "<next_year_id>",
+  "campusId": "<campus_id>"
+}
+```
+
+---
+
+### Fee Assignments
+
+Assigning a fee structure to a student generates invoices for that student.
+
+| Operation | Description |
+|-----------|-------------|
+| `getFeeAssignmentQueue(academicYearId: ID!, campusId: ID)` | Students without fee assignment yet |
+| `createFeeAssignment(input: AWSJSON!)` | Assign fee structure to one student — creates invoice |
+| `bulkAssignFeeStructure(input: AWSJSON!)` | Assign to all students in a class at once |
+| `getStudentFeeAssignment(studentId: ID!, academicYearId: ID!)` | Student's current assignment |
+| `listFeeAssignments(academicYearId: ID)` | List all assignments |
+| `getFeeAssignment(id: ID!)` | Get single |
+
+**Assign single student input:**
+```json
+{
+  "studentId": "<student_id>",
+  "feeStructureId": "<fee_structure_id>",
+  "academicYearId": "<academic_year_id>",
+  "campusId": "<campus_id>",
+  "discountAmount": 5000,
+  "discountReason": "Merit scholarship"
+}
+```
+
+**Bulk assign input:**
+```json
+{
+  "feeStructureId": "<fee_structure_id>",
+  "academicYearId": "<academic_year_id>",
+  "campusId": "<campus_id>",
+  "classId": "<class_id>"
+}
+```
+
+**Bulk assign response:**
+```json
+{ "succeeded": 42, "failed": 0, "total": 42 }
+```
+
+> Assigning a fee structure automatically generates an Invoice with status `PENDING`.
+
+---
+
+### Invoices
+
+| Operation | Description |
+|-----------|-------------|
+| `getStudentInvoices(studentId: ID!)` | All invoices for a student |
+| `listInvoices(academicYearId: ID)` | List (filter: `studentId`, `status`, `campusId`) |
+| `getInvoice(id: ID!)` | Get single invoice |
+| `getStudentDues(studentId: ID!)` | Outstanding unpaid invoices + total due |
+| `createOneOffCharge(input: AWSJSON!)` | Create a one-time ad-hoc charge |
+| `reviseInvoice(id: ID!, input: AWSJSON!)` | Revise invoice amount (creates audit trail) |
+| `cancelInvoice(id: ID!, reason: String)` | Cancel invoice |
+| `getFeeRevisions(id: ID!)` | Revision history for an invoice |
+
+**Invoice response:**
+```json
+{
+  "id": "...",
+  "invoiceNumber": "GF_25-26_ORD_000001",
+  "studentId": "...",
+  "status": "PENDING",
+  "totalAmount": 55000,
+  "concessionAmount": 5000,
+  "netAmount": 50000,
+  "paidAmount": 0,
+  "dueAmount": 50000,
+  "dueDate": "2025-07-31",
+  "items": [
+    {
+      "feeHeadId": "...",
+      "feeHeadName": "Tuition Fee",
+      "amount": 50000,
+      "netAmount": 45000,
+      "paidAmount": 0,
+      "balanceAmount": 45000
+    }
+  ]
+}
+```
+
+**Invoice statuses:** `PENDING` → `PARTIALLY_PAID` → `PAID` (or `CANCELLED` / `OVERDUE`)
+
+**One-off charge input:**
+```json
+{
+  "studentId": "<student_id>",
+  "campusId": "<campus_id>",
+  "academicYearId": "<academic_year_id>",
+  "classId": "<class_id>",
+  "amount": 500,
+  "description": "Library fine",
+  "feeHeadId": "<fee_head_id>",
+  "feeHeadName": "Tuition Fee"
+}
+```
+
+**Revise input:**
+```json
+{ "newAmount": 48000, "reason": "Scholarship discount applied" }
+```
+
+---
+
+### Payments
+
+| Operation | Description |
+|-----------|-------------|
+| `recordPayment(input: AWSJSON!)` | Record offline payment (CASH / CHEQUE / UPI) |
+| `collectPaymentByStudent(studentId: ID!, input: AWSJSON!)` | Collect across all outstanding invoices (oldest-first) |
+| `createPaymentOrder(input: AWSJSON!)` | Create Razorpay order for online payment |
+| `verifyPaymentSignature(input: AWSJSON!)` | Verify Razorpay signature after client payment |
+| `listPayments(studentId: ID)` | List payments |
+| `getPayment(id: ID!)` | Get single payment |
+| `listReceipts(studentId: ID)` | List successful payments with receipts |
+| `getReceipt(id: ID!)` | Get receipt |
+| `listPaymentAllocations(paymentId: ID!)` | See how a payment was allocated to fee heads |
+
+**Record offline payment input:**
+```json
+{
+  "invoiceId": "<invoice_id>",
+  "studentId": "<student_id>",
+  "campusId": "<campus_id>",
+  "amount": 25000,
+  "method": "CASH",
+  "remarks": "Term 1 payment",
+  "referenceNumber": ""
+}
+```
+
+**Payment methods:** `CASH` `CHEQUE` `BANK_TRANSFER` `UPI` `CARD` `ONLINE`
+
+**Collect by student input** (splits across all outstanding invoices oldest-first):
+```json
+{
+  "amount": 50000,
+  "method": "CASH",
+  "remarks": "Annual fee collection"
+}
+```
+
+**Collect response:**
+```json
+{
+  "payments": [...],
+  "totalCollected": 50000,
+  "remainingAmount": 0
+}
+```
+
+**Create Razorpay order input:**
+```json
+{ "invoiceId": "<invoice_id>", "amount": 25000 }
+```
+
+**Create Razorpay order response:**
+```json
+{
+  "orderId": "order_XXXXXXXX",
+  "amount": 2500000,
+  "currency": "INR",
+  "paymentId": "<pre-created-payment-doc-id>"
+}
+```
+
+**Verify signature input:**
+```json
+{
+  "razorpayOrderId": "order_XXXXXXXX",
+  "razorpayPaymentId": "pay_XXXXXXXX",
+  "razorpaySignature": "hmac_sha256_signature"
+}
+```
+
+**Payment recording response:**
+```json
+{
+  "payment": {
+    "_id": "...",
+    "amount": 25000,
+    "method": "CASH",
+    "status": "SUCCESS",
+    "receiptNumber": "GF/REC-000001",
+    "paidAt": "2025-07-05T10:30:00Z"
+  }
+}
+```
+
+---
+
+### Reports
+
+| Operation | Description |
+|-----------|-------------|
+| `dayBook(from: String, to: String, campusId: ID)` | All payments for a date or range |
+| `feeCollectionAnalytics(academicYearId: ID!, campusId: ID)` | Monthly collection summary |
+
+---
+
+## 9. API — Academics
+
+> **Required roles:** ADMIN, ACADEMIC_MANAGER
+
+### Classes
+
+| Operation | Description |
+|-----------|-------------|
+| `createClass(input: AWSJSON!)` | Create a class/grade |
+| `listClasses(academicYearId: ID)` | List classes |
+| `getClass(id: ID!)` | Get single class |
+| `updateClass(id: ID!, input: AWSJSON!)` | Update class |
+| `deleteClass(id: ID!)` | Delete |
+
+**Create input:**
+```json
+{
+  "name": "Grade 10",
+  "code": "G10",
+  "campusId": "<campus_id>",
+  "academicYearId": "<academic_year_id>",
+  "programId": "<program_id>"
+}
+```
+
+---
+
+### Sections
+
+| Operation | Description |
+|-----------|-------------|
+| `createSection(classId: ID!, input: AWSJSON!)` | Create a section under a class |
+| `listAllSections(classId: ID, academicYearId: ID)` | List sections (filter by class or year) |
+| `getSection(id: ID!)` | Get single section |
+| `updateSection(id: ID!, input: AWSJSON!)` | Update section |
+| `deleteSection(id: ID!)` | Soft-delete section |
+| `setSectionIncharge(sectionId: ID!, input: AWSJSON!)` | Assign class teacher |
+| `listSectionStudents(sectionId: ID!)` | Students currently in section |
+
+**Create input:**
+```json
+{
+  "name": "A",
+  "academicYearId": "<academic_year_id>",
+  "campusId": "<campus_id>",
+  "capacity": 40
+}
+```
+
+---
+
+### Students
+
+| Operation | Description |
+|-----------|-------------|
+| `enrollStudent(input: AWSJSON!)` | Enroll new student (creates Student + Enrollment) |
+| `convertApplicationToStudent(input: AWSJSON!)` | Convert approved admission application |
+| `getStudent(id: ID!)` | Get student |
+| `updateStudent(studentId: ID!, input: AWSJSON!)` | Update student details |
+| `updateStudentStatus(studentId: ID!, status: String!)` | Change status |
+| `assignStudentClass(studentId: ID!, input: AWSJSON!)` | Assign to class and/or section |
+| `listStudents` | List students (filter: `campusId`, `classId`, `sectionId`, `status`) |
+| `enableStudentPortal(studentId: ID!)` | Create Cognito account for student self-access |
+| `enableGuardianPortal(studentId: ID!, input: AWSJSON!)` | Create Cognito account for guardian |
+
+**Enroll input:**
+```json
+{
+  "firstName": "Arjun",
+  "lastName": "Kumar",
+  "dateOfBirth": "2010-03-15",
+  "gender": "MALE",
+  "phone": "9876543210",
+  "email": "arjun.k@example.com",
+  "campusId": "<campus_id>",
+  "academicYearId": "<academic_year_id>",
+  "classId": "<class_id>",
+  "sectionId": "<section_id>",
+  "guardians": [
+    {
+      "name": "Ravi Kumar",
+      "relation": "Father",
+      "phone": "9876543211",
+      "email": "ravi@example.com"
+    }
+  ]
+}
+```
+
+**Enroll response:**
+```json
+{
+  "id": "...",
+  "admissionNo": "ADM-2025-001",
+  "registrationNumber": "REG-G10-25-26-001",
+  "firstName": "Arjun",
+  "lastName": "Kumar",
+  "status": "ACTIVE",
+  "classId": "...",
+  "sectionId": "...",
+  "academicYearId": "..."
+}
+```
+
+**Student statuses:** `ACTIVE` `INACTIVE` `GRADUATED` `TRANSFERRED` `DROPPED`
+
+**Assign to class input:**
+```json
+{
+  "classId": "<class_id>",
+  "sectionId": "<section_id>",
+  "academicYearId": "<academic_year_id>"
+}
+```
+
+> **Duplicate detection:** If a student with the same phone/email or same name+DOB exists, the API returns a `CONFLICT` error. Pass `"force": true` inside input to override.
+
+---
+
+### Attendance
+
+| Operation | Description |
+|-----------|-------------|
+| `markSectionAttendance(input: BulkAttendanceInput!)` | Mark attendance for all students in a section |
+| `getSectionAttendance(sectionId: ID!, date: AWSDate!)` | Get attendance for a section on a date |
+| `getSectionAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!)` | Summary report |
+| `getStudentAttendance(studentId: ID!, from: AWSDate!, to: AWSDate!)` | Student attendance history |
+
+**Mark attendance input:**
+```json
+{
+  "sectionId": "<section_id>",
+  "date": "2025-07-15",
+  "records": [
+    { "studentId": "<student_id>", "status": "PRESENT" },
+    { "studentId": "<student_id_2>", "status": "ABSENT" },
+    { "studentId": "<student_id_3>", "status": "LATE" }
+  ]
+}
+```
+
+**Attendance statuses:** `PRESENT` `ABSENT` `LATE` `EXCUSED` `HOLIDAY`
+
+---
+
+### Exams & Results
+
+| Operation | Description |
+|-----------|-------------|
+| `createExam(input: AWSJSON!)` | Create exam definition |
+| `listExams(academicYearId: ID)` | List exams |
+| `getExam(id: ID!)` | Get exam |
+| `publishResults(examId: ID!)` | Publish results (makes them visible to students) |
+| `listResults(examId: ID!)` | List all result entries for exam |
+
+**Create exam input:**
+```json
+{
+  "name": "Term 1 Exam 2025",
+  "classId": "<class_id>",
+  "sectionId": "<section_id>",
+  "academicYearId": "<academic_year_id>",
+  "campusId": "<campus_id>",
+  "date": "2025-10-15",
+  "maxMarks": 100
+}
+```
+
+---
+
+### Timetable
+
+| Operation | Description |
+|-----------|-------------|
+| `getSectionTimetable(sectionId: ID!)` | Section weekly timetable |
+| `getTeacherTimetable(teacherId: ID!)` | Teacher's schedule |
+| `getTeacherWorkload(teacherId: ID!)` | Weekly periods count |
+| `replaceSectionTimetable(sectionId: ID!, slots: [TimetableSlotInput!]!)` | Replace entire timetable |
+
+**Slot input:**
+```json
+{
+  "dayOfWeek": "MONDAY",
+  "periodNumber": 1,
+  "startTime": "09:00",
+  "endTime": "09:50",
+  "subjectId": "<subject_id>",
+  "teacherId": "<teacher_id>"
+}
+```
+
+---
+
+### Certificates
+
+| Operation | Description |
+|-----------|-------------|
+| `listCertificates` | List certificate requests |
+| `issueCertificate(input: AWSJSON!)` | Request a certificate |
+| `approveCertificate(id: ID!)` | Approve and issue |
+
+**Issue input:**
+```json
+{
+  "studentId": "<student_id>",
+  "type": "BONAFIDE",
+  "reason": "Bank loan application"
+}
+```
+
+**Certificate types:** `BONAFIDE` `TRANSFER` `CHARACTER` `CONDUCT` `MIGRATION`
+
+---
+
+## 10. API — Promotions
+
+> **Required permissions:** `academics.promotion.create` / `academics.promotion.read`
+
+Promotions move students from one academic year + grade to the next, with configurable section assignment strategies and automatic fee handling.
+
+### Operations
+
+| Operation | Description |
+|-----------|-------------|
+| `setStudentPromotionEligibility(input: AWSJSON!)` | Mark students ELIGIBLE / DETAINED / ON_HOLD before promoting |
+| `promoteStudents(input: AWSJSON!)` | Run batch promotion (returns batch with per-student results) |
+| `listPromotionBatches(fromAcademicYearId: ID)` | List promotion batches |
+| `getPromotionBatch(id: ID!)` | Get batch details |
+| `listPromotionBatchItems(id: ID!)` | Individual student results within a batch |
+
+---
+
+### Set Promotion Eligibility
+
+Sets eligibility status on each student's current-year enrollment. Must be done before promoting if using `USE_ENROLLMENT_ELIGIBILITY` mode.
+
+```json
+{
+  "academicYearId": "<current_academic_year_id>",
+  "updates": [
+    { "studentId": "<student_id_1>", "eligibility": "ELIGIBLE" },
+    { "studentId": "<student_id_2>", "eligibility": "DETAINED" },
+    { "studentId": "<student_id_3>", "eligibility": "ON_HOLD" }
+  ]
+}
+```
+
+**Response:** `{ "updated": 3 }`
+
+**Eligibility values:** `ELIGIBLE` `DETAINED` `ON_HOLD`
+
+---
+
+### Promote Students
+
+The main promotion operation. Creates a `PromotionBatch` and per-student `PromotionBatchItem` records.
+
+**Input:**
+```json
+{
+  "fromAcademicYearId": "<current_year_id>",
+  "toAcademicYearId": "<next_year_id>",
+  "campusId": "<campus_id>",
+  "fromGradeId": "<current_class_id>",
+  "toGradeId": "<next_class_id>",
+  "studentIds": ["<student_id_1>", "<student_id_2>"],
+
+  "sectionStrategy": "SAME_SECTION",
+
+  "eligibilityMode": "USE_ENROLLMENT_ELIGIBILITY",
+
+  "feeAction": "ASSIGN_EXISTING",
+  "feeStructureId": "<next_year_fee_structure_id>",
+  "allowPendingFee": false
+}
+```
+
+**Response:**
+```json
+{
+  "batch": {
+    "id": "...",
+    "status": "COMPLETED",
+    "fromAcademicYearId": "...",
+    "toAcademicYearId": "...",
+    "sectionStrategy": "SAME_SECTION",
+    "feeAction": "ASSIGN_EXISTING",
+    "totalStudents": 2
+  },
+  "promotedCount": 2,
+  "detainedCount": 0,
+  "skippedCount": 0,
+  "failedCount": 0
+}
+```
+
+---
+
+### Section Strategies
+
+| Strategy | Required extra fields | Behaviour |
+|----------|-----------------------|-----------|
+| `SAME_SECTION` | — | Student goes to section with same name in new grade |
+| `MANUAL` | `sectionAssignments: [{studentId, sectionId}]` | Explicit per-student assignment |
+| `AUTO_SHUFFLE` | `targetSectionIds: [...]` | Round-robin across target sections |
+| `GENDER_BALANCE` | `targetSectionIds: [...]` | Interleaves M/F before round-robin |
+| `CAPACITY_LIMIT` | `targetSectionIds: [...]`, `maxStudentsPerSection: 40` | Fills sections up to max capacity |
+| `PERFORMANCE_RANK` | `targetSectionIds: [...]`, `rankByExamId: "..."` | Ranked by exam marks, then round-robin |
+| `SUBJECT_GROUP` | `subjectGroupSectionMap: [{subjectGroupId, sectionId}]`, `targetSectionIds` | Groups into sections by elective stream |
+| `TRANSPORT_ROUTE` | `transportRouteSectionMap: [{transportRouteId, sectionId}]`, `targetSectionIds` | Groups by bus route |
+| `EXCEL_IMPORT` | `sectionAssignments: [{studentId, sectionId}]` | Uploaded import (same as MANUAL) |
+
+---
+
+### Fee Actions
+
+| `feeAction` | Behaviour |
+|-------------|-----------|
+| `SKIP` | No fee assignment; student must be assigned manually later |
+| `ASSIGN_EXISTING` | Assign existing fee structure(s) matching `toAcademicYearId` + `toGradeId`. Provide `feeStructureId` or `feeStructureIds` for explicit selection |
+| `COPY_PATTERN` | Copies fee structures and schedules from `fromAcademicYearId`/`fromGradeId` into the new year, then assigns the copies |
+
+---
+
+### Eligibility Modes
+
+| `eligibilityMode` | Behaviour |
+|-------------------|-----------|
+| `USE_ENROLLMENT_ELIGIBILITY` (default) | `DETAINED` students are not promoted. `ON_HOLD` are skipped for manual review. `ELIGIBLE` or unset → promoted |
+| `IGNORE_RESULTS` | All students in `studentIds` are promoted regardless of eligibility flags |
+
+> Pass `"force": true` in the input to bypass both eligibility and pending-fee checks.
+
+---
+
+### Promotion Batch Statuses
+
+`PROCESSING` → `COMPLETED` | `PARTIALLY_COMPLETED` | `FAILED`
+
+---
+
+### List Promotion Batch Items response
+
+```json
+[
+  {
+    "studentId": "...",
+    "action": "PROMOTE",
+    "fromGradeId": "...",
+    "fromSectionId": "...",
+    "toGradeId": "...",
+    "toSectionId": "...",
+    "feeAssignmentStatus": "ASSIGNED",
+    "generatedInvoiceIds": ["..."],
+    "remarks": null
+  },
+  {
+    "studentId": "...",
+    "action": "DETAIN",
+    "feeAssignmentStatus": "SKIPPED",
+    "generatedInvoiceIds": [],
+    "remarks": "Result: DETAINED"
+  }
+]
+```
+
+**Item actions:** `PROMOTE` `DETAIN` `SKIP`
+**Fee assignment statuses:** `PENDING` `ASSIGNED` `SKIPPED` `FAILED`
+
+---
+
+## 11. API — Communications
+
+> **Required roles:** ADMIN, ACADEMIC_MANAGER
 
 ### Announcements
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/communication/announcements` | List (filter: `status`, `targetGroup`) |
-| `GET`  | `/api/admin/communication/announcements/:id` | Get announcement |
-| `POST` | `/api/admin/communication/announcements` | Create (can set `publishNow: true`) |
-| `PATCH`| `/api/admin/communication/announcements/:id` | Update |
-| `POST` | `/api/admin/communication/announcements/:id/publish` | Publish draft |
-| `POST` | `/api/admin/communication/announcements/:id/archive` | Archive |
-| `DELETE`| `/api/admin/communication/announcements/:id` | Delete |
+| Operation | Description |
+|-----------|-------------|
+| `createAnnouncement(input: AWSJSON!)` | Create and optionally publish immediately |
+| `listAnnouncements` | List announcements |
 
-**Create body:**
+**Input:**
 ```json
 {
   "title": "Exam Schedule Released",
-  "content": "The semester exam schedule has been posted...",
-  "targetGroups": ["STUDENTS", "PARENTS"],
-  "publishNow": true
+  "content": "Semester exams begin October 15...",
+  "campusId": "<campus_id>",
+  "targetAudience": "ALL"
 }
 ```
+
+**Target audiences:** `ALL` `STUDENTS` `STAFF` `PARENTS`
 
 ---
 
 ### Events
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/events` | List events (query: `upcoming=true`, `campusId`) |
-| `GET`  | `/api/admin/events/:id` | Get event |
-| `POST` | `/api/admin/events` | Create event |
-| `PATCH`| `/api/admin/events/:id` | Update event |
-| `DELETE`| `/api/admin/events/:id` | Delete event |
-
-**Create body:**
-```json
-{
-  "title": "Annual Sports Day",
-  "description": "...",
-  "startDate": "2025-12-10T09:00:00Z",
-  "endDate": "2025-12-10T17:00:00Z",
-  "venue": "College Ground",
-  "campusId": "..."
-}
-```
+| Operation | Description |
+|-----------|-------------|
+| `listEvents` | List events |
+| `createEvent(input: AWSJSON!)` | Create event |
 
 ---
 
 ### Leave Requests
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/leave` | List leave requests (admins see all; staff see own) |
-| `GET`  | `/api/admin/leave/:id` | Get leave request |
-| `POST` | `/api/admin/leave` | Submit leave request |
-| `PATCH`| `/api/admin/leave/:id` | Update own PENDING request |
-| `POST` | `/api/admin/leave/:id/approve` | Approve (admin only) |
-| `POST` | `/api/admin/leave/:id/reject` | Reject (admin only) |
-| `POST` | `/api/admin/leave/:id/cancel` | Cancel own leave |
-| `DELETE`| `/api/admin/leave/:id` | Delete (admin only) |
-
-**Submit body:**
-```json
-{
-  "leaveType": "CASUAL",
-  "fromDate": "2025-07-14",
-  "toDate": "2025-07-15",
-  "reason": "Family function"
-}
-```
-
-**Approve/Reject body:**
-```json
-{ "remarks": "Approved. Ensure handover." }
-```
-
-**Leave types:** `CASUAL`, `SICK`, `EARNED`, `UNPAID`, `MATERNITY`, `PATERNITY`, `COMPENSATORY`
+| Operation | Description |
+|-----------|-------------|
+| `listLeaveRequests` | List leave requests (admin sees all, staff see own) |
+| `submitLeaveRequest(input: AWSJSON!)` | Submit leave |
+| `approveLeaveRequest(id: ID!)` | Approve |
+| `rejectLeaveRequest(id: ID!)` | Reject |
 
 ---
 
-## 12. API — Results (Public)
+## 12. API — Storage
 
-### Public result lookup (no auth)
+### Upload file
 
-### GET /api/public/results/:token
-Retrieve a published result batch by its public token.
-
-**Response:** Full result batch document (only if `status === 'PUBLISHED'`)
-
-```json
-{
-  "_id": "...",
-  "title": "Semester 1 Results 2025",
-  "description": "...",
-  "examId": "...",
-  "academicYearId": "...",
-  "status": "PUBLISHED",
-  "publishedAt": "2025-12-20T10:00:00Z",
-  "fileKey": "tenantId/results/sem1-2025.pdf"
-}
+```graphql
+mutation GenerateUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }
 ```
-
----
-
-### Admin — Result Batches (requires auth)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET`  | `/api/admin/results` | List batches (filter: `status`, `academicYearId`, `examId`) |
-| `GET`  | `/api/admin/results/:id` | Get batch |
-| `GET`  | `/api/admin/results/:id/token` | Get public share token + URL |
-| `POST` | `/api/admin/results` | Create batch |
-| `PATCH`| `/api/admin/results/:id` | Update draft batch |
-| `POST` | `/api/admin/results/:id/publish` | Publish (makes public link active) |
-| `POST` | `/api/admin/results/:id/archive` | Archive |
-| `DELETE`| `/api/admin/results/:id` | Delete draft batch |
-
-**Create body:**
-```json
-{
-  "title": "Semester 1 Results 2025",
-  "description": "Results for all B.Tech year 1 students",
-  "examId": "...",
-  "academicYearId": "...",
-  "campusId": "..."
-}
-```
-
-**Public URL format:** `https://<APP_BASE_URL>/results/<publicToken>`
-
----
-
-## 13. API — Storage
-
-### POST (Mutation) — generateUploadUrl
-Generate a presigned S3 URL for direct client upload. Requires auth.
 
 **Input:**
 ```json
 {
   "fileName": "marksheet.pdf",
   "contentType": "application/pdf",
-  "folder": "applications"
+  "folder": "documents"
 }
 ```
 
 **Response:**
 ```json
 {
-  "uploadUrl": "https://s3.amazonaws.com/vebgenix-docs-dev/tenantId/applications/marksheet-uuid.pdf?...",
-  "key": "tenantId/applications/marksheet-uuid.pdf",
+  "uploadUrl": "https://s3.amazonaws.com/vebgenix-docs/tenantId/documents/uuid.pdf?...",
+  "key": "tenantId/documents/uuid.pdf",
   "expiresIn": 300
 }
 ```
 
-The client uploads the file directly to S3 using a `PUT` request to `uploadUrl`. No file data passes through Lambda.
+> Client uploads directly to S3 using `PUT` to `uploadUrl`. No file data passes through Lambda.
 
 ---
 
-### GET (Query) — generateDownloadUrl
-Generate a presigned S3 download URL. Access enforced by tenant: the `key` must start with `<tenantId>/`.
+### Download file
 
-**Input:**
-```json
-{ "key": "tenantId/applications/marksheet-uuid.pdf" }
+```graphql
+mutation GenerateDownloadUrl($input: AWSJSON!) { getDownloadUrl(input: $input) }
 ```
 
-**Response:**
+**Input:** `{ "key": "tenantId/documents/uuid.pdf" }`
+**Response:** `{ "downloadUrl": "https://s3...", "expiresIn": 900 }`
+
+---
+
+## 13. API — Results (Public)
+
+### Public result lookup (no auth required)
+
+```graphql
+query GetPublicResult($token: String!) { getPublicResult(token: $token) }
+```
+
+Returns the published result batch for the given token.
+
+---
+
+### Admin — Result Batches
+
+| Operation | Description |
+|-----------|-------------|
+| `createResultBatch(input: AWSJSON!)` | Create draft result batch |
+| `listResultBatches(academicYearId: ID)` | List batches |
+| `publishResults(examId: ID!)` | Publish — activates public token |
+
+**Create input:**
 ```json
 {
-  "downloadUrl": "https://s3.amazonaws.com/...",
-  "expiresIn": 900
+  "examId": "<exam_id>",
+  "classId": "<class_id>",
+  "sectionId": "<section_id>",
+  "academicYearId": "<academic_year_id>"
 }
 ```
 
 ---
 
-## 14. API — Admin Cleanup (Deduplication)
+## 14. API — Audit & Cleanup
 
-> **Requires auth.** All operations require `admin.cleanup.read` or `admin.cleanup.write` permission.
+> **Required role:** ADMIN
+
+### Audit Logs
+
+```graphql
+query { listAuditLogs(limit: 20) }
+```
+
+Returns recent admin actions with `entityType`, `entityId`, `action`, `profileId`, `timestamp`.
+
+---
 
 ### Duplicate Reports
 
-| Method | GraphQL Query | Description |
-|--------|---------------|-------------|
-| `GET`  | `getDuplicateReport` | Combined: enquiries + students + applications with duplicate phones |
-| `GET`  | `getDuplicateEnquiryReport` | Duplicate enquiries grouped by phone and email |
-| `GET`  | `getDuplicateStudentReport` | Duplicate students grouped by name+DOB and phone |
+| Operation | Description |
+|-----------|-------------|
+| `getDuplicateStudentReport` | Students sharing same name+DOB or phone |
+| `getDuplicateEnquiryReport` | Enquiries with duplicate phone/email |
 
-**getDuplicateEnquiryReport response:**
+---
+
+### Merge
+
+| Operation | Description |
+|-----------|-------------|
+| `mergeStudents(input: AWSJSON!)` | Merge duplicates — keeps primary, deactivates others |
+
+**Input:**
 ```json
 {
-  "byPhone": [{ "_id": "9876543210", "count": 3, "ids": ["...","...","..."], "names": ["Rahul","Rahul K","R. Sharma"] }],
-  "byEmail": [{ "_id": "rahul@ex.com", "count": 2, "ids": ["...","..."], "names": ["Rahul","Rahul K"] }],
-  "totalPhoneDuplicates": 5,
-  "totalEmailDuplicates": 2
+  "primaryStudentId": "<keep_id>",
+  "duplicateStudentIds": ["<dup1>", "<dup2>"]
 }
 ```
-
-### Merge Operations
-
-#### POST (Mutation) — mergeEnquiries / runDeduplication
-Merge duplicate enquiries — keep one, delete the rest. Applications linked to merged IDs are re-pointed to the keeper.
-
-```json
-{
-  "keepId": "<enquiry-id-to-keep>",
-  "mergeIds": ["<dup1>", "<dup2>"]
-}
-```
-
-**Response:** `{ "success": true, "keptId": "...", "deletedCount": 2 }`
-
-#### POST (Mutation) — mergeStudents
-Deactivate duplicate student records and mark them as merged.
-
-```json
-{
-  "keepId": "<student-id-to-keep>",
-  "mergeIds": ["<dup1>", "<dup2>"]
-}
-```
-
-**Response:** `{ "success": true, "keptId": "...", "deactivatedCount": 2 }`
-
-### Bulk Cleanup
-
-#### DELETE (Mutation) — bulkDeleteInactiveEnquiries
-Delete closed enquiries older than N days (default: 90).
-
-```json
-{ "daysOld": 90 }
-```
-
-**Response:** `{ "deletedCount": 47 }`
 
 ---
 
 ## 15. Async Workers
 
-### Email Worker (SQS)
-Triggered by EventBridge rules via SQS. Sends emails via SES.
+### Email Worker (SQS via EventBridge)
 
-**Events it listens for:**
-- `StaffInvited` → welcome + credentials email
-- `InvoiceCreated` → invoice notification to student/parent
-- `PaymentReceived` → payment receipt email
-- `EnquiryReceived` → acknowledgement to enquirer
+Triggered events → SES email:
+
+| Event | Email sent |
+|-------|-----------|
+| `StaffInvited` | Welcome email with temporary Cognito credentials |
+| `InvoiceCreated` | Invoice notification to student/guardian |
+| `PaymentReceived` | Payment receipt |
+| `EnquiryReceived` | Acknowledgement to enquirer |
+| `AnnouncementPublished` | Notification to target audience |
 
 ### Jobs Worker (SQS)
+
 Background processing:
-- Student registration number generation
-- Bulk assignment progress tracking
-- Certificate generation (PDF via template)
+- Student registration number generation (sequential per class/section)
+- Bulk class assignment progress tracking
+- Certificate PDF generation from templates
 
 ---
 
-## 16. Error Codes
+## 16. Error Handling
 
-All Lambda responses follow this error shape:
+Errors are thrown (not returned as `{ __error: true }`) so AppSync formats them correctly:
 
 ```json
 {
-  "__error": true,
-  "code": "NOT_FOUND",
-  "message": "Application not found",
-  "statusCode": 404
+  "errors": [
+    {
+      "message": "Application not found",
+      "extensions": {
+        "code": "NOT_FOUND"
+      }
+    }
+  ],
+  "data": null
 }
 ```
 
-| Code | HTTP | Description |
-|------|------|-------------|
+| Error Code | HTTP | Meaning |
+|------------|------|---------|
 | `BAD_REQUEST` | 400 | Invalid input / missing required field |
-| `UNAUTHORIZED` | 401 | No valid token provided |
-| `FORBIDDEN` | 403 | Token valid but insufficient permissions |
-| `NOT_FOUND` | 404 | Resource not found |
-| `CONFLICT` | 409 | Duplicate resource (e.g., duplicate phone in enquiry) |
+| `UNAUTHORIZED` | 401 | No valid token |
+| `FORBIDDEN` | 403 | Valid token but insufficient permission |
+| `NOT_FOUND` | 404 | Resource does not exist |
+| `CONFLICT` | 409 | Duplicate — e.g., same student phone, duplicate fee assignment |
+| `FEATURE_DISABLED` | 403 | Module disabled for this tenant |
 | `INTERNAL` | 500 | Unexpected server error |
 
 ---
 
-## 17. Postman Collection
+## 17. Permissions Reference
 
-Import `postman/Vebgenix-API.postman_collection.json` and `postman/Vebgenix-Dev.postman_environment.json` into Postman.
+Permissions follow the pattern `domain.resource.action`.
 
-**Environment variables:**
-
-| Variable | Description |
-|----------|-------------|
-| `base_url` | `http://localhost:5000` (dev) or AppSync URL |
-| `cognito_region` | e.g. `ap-south-1` |
-| `cognito_client_id` | Cognito App Client ID |
-| `access_token` | Set automatically after login |
-| `refresh_token` | Set automatically after login |
-| `id_token` | Set automatically after login |
-| `tenant_id` | Set to your tenant's `_id` |
-
-**Login test script** (auto-saves tokens):
-```js
-const body = pm.response.json();
-if (body.AuthenticationResult) {
-  pm.environment.set('access_token',  body.AuthenticationResult.AccessToken);
-  pm.environment.set('refresh_token', body.AuthenticationResult.RefreshToken);
-  pm.environment.set('id_token',      body.AuthenticationResult.IdToken);
-}
-pm.expect(pm.response.code).to.be.oneOf([200]);
-```
+| Permission | Roles with access | Description |
+|------------|-------------------|-------------|
+| `settings.academic_year.create` | ADMIN | Create academic years |
+| `settings.academic_year.update` | ADMIN | Update / activate academic year |
+| `tenant.campuses.create` | ADMIN | Create campuses |
+| `admissions.enquiry.create` | ADMIN, ADMISSIONS_OFFICER | Log enquiries |
+| `admissions.application.review` | ADMIN, ADMISSIONS_OFFICER | Review applications |
+| `admissions.application.approve` | ADMIN | Approve/reject applications |
+| `academics.sections.create` | ADMIN, ACADEMIC_MANAGER | Create sections |
+| `academics.students.assign` | ADMIN, ACADEMIC_MANAGER | Assign student to class |
+| `students.enroll` | ADMIN, ACADEMIC_MANAGER | Enroll new student |
+| `students.status.update` | ADMIN | Change student status |
+| `academics.promotion.create` | ADMIN, ACADEMIC_MANAGER | Run and manage promotions |
+| `academics.promotion.read` | ADMIN, ACADEMIC_MANAGER, TEACHER | View promotion batches |
+| `academics.results.publish` | ADMIN, PRINCIPAL | Publish exam results |
+| `finance.fee_head.read` | ADMIN, FINANCE_MANAGER | View fee heads |
+| `finance.fee_assignment.create` | ADMIN, FINANCE_MANAGER | Assign fee structures |
+| `finance.fee_assignment.read` | ADMIN, FINANCE_MANAGER | View fee assignments |
+| `finance.fee_pattern.copy` | ADMIN, FINANCE_MANAGER | Copy fee pattern to next year |
+| `finance.invoice.read` | ADMIN, FINANCE_MANAGER, CASHIER | View invoices |
+| `finance.invoice.create` | ADMIN, FINANCE_MANAGER | Create one-off charges |
+| `finance.invoice.update` | ADMIN, FINANCE_MANAGER | Revise / cancel invoices |
+| `finance.payment.create` | ADMIN, FINANCE_MANAGER, CASHIER | Record payments |
+| `finance.payment.read` | ADMIN, FINANCE_MANAGER, CASHIER | View payments |
+| `finance.reports.read` | ADMIN, FINANCE_MANAGER | Day book, analytics |
+| `identity.staff.read` | ADMIN | View staff list |
+| `identity.roles.assign` | ADMIN | Assign roles |
+| `comms.leave.approve` | ADMIN, HR_MANAGER | Approve leave |
 
 ---
 
-## Permissions Reference
+## 18. Postman Collection
 
-Permissions are checked via `authorize(ctx, 'domain.resource.action')`.
+**Files:**
+- `postman/Vebgenix-API.postman_collection.json`
+- `postman/Vebgenix-Dev.postman_environment.json`
 
-| Permission | Who has it | Description |
-|-----------|-----------|-------------|
-| `admissions.enquiry.read` | ADMIN, ADMISSIONS_OFFICER | View enquiries |
-| `admissions.enquiry.create` | ADMIN, ADMISSIONS_OFFICER | Create enquiries |
-| `admissions.application.review` | ADMIN, ADMISSIONS_OFFICER | Review applications |
-| `admissions.application.approve` | ADMIN | Approve/reject applications |
-| `finance.fee_head.read` | ADMIN, FINANCE_MANAGER | View fee heads |
-| `finance.invoice.read` | ADMIN, FINANCE_MANAGER, CASHIER | View invoices |
-| `finance.payment.create` | ADMIN, FINANCE_MANAGER, CASHIER | Record payments |
-| `finance.reports.read` | ADMIN, FINANCE_MANAGER | View financial reports |
-| `academics.results.publish` | ADMIN, PRINCIPAL | Publish exam results |
-| `identity.users.update` | ADMIN | Manage user profiles |
-| `identity.roles.assign` | ADMIN | Assign roles |
-| `comms.leave.approve` | ADMIN, HR_MANAGER | Approve leave |
-| `settings.programs.create` | ADMIN | Manage programs |
-| `tenant.settings.update` | ADMIN | Update tenant settings |
+Import both into Postman. All requests auto-save response IDs into environment variables for chaining.
+
+### Environment variables
+
+| Variable | Set by | Description |
+|----------|--------|-------------|
+| `appsync_url` | Manual | AppSync GraphQL endpoint |
+| `cognito_region` | Manual | e.g. `ap-south-1` |
+| `cognito_client_id` | Manual | Cognito App Client ID |
+| `id_token` | Get Token | Cognito ID token (used in Authorization header) |
+| `access_token` | Get Token | Cognito Access token |
+| `refresh_token` | Get Token | Refresh token |
+| `tenant_id` | Me / Manual | Tenant ObjectId |
+| `campus_id` | Create Campus / List Campuses | Campus ObjectId |
+| `academic_year_id` | Create Academic Year | Current year ID |
+| `to_academic_year_id` | Manual | Target year for promotions |
+| `program_id` | Create Program | Program ObjectId |
+| `class_id` | Create Class | Class/grade ObjectId |
+| `section_id` | Create Section | Section ObjectId |
+| `to_class_id` | Manual | Target class for promotions |
+| `fee_category_id` | Create Fee Category | Fee category ObjectId |
+| `fee_head_id` | Create Fee Head | Fee head ObjectId |
+| `fee_schedule_id` | Create Fee Schedule | Schedule ObjectId |
+| `fee_structure_id` | Create Fee Structure | Structure ObjectId |
+| `fee_assignment_id` | Assign Fee Structure | Assignment ObjectId |
+| `student_id` | Enroll Student | Student ObjectId |
+| `invoice_id` | Get Student Invoices | Invoice ObjectId |
+| `payment_id` | Record Payment | Payment ObjectId |
+| `receipt_id` | List Receipts | Receipt ObjectId |
+| `exam_id` | Create Exam | Exam ObjectId |
+| `promotion_batch_id` | Promote Students | Promotion batch ObjectId |
+
+---
+
+## 19. End-to-End Workflow
+
+Run these Postman requests in order to set up and test the full academic cycle:
+
+```
+Step  Request                          Saves
+────────────────────────────────────────────────────────────────
+ 1.   Get Token                        id_token, access_token
+ 2.   Me (current user)                tenant_id
+
+── Settings ──────────────────────────────────────────────────
+ 3.   Create Academic Year             academic_year_id
+ 4.   Set Active Academic Year
+ 5.   List Academic Years              (verify)
+ 6.   Create Campus                    campus_id
+ 7.   Create Program                   program_id
+ 8.   Update Tenant Features           (enable all modules)
+
+── Classes & Sections ────────────────────────────────────────
+ 9.   Create Class                     class_id
+10.   Create Section                   section_id
+
+── Fee Setup ─────────────────────────────────────────────────
+11.   Create Fee Category              fee_category_id
+12.   Create Fee Head                  fee_head_id
+13.   Create Fee Schedule              fee_schedule_id
+14.   Create Fee Structure             fee_structure_id
+
+── Student Enrollment ────────────────────────────────────────
+15.   Enroll Student                   student_id
+16.   Assign Student to Class
+17.   Get Student                      (verify)
+
+── Fee Assignment ────────────────────────────────────────────
+18.   Get Fee Assignment Queue         (see unassigned)
+19.   Assign Fee Structure             fee_assignment_id
+20.   Get Student Invoices             invoice_id
+21.   Student Dues                     (verify outstanding)
+
+── Payments ──────────────────────────────────────────────────
+22.   Record Payment (Cash)            payment_id
+23.   List Receipts                    receipt_id
+24.   Get Receipt
+25.   Student Dues                     (verify reduced)
+
+── Exams ─────────────────────────────────────────────────────
+26.   Create Exam                      exam_id
+27.   Publish Results
+
+── Promotions ────────────────────────────────────────────────
+28.   Create Academic Year (next)      to_academic_year_id  ← set manually
+29.   Create Class (next grade)        to_class_id          ← set manually
+30.   Create Section (next grade)
+31.   Create Fee Structure (next year) fee_structure_id (next)
+32.   Set Promotion Eligibility        (mark students ELIGIBLE)
+33.   Promote Students                 promotion_batch_id
+34.   List Promotion Batch Items       (verify results)
+35.   Get Student                      (verify new classId/sectionId)
+```
+
+> **After step 33**, each promoted student has a new `StudentAcademicEnrollment` record for `to_academic_year_id` and their `Student.classId` / `Student.sectionId` are updated to the new grade/section.
