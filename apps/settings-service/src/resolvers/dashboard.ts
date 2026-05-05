@@ -12,13 +12,24 @@ export async function resolveDashboard(
 
     case 'dashboardOverview':
     case 'GET:/api/admin/dashboard': {
-      const [totalStudents, totalStaff, pendingAdmissions, openEnquiries] = await Promise.all([
+      const [activeStudents, staff, pendingAdmissions, openEnquiries, admissionsToday] = await Promise.all([
         Student.countDocuments({ tenantId, status: 'ACTIVE' }),
         Profile.countDocuments({ tenantId, personaRole: { $in: ['STAFF', 'TEACHER'] }, isActive: true }),
         Application.countDocuments({ tenantId, status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } }),
         Enquiry.countDocuments({ tenantId, status: { $in: ['NEW', 'CONTACTED'] } }),
+        Application.countDocuments({
+          tenantId,
+          createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+        }),
       ]);
-      return { totalStudents, totalStaff, pendingAdmissions, openEnquiries };
+      return {
+        generatedAt: new Date().toISOString(),
+        totals: { activeStudents, staff, admissionsToday, admissionsMTD: pendingAdmissions, enquiriesToday: openEnquiries, applicationsToday: admissionsToday, approvalsPending: pendingAdmissions },
+        admissions: { pending: pendingAdmissions, openEnquiries },
+        students: { active: activeStudents },
+        fees: null,
+        recentAdmissions: [],
+      };
     }
 
     case 'superAdminOverview':

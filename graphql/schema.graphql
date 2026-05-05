@@ -214,6 +214,9 @@ input CreateCampusInput {
   name: String!
   type: String!
   address: String
+  city: String
+  state: String
+  country: String
   phone: String
   email: String
 }
@@ -741,13 +744,13 @@ type Query {
   health: String
 
   # Dashboard
-  dashboardOverview(input: DashboardOverviewInput!): DashboardOverview!
+  dashboardOverview(input: DashboardOverviewInput): AWSJSON
   superAdminOverview(input: SuperAdminOverviewInput): SuperAdminOverview!
   platformStats: PlatformStats!
 
   # Identity
-  me: User!
-  listUsers(limit: Int, nextToken: String, filter: UserFilter): UserConnection!
+  me: AWSJSON
+  listUsers(limit: Int, nextToken: String, filter: UserFilter): AWSJSON
   getUser(id: ID!): User
   listStaff(campusId: ID, limit: Int, nextToken: String): AWSJSON
   getStaffMember(id: ID!): AWSJSON
@@ -820,7 +823,7 @@ type Query {
   listSectionCourses(sectionId: ID!): AWSJSON
 
   # Students
-  listStudents(filter: StudentFilter, limit: Int, nextToken: String): StudentConnection!
+  listStudents(filter: StudentFilter, limit: Int, nextToken: String): AWSJSON
   getStudent(id: ID!): AWSJSON
 
   # Academic Enrollments & Numbering

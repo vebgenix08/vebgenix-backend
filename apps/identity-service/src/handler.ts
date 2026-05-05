@@ -54,9 +54,17 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'GET:/api/me': {
         const tenantId = ctx.membership?.tenantId;
         if (!tenantId) {
-          return { id: ctx.userId, email: ctx.email, isPlatformAdmin: ctx.isPlatformAdmin };
+          return { id: ctx.userId, email: ctx.email, isPlatformAdmin: ctx.isPlatformAdmin, permissions: [], roles: [] };
         }
-        return IdentityRepo.findProfileByAuthUserId(tenantId, ctx.userId);
+        const profile = await IdentityRepo.findProfileByAuthUserId(tenantId, ctx.userId);
+        if (!profile) return { id: ctx.userId, email: ctx.email, permissions: [], roles: [] };
+        const doc = profile as unknown as Record<string, unknown>;
+        return {
+          ...doc,
+          id: String(doc._id ?? ctx.userId),
+          permissions: Array.from(ctx.permissions),
+          roles: (ctx.membership?.roles ?? []).map(r => r.roleName),
+        };
       }
 
       // ── Users ─────────────────────────────────────────────────────────────
