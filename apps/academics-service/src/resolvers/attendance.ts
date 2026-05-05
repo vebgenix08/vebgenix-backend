@@ -77,7 +77,7 @@ export async function resolveAttendance(
         },
       }));
       const { modifiedCount, upsertedCount } = await Attendance.bulkWrite(ops as never);
-      return { marked: modifiedCount + upsertedCount, date: date.toISOString() };
+      return { marked: modifiedCount + upsertedCount, date: date.toISOString(), records: records.map(r => ({ studentId: r.studentId, status: r.status })) };
     }
 
     // ── Summaries ─────────────────────────────────────────────────────────────

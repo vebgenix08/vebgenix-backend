@@ -58,10 +58,11 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         }
         const profile = await IdentityRepo.findProfileByAuthUserId(tenantId, ctx.userId);
         if (!profile) return { id: ctx.userId, email: ctx.email, permissions: [], roles: [] };
-        const doc = profile as unknown as Record<string, unknown>;
+        const doc = (profile as unknown as { toObject?: () => Record<string, unknown> }).toObject?.() ?? profile as unknown as Record<string, unknown>;
         return {
           ...doc,
           id: String(doc._id ?? ctx.userId),
+          email: String(doc.email ?? ctx.email ?? ''),
           permissions: Array.from(ctx.permissions),
           roles: (ctx.membership?.roles ?? []).map(r => r.roleName),
         };
@@ -74,7 +75,11 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const filter: Record<string, unknown> = { personaRole: { $ne: 'STUDENT' } };
         if (args.isActive !== undefined) filter.isActive = args.isActive === 'true' || args.isActive === true;
         if (args.campusId) filter['campusAccess.campusId'] = args.campusId;
-        return IdentityRepo.listProfiles(tenantId, filter);
+        const profiles = await IdentityRepo.listProfiles(tenantId, filter);
+        return {
+          edges: profiles.map(p => ({ cursor: (p as unknown as Record<string, unknown>)._id?.toString() ?? '', node: p })),
+          pageInfo: { hasNextPage: false, nextCursor: null },
+        };
       }
 
       case 'getUser':

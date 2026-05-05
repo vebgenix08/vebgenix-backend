@@ -13,8 +13,10 @@ export async function resolveStudents(
 ): Promise<unknown> {
   switch (operation) {
     case 'listStudents':
-    case 'GET:/api/admin/students':
-      return AcademicsRepo.listStudents(tenantId, (args.filter ?? {}) as Record<string, unknown>);
+    case 'GET:/api/admin/students': {
+      const students = await AcademicsRepo.listStudents(tenantId, (args.filter ?? {}) as Record<string, unknown>);
+      return { items: students, nextToken: null };
+    }
 
     case 'getStudent':
     case 'GET:/api/admin/students/:studentId':
