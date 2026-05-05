@@ -5,6 +5,7 @@ export interface IAcademicYear extends Document {
   name: string;
   startDate: Date;
   endDate: Date;
+  isActive: boolean;
   isCurrent: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -16,6 +17,7 @@ const AcademicYearSchema = new Schema<IAcademicYear>(
     name:      { type: String, required: true },
     startDate: { type: Date, required: true },
     endDate:   { type: Date, required: true },
+    isActive:  { type: Boolean, default: false },
     isCurrent: { type: Boolean, default: false },
   },
   { timestamps: true }

@@ -56,16 +56,19 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       const payload    = typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody as Record<string, unknown>;
       const event_type = payload.event as string;
       if (event_type === 'payment.captured') {
-        const paymentEntity = (payload.payload as Record<string, Record<string, unknown>>).payment.entity as Record<string, unknown>;
-        const orderId       = paymentEntity.order_id as string;
-        const payment       = await FinanceRepo.findPaymentByRazorpayOrderId(orderId);
-        if (payment) {
-          await RecordPayment.applyOnlineSuccess(
-            payment.tenantId.toString(),
-            payment._id.toString(),
-            paymentEntity.id as string,
-            signature,
-          );
+        const payloadData   = payload.payload as Record<string, Record<string, unknown>> | undefined;
+        const paymentEntity = payloadData?.payment?.entity as Record<string, unknown> | undefined;
+        if (paymentEntity) {
+          const orderId = paymentEntity.order_id as string;
+          const payment = await FinanceRepo.findPaymentByRazorpayOrderId(orderId);
+          if (payment) {
+            await RecordPayment.applyOnlineSuccess(
+              payment.tenantId.toString(),
+              payment._id.toString(),
+              paymentEntity.id as string,
+              signature,
+            );
+          }
         }
       }
       return { statusCode: 200, body: 'OK' };
@@ -108,9 +111,9 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     throw new AppError('NOT_FOUND', `Unknown operation: ${operation}`);
   } catch (err) {
     if (isAppError(err)) {
-      return { __error: true, code: err.code, message: err.message, statusCode: err.statusCode };
+      throw err;
     }
     console.error('[finance-service] unhandled error:', err);
-    return { __error: true, code: 'INTERNAL', message: 'Internal server error', statusCode: 500 };
+    throw new Error('Internal server error');
   }
 };

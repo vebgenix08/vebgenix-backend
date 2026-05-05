@@ -279,9 +279,9 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     }
   } catch (err) {
     if (isAppError(err)) {
-      return { __error: true, code: err.code, message: err.message, statusCode: err.statusCode };
+      throw err;
     }
     console.error('[comms-service] unhandled error:', err);
-    return { __error: true, code: 'INTERNAL', message: 'Internal server error', statusCode: 500 };
+    throw new Error('Internal server error');
   }
 };

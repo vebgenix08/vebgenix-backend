@@ -16,7 +16,9 @@ export async function resolveFeeHeads(
       authorize(ctx, 'finance.fee_head.read');
       const filters: { feeCategoryId?: string; activeOnly?: boolean } = {};
       if (args.feeCategoryId) filters.feeCategoryId = args.feeCategoryId as string;
-      if (args.activeOnly === false || args.activeOnly === 'false') filters.activeOnly = false;
+      // schema exposes `isActive`; also accept legacy `activeOnly`
+      const activeFlag = args.isActive ?? args.activeOnly;
+      if (activeFlag === false || activeFlag === 'false') filters.activeOnly = false;
       return FinanceRepo.listFeeHeadsFiltered(tenantId, filters);
     }
 

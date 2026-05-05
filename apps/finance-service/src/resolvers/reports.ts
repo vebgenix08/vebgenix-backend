@@ -12,8 +12,13 @@ export async function resolveReports(
     case 'dayBookReport':
     case 'GET:/api/admin/finance/reports/day-book': {
       authorize(ctx, 'finance.reports.read');
-      const from  = args.from ? new Date(args.from as string) : new Date(new Date().setHours(0, 0, 0, 0));
-      const to    = args.to   ? new Date(args.to as string)   : new Date(new Date().setHours(23, 59, 59, 999));
+      // `date` is a single-day shorthand; `from`/`to` allow custom ranges
+      const dateStr = (args.date ?? args.from) as string | undefined;
+      const baseDate = dateStr ? new Date(dateStr) : new Date();
+      const from = new Date(new Date(baseDate).setHours(0, 0, 0, 0));
+      const to   = args.to
+        ? new Date(new Date(args.to as string).setHours(23, 59, 59, 999))
+        : new Date(new Date(baseDate).setHours(23, 59, 59, 999));
       return FinanceRepo.dayBookReport(tenantId, from, to, args.campusId as string | undefined);
     }
 
