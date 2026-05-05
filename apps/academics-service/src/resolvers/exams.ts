@@ -16,8 +16,11 @@ export async function resolveExams(
     case 'getExam':
       return AcademicsRepo.findExamById(tenantId, args.id as string);
 
-    case 'createExam':
-      return AcademicsRepo.createExam(tenantId, args as object);
+    case 'createExam': {
+      authorize(ctx, 'academics.exams.update');
+      const input = (args.input as Record<string, unknown>) ?? args;
+      return AcademicsRepo.createExam(tenantId, input as object);
+    }
 
     case 'updateExam':
     case 'PATCH:/api/admin/exams/:id': {
