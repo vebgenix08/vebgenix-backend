@@ -30,7 +30,9 @@ export async function connectDB(uri: string, dbName?: string): Promise<void> {
 
   connectingPromise = mongoose
     .connect(uri, {
-      dbName: dbName ?? process.env.DB_NAME ?? 'vebgenix',
+      // Only override dbName if explicitly provided — otherwise use the database
+      // name from the MONGODB_URI (the segment after the last slash).
+      ...(dbName ?? process.env.DB_NAME ? { dbName: dbName ?? process.env.DB_NAME } : {}),
 
       // ── Timeout settings (critical for Lambda) ────────────────────────────
       serverSelectionTimeoutMS: 5_000,  // give up if no server found in 5 s
