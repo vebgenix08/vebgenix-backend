@@ -3997,5 +3997,674 @@
         }
       ]
     }
+  ,
+    {
+      "name": "🛡️ Platform Admin",
+      "description": "Super-admin only. Requires a platform-admin Cognito account.\nSave platform admin token as {{platform_id_token}} before running these requests.",
+      "item": [
+
+        {
+          "name": "Auth — Get Platform Admin Token",
+          "request": {
+            "method": "POST",
+            "url": "https://cognito-idp.{{cognito_region}}.amazonaws.com/",
+            "header": [
+              { "key": "X-Amz-Target",  "value": "AWSCognitoIdentityProviderService.InitiateAuth" },
+              { "key": "Content-Type",   "value": "application/x-amz-json-1.1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": {\n    \"USERNAME\": \"{{platform_admin_email}}\",\n    \"PASSWORD\": \"{{platform_admin_password}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "const auth = r.AuthenticationResult;",
+                  "if (auth) {",
+                  "  pm.environment.set('platform_id_token', auth.IdToken);",
+                  "  pm.environment.set('platform_access_token', auth.AccessToken);",
+                  "  console.log('✅ Platform tokens saved.');",
+                  "} else {",
+                  "  console.error('❌ Platform auth failed:', JSON.stringify(r));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "List All Tenants",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { listTenants }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.listTenants;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('listTenants returned', () => pm.expect(d).to.exist);",
+                  "const first = Array.isArray(d) ? d[0] : (d && d.items && d.items[0]);",
+                  "if (first && first.id) { pm.environment.set('target_tenant_id', first.id); console.log('target_tenant_id:', first.id); }"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Get Tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query GetTenant($id: ID!) { getTenant(id: $id) }\",\n  \"variables\": { \"id\": \"{{target_tenant_id}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.getTenant;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('getTenant returned', () => pm.expect(d).to.exist);",
+                  "if (d) console.log('Tenant:', JSON.stringify(d));"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Create Tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateTenant($input: AWSJSON!) { createTenant(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\": \\\"Test School\\\", \\\"subdomain\\\": \\\"testschool\\\", \\\"type\\\": \\\"SCHOOL\\\"}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.createTenant;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('createTenant returned', () => pm.expect(d).to.exist);",
+                  "if (d && d.id) { pm.environment.set('target_tenant_id', d.id); console.log('target_tenant_id:', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Provision Tenant (Full Setup)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ProvisionTenant($input: AWSJSON!) { provisionTenant(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"tenantName\\\": \\\"Demo School\\\", \\\"subdomain\\\": \\\"demoschool\\\", \\\"campusName\\\": \\\"Main Campus\\\", \\\"adminEmail\\\": \\\"admin@demoschool.com\\\", \\\"adminName\\\": \\\"Demo Admin\\\"}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.provisionTenant;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('provisionTenant returned', () => pm.expect(d).to.exist);",
+                  "if (d && d.tenant && d.tenant.id) {",
+                  "  pm.environment.set('target_tenant_id', d.tenant.id);",
+                  "  console.log('Provisioned tenant:', d.tenant.id);",
+                  "}",
+                  "if (d) console.log('Provision result:', JSON.stringify(d));"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Update Tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation UpdateTenant($id: ID!, $input: AWSJSON!) { updateTenant(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{target_tenant_id}}\",\n    \"input\": \"{\\\"name\\\": \\\"Updated School Name\\\"}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('updateTenant returned', () => pm.expect(r.data && r.data.updateTenant).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Deactivate Tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation DeactivateTenant($id: ID!) { deactivateTenant(id: $id) }\",\n  \"variables\": { \"id\": \"{{target_tenant_id}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('deactivateTenant returned', () => pm.expect(r.data && r.data.deactivateTenant).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Finalize Tenant Onboarding",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation FinalizeOnboarding($id: ID!) { finalizeOnboarding(id: $id) }\",\n  \"variables\": { \"id\": \"{{target_tenant_id}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('finalizeOnboarding returned', () => pm.expect(r.data && r.data.finalizeOnboarding).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Request Tenant Deletion",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation RequestTenantDeletion($id: ID!) { requestTenantDeletion(id: $id) }\",\n  \"variables\": { \"id\": \"{{target_tenant_id}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.requestTenantDeletion;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('requestTenantDeletion returned', () => pm.expect(d).to.exist);",
+                  "if (d) console.log('Deletion OTP sent to:', d.maskedEmail, '— expires:', d.expiresAt);"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Confirm Tenant Deletion",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ConfirmTenantDeletion($id: ID!, $otp: String!) { confirmTenantDeletion(id: $id, otp: $otp) }\",\n  \"variables\": { \"id\": \"{{target_tenant_id}}\", \"otp\": \"{{deletion_otp}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('confirmTenantDeletion returned', () => pm.expect(r.data && r.data.confirmTenantDeletion).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "List Tenant Users",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query ListTenantUsers($id: ID!) { listTenantUsers(id: $id) }\",\n  \"variables\": { \"id\": \"{{target_tenant_id}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.listTenantUsers;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('listTenantUsers returned', () => pm.expect(d).to.exist);",
+                  "const first = Array.isArray(d) ? d[0] : (d && d.items && d.items[0]);",
+                  "if (first && first.id) { pm.environment.set('target_user_id', first.id); console.log('target_user_id:', first.id); }"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Provision Tenant User",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ProvisionTenantUser($id: ID!, $input: AWSJSON!) { provisionTenantUser(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{target_tenant_id}}\",\n    \"input\": \"{\\\"email\\\": \\\"newadmin@school.com\\\", \\\"name\\\": \\\"New Admin\\\", \\\"role\\\": \\\"TENANT_ADMIN\\\"}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.provisionTenantUser;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('provisionTenantUser returned', () => pm.expect(d).to.exist);",
+                  "if (d && d.id) { pm.environment.set('target_user_id', d.id); console.log('target_user_id:', d.id); }"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Delete Tenant User",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation DeleteTenantUser($tenantId: ID!, $userId: ID!) { deleteTenantUser(tenantId: $tenantId, userId: $userId) }\",\n  \"variables\": { \"tenantId\": \"{{target_tenant_id}}\", \"userId\": \"{{target_user_id}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('deleteTenantUser returned', () => pm.expect(r.data && r.data.deleteTenantUser).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Resend Tenant Invite",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ResendTenantInvite($id: ID!) { resendTenantInvite(id: $id) }\",\n  \"variables\": { \"id\": \"{{target_tenant_id}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('resendTenantInvite returned', () => pm.expect(r.data && r.data.resendTenantInvite).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Super Admin Overview",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { superAdminOverview }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.superAdminOverview;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('superAdminOverview returned', () => pm.expect(d).to.exist);",
+                  "if (d) console.log('Platform overview:', JSON.stringify(d));"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Platform Stats",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { platformStats }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.platformStats;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('platformStats returned', () => pm.expect(d).to.exist);",
+                  "if (d) console.log('Platform stats:', JSON.stringify(d));"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "List Available Features",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { listAvailableFeatures }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.listAvailableFeatures;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('listAvailableFeatures returned', () => pm.expect(d).to.exist);",
+                  "if (d) console.log('Features:', JSON.stringify(d));"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Update Tenant Features (Platform)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation UpdateTenantFeatures($id: ID!, $input: AWSJSON!) { updateTenantFeatures(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{target_tenant_id}}\",\n    \"input\": \"{\\\"ADMISSIONS\\\": true, \\\"FINANCE\\\": true, \\\"ACADEMICS\\\": true}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('updateTenantFeatures returned', () => pm.expect(r.data && r.data.updateTenantFeatures).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "List Platform Audit Logs",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { listPlatformAuditLogs }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.listPlatformAuditLogs;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('listPlatformAuditLogs returned', () => pm.expect(d).to.exist);",
+                  "const first = Array.isArray(d) ? d[0] : (d && d.items && d.items[0]);",
+                  "if (first && first.id) { pm.environment.set('platform_audit_log_id', first.id); console.log('platform_audit_log_id:', first.id); }"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Get Platform Audit Log",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query GetPlatformAuditLog($id: ID!) { getPlatformAuditLog(id: $id) }\",\n  \"variables\": { \"id\": \"{{platform_audit_log_id}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.getPlatformAuditLog;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('getPlatformAuditLog returned', () => pm.expect(d).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+
+        {
+          "name": "Impersonate User",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              { "key": "Authorization", "value": "{{platform_id_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ImpersonateUser($userId: ID!) { impersonateUser(userId: $userId) }\",\n  \"variables\": { \"userId\": \"{{target_user_id}}\" }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "let d = r.data && r.data.impersonateUser;",
+                  "try { if (typeof d === 'string') d = JSON.parse(d); } catch(e) {}",
+                  "pm.test('impersonateUser returned', () => pm.expect(d).to.exist);",
+                  "if (d) console.log('Impersonation result:', JSON.stringify(d));"
+                ]
+              }
+            }
+          ]
+        }
+
+      ]
+    }
   ]
 }
