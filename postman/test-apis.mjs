@@ -8,6 +8,10 @@ const COGNITO_CLIENT_ID = '1ctmssr5fq0clpm27ubbdgbjej';
 const APPSYNC_URL       = 'https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql';
 const EMAIL             = 'dhanushags08@gmail.com';
 const PASSWORD          = 'Qwerty@1234';
+const RUN_ID            = Date.now().toString(36).toUpperCase();
+const SHORT_ID          = RUN_ID.slice(-6);
+const NUM_ID            = Date.now().toString().slice(-8);
+const STAFF_EMAIL       = `staff.${SHORT_ID.toLowerCase()}@test.com`;
 
 const env = {};
 const results = [];
@@ -64,7 +68,10 @@ function parse(raw) {
   return raw;
 }
 
-function id(d) { return d?.id || d?._id; }
+function id(d) { return d?.id || d?._id || d?.student?.id || d?.student?._id; }
+function firstItem(d) { return Array.isArray(d) ? d[0] : d?.items?.[0] ?? d?.edges?.[0]?.node; }
+function suffixName(base) { return `${base} ${SHORT_ID}`; }
+function suffixCode(base) { return `${base}${SHORT_ID}`.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 20); }
 
 async function run() {
   console.log('\n═══════════════════════════════════════════════');
@@ -85,6 +92,9 @@ async function run() {
   console.log('\n⚙️  PERMISSIONS SYNC');
   await test('Sync Tenant Admin Permissions', async () => {
     const res = await gql('mutation { syncTenantAdminPermissions }');
+    if (res.errors?.some(e => e.message?.includes('FieldUndefined'))) {
+      return { skipped: 'syncTenantAdminPermissions is not deployed in this schema' };
+    }
     const d = ok(res, 'syncTenantAdminPermissions');
     return parse(d);
   });
@@ -163,7 +173,7 @@ async function run() {
 
   await test('Create Program', async () => {
     if (!env.campus_id) throw new Error('No campus_id');
-    const input = JSON.stringify({ name: 'Science', code: 'SCI', type: 'SCHOOL', campusId: env.campus_id, durationYears: 1 });
+    const input = JSON.stringify({ name: suffixName('Science'), code: suffixCode('SCI'), type: 'SCHOOL', campusId: env.campus_id, durationYears: 1 });
     const res = await gql('mutation CreateProgram($input: AWSJSON!) { createProgram(input: $input) }', { input });
     const d = parse(ok(res, 'createProgram'));
     if (id(d)) env.program_id = id(d);
@@ -172,7 +182,12 @@ async function run() {
 
   await test('List Programs', async () => {
     const res = await gql('query { listPrograms }');
-    return parse(ok(res, 'listPrograms'));
+    const d = parse(ok(res, 'listPrograms'));
+    if (!env.program_id) {
+      const first = firstItem(d);
+      if (first) env.program_id = id(first);
+    }
+    return d;
   });
 
   await test('Dashboard Overview', async () => {
@@ -226,12 +241,51 @@ async function run() {
     return parse(ok(res, 'listUsers'));
   });
 
+  await test('Invite Staff / Onboard Staff', async () => {
+    if (!env.campus_id) throw new Error('No campus_id');
+    const res = await gql(
+      `mutation InviteStaff($input: InviteStaffInput!) {
+        inviteStaff(input: $input) { success membershipId }
+      }`,
+      {
+        input: {
+          email: STAFF_EMAIL,
+          fullName: suffixName('API Teacher'),
+          roleIds: [],
+          campusIds: [env.campus_id],
+          allCampuses: false,
+        },
+      },
+    );
+    const d = ok(res, 'inviteStaff');
+    if (d?.membershipId) env.staff_profile_id = d.membershipId;
+    return d;
+  });
+
+  await test('List Staff', async () => {
+    const res = await gql('query ListStaff($campusId: ID) { listStaff(campusId: $campusId) }', { campusId: env.campus_id });
+    const d = parse(ok(res, 'listStaff'));
+    const list = Array.isArray(d) ? d : d?.items ?? [];
+    const staff = list.find(s => s.email === STAFF_EMAIL) ?? firstItem(d);
+    if (!env.staff_profile_id && staff) env.staff_profile_id = id(staff);
+    return d;
+  });
+
+  await test('List Employees', async () => {
+    const res = await gql('query ListEmployees($campusId: ID) { listEmployees(campusId: $campusId) }', { campusId: env.campus_id });
+    const d = parse(ok(res, 'listEmployees'));
+    const list = Array.isArray(d) ? d : d?.items ?? [];
+    const employee = list.find(e => e.email === STAFF_EMAIL) ?? firstItem(d);
+    if (employee) env.employee_id = id(employee);
+    return d;
+  });
+
   // ── 5. Academics — Classes ────────────────────────────────────────────────────
   console.log('\n📚 ACADEMICS — Classes');
 
   await test('Create Class', async () => {
     if (!env.campus_id || !env.academic_year_id) throw new Error('Need campus_id and academic_year_id');
-    const input = JSON.stringify({ name: 'Grade 1', code: 'G1', grade: '1', campusId: env.campus_id, academicYearId: env.academic_year_id });
+    const input = JSON.stringify({ name: suffixName('Grade 1'), code: suffixCode('G1'), grade: '1', campusId: env.campus_id, academicYearId: env.academic_year_id });
     const res = await gql('mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }', { input });
     const d = parse(ok(res, 'createClass'));
     if (id(d)) env.class_id = id(d);
@@ -242,7 +296,7 @@ async function run() {
     const res = await gql('query { listClasses }');
     const d = parse(ok(res, 'listClasses'));
     if (!env.class_id) {
-      const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+      const first = firstItem(d);
       if (first) env.class_id = id(first);
     }
     return d;
@@ -250,7 +304,7 @@ async function run() {
 
   await test('Create Section', async () => {
     if (!env.class_id) throw new Error('No class_id');
-    const input = JSON.stringify({ name: 'A', academicYearId: env.academic_year_id, campusId: env.campus_id });
+    const input = JSON.stringify({ name: `A-${SHORT_ID}`, academicYearId: env.academic_year_id, campusId: env.campus_id });
     const res = await gql(
       'mutation CreateSection($classId: ID!, $input: AWSJSON!) { createSection(classId: $classId, input: $input) }',
       { classId: env.class_id, input },
@@ -266,7 +320,97 @@ async function run() {
       'query ListSections($classId: ID!, $academicYearId: ID!) { listAllSections(classId: $classId, academicYearId: $academicYearId) }',
       { classId: env.class_id, academicYearId: env.academic_year_id },
     );
-    return parse(ok(res, 'listAllSections'));
+    const d = parse(ok(res, 'listAllSections'));
+    if (!env.section_id) {
+      const first = firstItem(d);
+      if (first) env.section_id = id(first);
+    }
+    return d;
+  });
+
+  await test('Create Subject', async () => {
+    if (!env.campus_id) throw new Error('No campus_id');
+    const input = JSON.stringify({
+      name: suffixName('Mathematics'),
+      code: suffixCode('MATH'),
+      campusId: env.campus_id,
+      type: 'CORE',
+      creditsOrPeriods: 5,
+    });
+    const res = await gql('mutation CreateSubject($input: AWSJSON!) { createSubject(input: $input) }', { input });
+    const d = parse(ok(res, 'createSubject'));
+    if (id(d)) env.subject_id = id(d);
+    return d;
+  });
+
+  await test('List Subjects', async () => {
+    const res = await gql('query ListSubjects($campusId: ID) { listSubjects(campusId: $campusId) }', { campusId: env.campus_id });
+    const d = parse(ok(res, 'listSubjects'));
+    if (!env.subject_id) {
+      const first = firstItem(d);
+      if (first) env.subject_id = id(first);
+    }
+    return d;
+  });
+
+  await test('Replace Section Timetable', async () => {
+    if (!env.section_id) throw new Error('No section_id');
+    const slots = [{
+      dayOfWeek: 'MON',
+      periodNumber: 1,
+      startTime: '09:00',
+      endTime: '09:45',
+      subjectId: env.subject_id,
+      teacherProfileId: env.staff_profile_id,
+      room: '101',
+      label: 'Mathematics',
+      isBreak: false,
+    }, {
+      dayOfWeek: 'MON',
+      periodNumber: 2,
+      startTime: '09:45',
+      endTime: '10:00',
+      label: 'Break',
+      isBreak: true,
+    }];
+    const res = await gql(
+      `mutation ReplaceSectionTimetable($sectionId: ID!, $slots: [TimetableSlotInput!]!) {
+        replaceSectionTimetable(sectionId: $sectionId, slots: $slots) {
+          sectionId
+          slots { id sectionId dayOfWeek periodNumber startTime endTime label isBreak }
+        }
+      }`,
+      { sectionId: env.section_id, slots },
+    );
+    return ok(res, 'replaceSectionTimetable');
+  });
+
+  await test('Get Section Timetable', async () => {
+    if (!env.section_id) throw new Error('No section_id');
+    const res = await gql(
+      `query GetSectionTimetable($sectionId: ID!) {
+        getSectionTimetable(sectionId: $sectionId) {
+          sectionId
+          slots { id dayOfWeek periodNumber startTime endTime label isBreak }
+        }
+      }`,
+      { sectionId: env.section_id },
+    );
+    return ok(res, 'getSectionTimetable');
+  });
+
+  await test('Get Teacher Timetable', async () => {
+    if (!env.staff_profile_id) return { skipped: 'No staff_profile_id' };
+    const res = await gql(
+      `query GetTeacherTimetable($profileId: ID!) {
+        getTeacherTimetable(profileId: $profileId) {
+          slots { id sectionId dayOfWeek periodNumber startTime endTime label isBreak }
+          incharges { id role }
+        }
+      }`,
+      { profileId: env.staff_profile_id },
+    );
+    return ok(res, 'getTeacherTimetable');
   });
 
   // ── 6. Finance — Fee Setup ────────────────────────────────────────────────────
@@ -274,8 +418,8 @@ async function run() {
 
   await test('Create Fee Category', async () => {
     const input = JSON.stringify({
-      name: 'Tuition Fee', feeType: 'GENERAL',
-      invoicePrefix: 'TF', receiptPrefix: 'TR',
+      name: suffixName('Tuition Fee'), feeType: 'GENERAL',
+      invoicePrefix: `TF${SHORT_ID.slice(-3)}`, receiptPrefix: `TR${SHORT_ID.slice(-3)}`,
       moduleType: 'FEE',
     });
     const res = await gql('mutation CreateFeeCat($input: AWSJSON!) { createFeeCategory(input: $input) }', { input });
@@ -294,7 +438,7 @@ async function run() {
     const res = await gql('query { listFeeCategories }');
     const d = parse(ok(res, 'listFeeCategories'));
     if (!env.fee_category_id) {
-      const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+      const first = firstItem(d);
       if (first) env.fee_category_id = id(first);
     }
     return d;
@@ -302,7 +446,13 @@ async function run() {
 
   await test('Create Fee Head', async () => {
     if (!env.fee_category_id) throw new Error('No fee_category_id');
-    const input = JSON.stringify({ name: 'Term 1 Fee', type: 'ONE_TIME', feeCategoryId: env.fee_category_id });
+    const input = JSON.stringify({
+      name: suffixName('Term 1 Fee'),
+      type: 'ONE_TIME',
+      feeCategoryId: env.fee_category_id,
+      code: suffixCode('T1F'),
+      prefix: suffixCode('T1F').slice(0, 8),
+    });
     const res = await gql('mutation CreateFeeHead($input: AWSJSON!) { createFeeHead(input: $input) }', { input });
     const d = parse(ok(res, 'createFeeHead'));
     if (id(d)) env.fee_head_id = id(d);
@@ -310,10 +460,13 @@ async function run() {
   });
 
   await test('List Fee Heads', async () => {
-    const res = await gql('query { listFeeHeads }');
+    const res = await gql(
+      'query ListFeeHeads($feeCategoryId: ID) { listFeeHeads(feeCategoryId: $feeCategoryId) }',
+      { feeCategoryId: env.fee_category_id },
+    );
     const d = parse(ok(res, 'listFeeHeads'));
     if (!env.fee_head_id) {
-      const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+      const first = firstItem(d);
       if (first) env.fee_head_id = id(first);
     }
     return d;
@@ -322,7 +475,7 @@ async function run() {
   await test('Create Fee Schedule', async () => {
     if (!env.academic_year_id) throw new Error('No academic_year_id');
     const input = JSON.stringify({
-      name: 'Annual 2025-26', academicYearId: env.academic_year_id,
+      name: suffixName('Annual'), academicYearId: env.academic_year_id,
       feeCategoryId: env.fee_category_id, dueDate: '2025-07-31',
     });
     const res = await gql('mutation CreateFeeSchedule($input: AWSJSON!) { createFeeSchedule(input: $input) }', { input });
@@ -341,10 +494,10 @@ async function run() {
       throw new Error('Need fee_category_id, academic_year_id, campus_id, fee_head_id');
     }
     const input = JSON.stringify({
-      name: 'Grade 1 Structure', feeCategoryId: env.fee_category_id,
+      name: suffixName('Grade 1 Structure'), feeCategoryId: env.fee_category_id,
       academicYearId: env.academic_year_id, campusId: env.campus_id,
       classId: env.class_id,
-      components: [{ feeHeadId: env.fee_head_id, feeHeadName: 'Term 1 Fee', amount: 10000 }],
+      components: [{ feeHeadId: env.fee_head_id, feeHeadName: suffixName('Term 1 Fee'), amount: 10000 }],
     });
     const res = await gql('mutation CreateFeeStructure($input: AWSJSON!) { createFeeStructure(input: $input) }', { input });
     const d = parse(ok(res, 'createFeeStructure'));
@@ -356,7 +509,7 @@ async function run() {
     const res = await gql('query { listFeeStructures }');
     const d = parse(ok(res, 'listFeeStructures'));
     if (!env.fee_structure_id) {
-      const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+      const first = firstItem(d);
       if (first) env.fee_structure_id = id(first);
     }
     return d;
@@ -372,8 +525,8 @@ async function run() {
 
   await test('Create Enquiry', async () => {
     const input = JSON.stringify({
-      studentName: 'Test Student', phone: '9999999999',
-      guardianName: 'Test Parent', guardianEmail: 'parent@test.com',
+      studentName: suffixName('Test Student'), phone: `98${NUM_ID}`,
+      guardianName: 'Test Parent', guardianEmail: `parent.${SHORT_ID.toLowerCase()}@test.com`,
       gradeApplied: 'Grade 1', academicYearId: env.academic_year_id,
       campusId: env.campus_id,
     });
@@ -384,6 +537,43 @@ async function run() {
   await test('List Applications', async () => {
     const res = await gql('query { listApplications }');
     return parse(ok(res, 'listApplications'));
+  });
+
+  await test('Create Application (application no)', async () => {
+    if (!env.campus_id || !env.academic_year_id) throw new Error('Need campus_id and academic_year_id');
+    const input = JSON.stringify({
+      campusId: env.campus_id,
+      academicYearId: env.academic_year_id,
+      programId: env.program_id,
+      studentName: suffixName('Application Student'),
+      phone: `97${NUM_ID}`,
+      email: `application.${SHORT_ID.toLowerCase()}@test.com`,
+      dateOfBirth: '2015-02-15',
+      gender: 'MALE',
+      guardianName: 'Application Parent',
+      guardianPhone: `96${NUM_ID}`,
+      guardianRelation: 'Father',
+    });
+    const res = await gql('mutation CreateApplication($input: AWSJSON!) { createApplication(input: $input) }', { input });
+    const d = parse(ok(res, 'createApplication'));
+    if (id(d)) env.application_id = id(d);
+    if (!d?.applicationNumber && !d?.applicationNo) throw new Error('No application number generated');
+    return d;
+  });
+
+  await test('Submit Application', async () => {
+    if (!env.application_id) throw new Error('No application_id');
+    const res = await gql('mutation SubmitApplication($id: ID!) { submitApplication(id: $id) }', { id: env.application_id });
+    return parse(ok(res, 'submitApplication'));
+  });
+
+  await test('Approve Application', async () => {
+    if (!env.application_id) throw new Error('No application_id');
+    const res = await gql(
+      'mutation ApproveApplication($id: ID!, $input: AWSJSON) { approveApplication(id: $id, input: $input) }',
+      { id: env.application_id, input: JSON.stringify({ remarks: 'API test approval' }) },
+    );
+    return parse(ok(res, 'approveApplication'));
   });
 
   await test('Admissions Stats', async () => {
@@ -400,10 +590,13 @@ async function run() {
   await test('Enroll Student', async () => {
     if (!env.campus_id || !env.academic_year_id) throw new Error('Need campus_id and academic_year_id');
     const input = JSON.stringify({
-      firstName: 'John', lastName: 'Doe', dateOfBirth: '2015-01-15', gender: 'MALE',
+      firstName: 'John', lastName: SHORT_ID, dateOfBirth: '2015-01-15', gender: 'MALE',
       campusId: env.campus_id, academicYearId: env.academic_year_id,
-      classId: env.class_id,
-      guardians: [{ name: 'Jane Doe', relation: 'Mother', phone: '9876543210', email: 'jane@test.com' }],
+      classId: env.class_id, sectionId: env.section_id, programId: env.program_id,
+      phone: `95${NUM_ID}`,
+      email: `student.${SHORT_ID.toLowerCase()}@test.com`,
+      force: true,
+      guardians: [{ name: 'Jane Doe', relation: 'Mother', phone: `94${NUM_ID}`, email: `jane.${SHORT_ID.toLowerCase()}@test.com` }],
     });
     const res = await gql('mutation EnrollStudent($input: AWSJSON!) { enrollStudent(input: $input) }', { input });
     const d = parse(ok(res, 'enrollStudent'));
@@ -425,9 +618,25 @@ async function run() {
     }
     const d = parse(ok(res, 'listStudents'));
     if (!env.student_id) {
-      const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+      const first = firstItem(d);
       if (first) env.student_id = id(first);
     }
+    return d;
+  });
+
+  await test('Convert Application To Student (admission no)', async () => {
+    if (!env.application_id) throw new Error('No application_id');
+    const res = await gql(
+      `mutation ConvertApplication($applicationId: ID!) {
+        convertApplicationToStudent(applicationId: $applicationId) { id fullName registrationNumber applicationNo admissionNo }
+      }`,
+      { applicationId: env.application_id },
+    );
+    const d = ok(res, 'convertApplicationToStudent');
+    if (!d?.id) throw new Error('Converted student missing id');
+    if (!d?.applicationNo) throw new Error('Converted student missing applicationNo');
+    if (!d?.admissionNo) throw new Error('Converted student missing admissionNo');
+    env.converted_student_id = d.id;
     return d;
   });
 
@@ -452,6 +661,80 @@ async function run() {
       { id: env.student_id, status: 'ACTIVE' },
     );
     return parse(ok(res, 'updateStudentStatus'));
+  });
+
+  await test('List Enrollments', async () => {
+    if (!env.academic_year_id || !env.campus_id || !env.class_id) throw new Error('Need academic_year_id, campus_id, class_id');
+    const res = await gql(
+      `query ListEnrollments($academicYearId: ID, $campusId: ID, $gradeId: ID, $sectionId: ID, $status: String) {
+        listEnrollments(academicYearId: $academicYearId, campusId: $campusId, gradeId: $gradeId, sectionId: $sectionId, status: $status)
+      }`,
+      {
+        academicYearId: env.academic_year_id,
+        campusId: env.campus_id,
+        gradeId: env.class_id,
+        sectionId: env.section_id,
+        status: 'ACTIVE',
+      },
+    );
+    const d = parse(ok(res, 'listEnrollments'));
+    const first = firstItem(d);
+    if (first) env.enrollment_id = id(first);
+    return d;
+  });
+
+  await test('Generate Registration Numbers', async () => {
+    if (!env.academic_year_id || !env.campus_id || !env.class_id) throw new Error('Need academic_year_id, campus_id, class_id');
+    const input = JSON.stringify({ academicYearId: env.academic_year_id, campusId: env.campus_id, gradeId: env.class_id });
+    const res = await gql('mutation GenerateRegistrationNumbers($input: AWSJSON!) { generateRegistrationNumbers(input: $input) }', { input });
+    const d = parse(ok(res, 'generateRegistrationNumbers'));
+    if (!Number(d?.generated)) throw new Error('No registration numbers generated');
+    return d;
+  });
+
+  await test('List Registration Batches', async () => {
+    const res = await gql(
+      'query ListRegistrationBatches($academicYearId: ID, $campusId: ID, $gradeId: ID) { listRegistrationBatches(academicYearId: $academicYearId, campusId: $campusId, gradeId: $gradeId) }',
+      { academicYearId: env.academic_year_id, campusId: env.campus_id, gradeId: env.class_id },
+    );
+    return parse(ok(res, 'listRegistrationBatches'));
+  });
+
+  await test('Freeze Registration Numbers', async () => {
+    const input = JSON.stringify({ academicYearId: env.academic_year_id, campusId: env.campus_id, gradeId: env.class_id });
+    const res = await gql('mutation FreezeRegistrationNumbers($input: AWSJSON!) { freezeRegistrationNumbers(input: $input) }', { input });
+    return parse(ok(res, 'freezeRegistrationNumbers'));
+  });
+
+  await test('Generate Roll Numbers', async () => {
+    if (!env.academic_year_id || !env.campus_id || !env.class_id || !env.section_id) {
+      throw new Error('Need academic_year_id, campus_id, class_id, section_id');
+    }
+    const input = JSON.stringify({
+      academicYearId: env.academic_year_id,
+      campusId: env.campus_id,
+      gradeId: env.class_id,
+      sectionId: env.section_id,
+      generationMode: 'ALPHABETICAL',
+    });
+    const res = await gql('mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }', { input });
+    const d = parse(ok(res, 'generateRollNumbers'));
+    if (!Number(d?.generated)) throw new Error('No roll numbers generated');
+    return d;
+  });
+
+  await test('List Roll No Batches', async () => {
+    const res = await gql(
+      'query ListRollNoBatches($academicYearId: ID, $campusId: ID, $gradeId: ID, $sectionId: ID) { listRollNoBatches(academicYearId: $academicYearId, campusId: $campusId, gradeId: $gradeId, sectionId: $sectionId) }',
+      { academicYearId: env.academic_year_id, campusId: env.campus_id, gradeId: env.class_id, sectionId: env.section_id },
+    );
+    return parse(ok(res, 'listRollNoBatches'));
+  });
+
+  await test('Freeze Roll Numbers', async () => {
+    const input = JSON.stringify({ academicYearId: env.academic_year_id, campusId: env.campus_id, gradeId: env.class_id, sectionId: env.section_id });
+    const res = await gql('mutation FreezeRollNumbers($input: AWSJSON!) { freezeRollNumbers(input: $input) }', { input });
+    return parse(ok(res, 'freezeRollNumbers'));
   });
 
   await test('Mark Attendance', async () => {
@@ -521,7 +804,7 @@ async function run() {
       { studentId: env.student_id },
     );
     const d = parse(ok(res, 'getStudentInvoices'));
-    const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+    const first = firstItem(d);
     if (first) env.invoice_id = id(first);
     return d;
   });
@@ -530,7 +813,7 @@ async function run() {
     const res = await gql('query { listInvoices }');
     const d = parse(ok(res, 'listInvoices'));
     if (!env.invoice_id) {
-      const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+      const first = firstItem(d);
       if (first) env.invoice_id = id(first);
     }
     return d;
@@ -582,7 +865,7 @@ async function run() {
   await test('List Receipts', async () => {
     const res = await gql('query { listReceipts }');
     const d = parse(ok(res, 'listReceipts'));
-    const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+    const first = firstItem(d);
     if (first) env.receipt_id = id(first);
     return d;
   });
@@ -631,7 +914,7 @@ async function run() {
   await test('Create Exam', async () => {
     if (!env.class_id || !env.academic_year_id || !env.campus_id) throw new Error('Need class_id, academic_year_id, campus_id');
     const input = JSON.stringify({
-      name: 'Unit Test 1', classId: env.class_id,
+      name: suffixName('Unit Test 1'), classId: env.class_id,
       academicYearId: env.academic_year_id, campusId: env.campus_id,
       startDate: '2025-08-01', endDate: '2025-08-05',
       maxMarks: 100, passingMarks: 35, type: 'UNIT_TEST',
@@ -671,7 +954,7 @@ async function run() {
 
   await test('Create Target Class (Grade 2)', async () => {
     if (!env.campus_id || !env.to_academic_year_id) throw new Error('Need campus_id and to_academic_year_id');
-    const input = JSON.stringify({ name: 'Grade 2', code: 'G2', grade: '2', campusId: env.campus_id, academicYearId: env.to_academic_year_id });
+    const input = JSON.stringify({ name: suffixName('Grade 2'), code: suffixCode('G2'), grade: '2', campusId: env.campus_id, academicYearId: env.to_academic_year_id });
     const res = await gql('mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }', { input });
     const d = parse(ok(res, 'createClass'));
     if (id(d)) env.to_class_id = id(d);
@@ -716,7 +999,7 @@ async function run() {
     const res = await gql('query { listPromotionBatches }');
     const d = parse(ok(res, 'listPromotionBatches'));
     if (!env.promotion_batch_id) {
-      const first = Array.isArray(d) ? d[0] : d?.items?.[0];
+      const first = firstItem(d);
       if (first) env.promotion_batch_id = id(first);
     }
     return d;
@@ -745,7 +1028,7 @@ async function run() {
   console.log('\n📢 COMMS');
 
   await test('Create Announcement', async () => {
-    const input = JSON.stringify({ title: 'Test Announcement', content: 'This is a test announcement.', audience: ['ALL'] });
+    const input = JSON.stringify({ title: suffixName('Test Announcement'), content: 'This is a test announcement.', audience: ['ALL'] });
     const res = await gql('mutation CreateAnnouncement($input: AWSJSON!) { createAnnouncement(input: $input) }', { input });
     return parse(ok(res, 'createAnnouncement'));
   });
@@ -769,7 +1052,7 @@ async function run() {
   console.log('\n📁 STORAGE');
 
   await test('Get Upload URL', async () => {
-    const input = JSON.stringify({ fileName: 'test.pdf', contentType: 'application/pdf', folder: 'docs' });
+    const input = JSON.stringify({ fileName: `test-${SHORT_ID}.pdf`, contentType: 'application/pdf', folder: 'docs' });
     const res = await gql('mutation GetUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }', { input });
     return parse(ok(res, 'getUploadUrl'));
   });
@@ -815,7 +1098,7 @@ async function run() {
   [
     'academic_year_id','campus_id','program_id','class_id','section_id',
     'fee_category_id','fee_head_id','fee_schedule_id','fee_structure_id','fee_assignment_id',
-    'student_id','invoice_id','payment_id','receipt_id','exam_id',
+    'student_id','converted_student_id','application_id','enrollment_id','staff_profile_id','employee_id','subject_id','invoice_id','payment_id','receipt_id','exam_id',
     'promotion_batch_id','to_academic_year_id','to_class_id',
   ].forEach(k => { if (env[k]) console.log(`  ${k}: ${env[k]}`); });
   console.log('');

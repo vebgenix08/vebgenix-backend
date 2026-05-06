@@ -39,6 +39,18 @@ function parseEvent(event: Record<string, unknown>) {
   return { operation: `${method}:${path}`, args: { ...body, ...params, ...qs } };
 }
 
+function toGqlProfile(profile: unknown, fallback: { id?: string; email?: string } = {}): Record<string, unknown> {
+  if (!profile) return { id: fallback.id ?? '', email: fallback.email ?? '' };
+  const doc = (profile as { toObject?: () => Record<string, unknown> }).toObject?.()
+    ?? (profile as Record<string, unknown>);
+  const { _id, ...rest } = doc;
+  return {
+    ...rest,
+    id:    String(doc.id ?? _id ?? fallback.id ?? ''),
+    email: String(doc.email ?? fallback.email ?? ''),
+  };
+}
+
 export const handler = async (event: Record<string, unknown>, context: Record<string, unknown>) => {
   bootstrapDB(context);
   try {
@@ -58,10 +70,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         }
         const profile = await IdentityRepo.findProfileByAuthUserId(tenantId, ctx.userId);
         if (!profile) return { id: ctx.userId, email: ctx.email, permissions: [], roles: [] };
-        const doc = profile as unknown as Record<string, unknown>;
         return {
-          ...doc,
-          id: String(doc._id ?? ctx.userId),
+          ...toGqlProfile(profile, { id: ctx.userId, email: ctx.email }),
           permissions: Array.from(ctx.permissions),
           roles: (ctx.membership?.roles ?? []).map(r => r.roleName),
         };
@@ -74,7 +84,14 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const filter: Record<string, unknown> = { personaRole: { $ne: 'STUDENT' } };
         if (args.isActive !== undefined) filter.isActive = args.isActive === 'true' || args.isActive === true;
         if (args.campusId) filter['campusAccess.campusId'] = args.campusId;
-        return IdentityRepo.listProfiles(tenantId, filter);
+        const profiles = await IdentityRepo.listProfiles(tenantId, filter);
+        return {
+          edges: profiles.map(p => {
+            const node = toGqlProfile(p) as Record<string, unknown>;
+            return { cursor: String(node.id), node };
+          }),
+          pageInfo: { hasNextPage: false, nextCursor: null },
+        };
       }
 
       case 'getUser':
@@ -288,7 +305,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'POST:/api/admin/staff/:id/resend-invite': {
         authorize(ctx, 'identity.users.update');
         const tenantId = getTenantId(ctx);
-        const profile  = await IdentityRepo.findProfileById(tenantId, args.id as string);
+        const profileId = (args.staffId ?? args.id) as string;
+        const profile  = await IdentityRepo.findProfileById(tenantId, profileId);
         if (!profile) throw new AppError('NOT_FOUND', 'Staff member not found');
         const { AdminCreateUserCommand, CognitoIdentityProviderClient } = await import('@aws-sdk/client-cognito-identity-provider');
         const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
@@ -297,7 +315,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
           Username:      profile.email,
           MessageAction: 'RESEND',
         }));
-        return { success: true, message: 'Invitation resent' };
+        return true;
       }
 
       // ── Accept invite ─────────────────────────────────────────────────────

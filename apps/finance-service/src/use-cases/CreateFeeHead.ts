@@ -5,6 +5,7 @@ import { authorize } from '@vebgenix/permissions';
 import { getTenantId } from '@vebgenix/tenant';
 import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
+import { normalizeFeePrefix } from '../numbering';
 
 export interface CreateFeeHeadInput {
   name: string;
@@ -12,6 +13,7 @@ export interface CreateFeeHeadInput {
   description?: string;
   feeCategoryId: string;
   code?: string;
+  prefix?: string;
   isRefundable?: boolean;
   isMandatory?: boolean;
   priorityOrder?: number;
@@ -32,11 +34,13 @@ export class CreateFeeHead {
     }
 
     const code = input.code ? input.code.toUpperCase() : undefined;
+    const prefix = normalizeFeePrefix(input.prefix ?? code, input.name);
 
     const feeHead = await FinanceRepo.createFeeHead(tenantId, {
       ...input,
       feeCategoryId: new Types.ObjectId(input.feeCategoryId),
       code,
+      prefix,
       isRefundable:  input.isRefundable  ?? false,
       isMandatory:   input.isMandatory   ?? true,
       priorityOrder: input.priorityOrder ?? 0,

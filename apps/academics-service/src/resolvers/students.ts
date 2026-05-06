@@ -5,6 +5,14 @@ import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 import { EnrollStudent } from '../use-cases/EnrollStudent';
 
+function toGqlStudent(student: unknown) {
+  if (!student) return student;
+  const doc = (student as { toObject?: () => Record<string, unknown> }).toObject?.()
+    ?? (student as Record<string, unknown>);
+  const { _id, ...rest } = doc;
+  return { ...rest, id: String(doc.id ?? _id) };
+}
+
 export async function resolveStudents(
   operation: string,
   args: Record<string, unknown>,
@@ -13,16 +21,23 @@ export async function resolveStudents(
 ): Promise<unknown> {
   switch (operation) {
     case 'listStudents':
-    case 'GET:/api/admin/students':
-      return AcademicsRepo.listStudents(tenantId, (args.filter ?? {}) as Record<string, unknown>);
+    case 'GET:/api/admin/students': {
+      const students = await AcademicsRepo.listStudents(tenantId, (args.filter ?? {}) as Record<string, unknown>);
+      return {
+        items: students.map(toGqlStudent),
+        nextToken: null,
+      };
+    }
 
     case 'getStudent':
     case 'GET:/api/admin/students/:studentId':
-      return AcademicsRepo.findStudentById(tenantId, (args.studentId ?? args.id) as string);
+      return toGqlStudent(await AcademicsRepo.findStudentById(tenantId, (args.studentId ?? args.id) as string));
 
     case 'enrollStudent':
-    case 'POST:/api/admin/students':
-      return EnrollStudent.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof EnrollStudent.execute>[1]);
+    case 'POST:/api/admin/students': {
+      const student = await EnrollStudent.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof EnrollStudent.execute>[1]);
+      return toGqlStudent(student);
+    }
 
     case 'convertApplicationToStudent': {
       const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
@@ -47,7 +62,7 @@ export async function resolveStudents(
           }]
         : undefined;
 
-      return EnrollStudent.execute(ctx, {
+      const student = await EnrollStudent.execute(ctx, {
         applicationId,
         campusId:       application.campusId.toString(),
         academicYearId: application.academicYearId.toString(),
@@ -61,6 +76,7 @@ export async function resolveStudents(
         address:        application.address,
         guardians,
       });
+      return toGqlStudent(student);
     }
 
     case 'updateStudent':

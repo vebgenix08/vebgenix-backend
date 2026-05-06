@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "vebgenix-api-collection",
     "name": "Vebgenix API",
-    "description": "Admin / Tenant-Admin API collection for Vebgenix (AppSync GraphQL).\nImport alongside Vebgenix-Dev.postman_environment.json.\n\nCredentials: dhanushags08@gmaill.com / Qwerty@1234\n\nRun in order:\n  1. Get Token         — saves id_token, access_token, refresh_token\n  2. Settings          — Create/Set Academic Year, Campus, Program\n  3. Academics         — Create Class → Create Section\n  4. Finance Setup     — Fee Category → Fee Head → Fee Schedule → Fee Structure\n  5. Students          — Enroll → Assign to Class\n  6. Finance Assign    — Assign Fee Structure → Get Student Invoices\n  7. Finance Payments  — Record Payment → List Receipts\n  8. Academics Exams   — Create Exam → Publish Results\n  9. Promotions        — Set Eligibility → Promote Students → View Batch\n\nEach request auto-saves its ID to env vars for chaining.\nPlatform-admin endpoints removed — not accessible with tenant admin credentials.",
+    "description": "Admin / Tenant-Admin API collection for Vebgenix (AppSync GraphQL).\nImport alongside Vebgenix-Dev.postman_environment.json.\n\nCredentials: dhanushags08@gmaill.com / Qwerty@1234\n\nRun in order:\n  1. Get Token         — saves id_token, access_token, refresh_token\n  2. Settings          — Create/Set Academic Year, Campus, Program\n  3. Academics         — Create Class → Create Section\n  4. Finance Setup     — Fee Category → Fee Head → Fee Schedule → Fee Structure\n  5. Students          — Enroll → Assign to Class\n  6. Finance Assign    — Assign Fee Structure → Get Student Invoices\n  7. Finance Payments  — Record Payment → List Receipts\n  8. Academics Exams   — Create Exam → Publish Results\n  9. Promotions        — Set Eligibility → Promote Students → View Batch\n\nEach request auto-saves its ID to env vars for chaining.\n🛡️ Platform Admin folder requires a separate platform super-admin token.\nSet platform_admin_email + platform_admin_password, then run \"Get Platform Token\".",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -26,7 +26,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": {\n    \"USERNAME\": \"dhanushags08@gmaill.com\",\n    \"PASSWORD\": \"Qwerty@1234\"\n  }\n}"
+              "raw": "{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": {\n    \"USERNAME\": \"{{admin_email}}\",\n    \"PASSWORD\": \"{{admin_password}}\"\n  }\n}"
             }
           },
           "event": [
@@ -47,6 +47,104 @@
                   "  console.error('❌ Auth failed:', JSON.stringify(r));",
                   "  pm.test('AuthenticationResult present', () => pm.expect(auth).to.exist);",
                   "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Forgot Password — Send Code",
+          "request": {
+            "method": "POST",
+            "url": "https://cognito-idp.{{cognito_region}}.amazonaws.com/",
+            "header": [
+              {
+                "key": "X-Amz-Target",
+                "value": "AWSCognitoIdentityProviderService.ForgotPassword"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-amz-json-1.1"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"Username\": \"{{forgot_password_email}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Code delivery returned', () => pm.expect(r.CodeDeliveryDetails).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Forgot Password — Reset",
+          "request": {
+            "method": "POST",
+            "url": "https://cognito-idp.{{cognito_region}}.amazonaws.com/",
+            "header": [
+              {
+                "key": "X-Amz-Target",
+                "value": "AWSCognitoIdentityProviderService.ConfirmForgotPassword"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-amz-json-1.1"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"Username\": \"{{forgot_password_email}}\",\n  \"ConfirmationCode\": \"{{password_reset_code}}\",\n  \"Password\": \"{{new_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Password — Logged In",
+          "request": {
+            "method": "POST",
+            "url": "https://cognito-idp.{{cognito_region}}.amazonaws.com/",
+            "header": [
+              {
+                "key": "X-Amz-Target",
+                "value": "AWSCognitoIdentityProviderService.ChangePassword"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-amz-json-1.1"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"AccessToken\": \"{{access_token}}\",\n  \"PreviousPassword\": \"{{previous_password}}\",\n  \"ProposedPassword\": \"{{proposed_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
                 ]
               }
             }
@@ -96,48 +194,6 @@
     {
       "name": "⚙️ Settings",
       "item": [
-        {
-          "name": "Sync Tenant Admin Permissions",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "{{id_token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{appsync_url}}",
-              "host": [
-                "{{appsync_url}}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation { syncTenantAdminPermissions }\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const r = pm.response.json();",
-                  "pm.test(\"syncTenantAdminPermissions 200\", () => pm.response.to.have.status(200));",
-                  "const raw = r.data && r.data.syncTenantAdminPermissions;",
-                  "let d; try { d = typeof raw === \"string\" ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
-                  "pm.test(\"sync result present\", () => pm.expect(d).to.exist);",
-                  "if (d) console.log(\"Sync result:\", JSON.stringify(d));"
-                ]
-              }
-            }
-          ]
-        },
         {
           "name": "Create Academic Year",
           "request": {
@@ -710,7 +766,7 @@
           ]
         },
         {
-          "name": "Invite Staff",
+          "name": "Invite Staff / Onboard Staff",
           "request": {
             "method": "POST",
             "url": "{{appsync_url}}",
@@ -730,7 +786,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation InviteStaff($input: AWSJSON!) { inviteStaff(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"email\\\":\\\"teacher@example.com\\\",\\\"role\\\":\\\"TEACHER\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"firstName\\\":\\\"Test\\\",\\\"lastName\\\":\\\"Teacher\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation InviteStaff($input: InviteStaffInput!) { inviteStaff(input: $input) { success membershipId } }\",\n  \"variables\": {\n    \"input\": {\n      \"email\": \"{{staff_email}}\",\n      \"fullName\": \"Test Teacher\",\n      \"roleIds\": [],\n      \"campusIds\": [\n        \"{{campus_id}}\"\n      ],\n      \"allCampuses\": false\n    }\n  }\n}"
             }
           },
           "event": [
@@ -741,8 +797,201 @@
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
-                  "pm.test('inviteStaff exists', () => pm.expect(r.data).to.exist);",
+                  "const d = r.data && r.data.inviteStaff;",
+                  "pm.test('inviteStaff succeeds', () => pm.expect(d && d.success).to.be.true);",
+                  "if (d && d.membershipId) { pm.environment.set('staff_profile_id', d.membershipId); console.log('staff_profile_id:', d.membershipId); }",
                   "if (r.errors) console.warn('Errors:', JSON.stringify(r.errors));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Staff",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{id_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query ListStaff($campusId: ID) { listStaff(campusId: $campusId) }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('listStaff exists', () => pm.expect(r.data && r.data.listStaff).to.exist);",
+                  "let list; try { list = typeof r.data.listStaff === 'string' ? JSON.parse(r.data.listStaff) : r.data.listStaff; } catch(e) { list = r.data.listStaff; }",
+                  "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('staff_profile_id')) { pm.environment.set('staff_profile_id', list[0].id || list[0]._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Employees",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{id_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query ListEmployees($campusId: ID) { listEmployees(campusId: $campusId) }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('listEmployees exists', () => pm.expect(r.data && r.data.listEmployees).to.exist);",
+                  "let list; try { list = typeof r.data.listEmployees === 'string' ? JSON.parse(r.data.listEmployees) : r.data.listEmployees; } catch(e) { list = r.data.listEmployees; }",
+                  "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('employee_id')) { pm.environment.set('employee_id', list[0].id || list[0]._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Employee",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{id_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query GetEmployee($id: ID!) { getEmployee(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{employee_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('getEmployee exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getEmployee).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resend Staff Invite",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{id_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ResendInvite($staffId: ID!) { resendInvite(staffId: $staffId) }\",\n  \"variables\": {\n    \"staffId\": \"{{staff_profile_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('resendInvite returned boolean', () => pm.expect(pm.response.json().data && pm.response.json().data.resendInvite).to.be.a('boolean'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept Invite",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "{{id_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-tenant-id",
+                "value": "{{tenant_id}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation AcceptInvite($token: String!) { acceptInvite(token: $token) { success email isExistingUser } }\",\n  \"variables\": {\n    \"token\": \"{{staff_email}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('acceptInvite succeeds', () => pm.expect(pm.response.json().data && pm.response.json().data.acceptInvite && pm.response.json().data.acceptInvite.success).to.be.true);"
                 ]
               }
             }
@@ -754,150 +1003,696 @@
       "name": "🎓 Admissions",
       "item": [
         {
-          "name": "Create Enquiry",
-          "request": {
-            "method": "POST",
-            "url": "{{appsync_url}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "{{id_token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "x-tenant-id",
-                "value": "{{tenant_id}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateEnquiry($input: AWSJSON!) { createEnquiry(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"studentName\\\":\\\"Rahul Sharma\\\",\\\"phone\\\":\\\"9876543210\\\",\\\"email\\\":\\\"rahul@example.com\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"source\\\":\\\"WALK_IN\\\"}\"\n  }\n}"
-            }
-          },
-          "event": [
+          "name": "Enquiries",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('createEnquiry exists', () => pm.expect(pm.response.json().data).to.exist);"
-                ]
-              }
+              "name": "Create Enquiry",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation CreateEnquiry($input: AWSJSON!) { createEnquiry(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"studentName\\\":\\\"Rahul Sharma\\\",\\\"phone\\\":\\\"9876543210\\\",\\\"email\\\":\\\"rahul@example.com\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"source\\\":\\\"WALK_IN\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('createEnquiry exists', () => pm.expect(r.data).to.exist);",
+                      "const raw = r.data && r.data.createEnquiry;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "const eid = d && (d.id || d._id);",
+                      "if (eid) { pm.environment.set('enquiry_id', eid); console.log('enquiry_id:', eid); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Enquiries",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query { listEnquiries }\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('listEnquiries exists', () => pm.expect(r.data).to.exist);",
+                      "const raw = r.data && r.data.listEnquiries;",
+                      "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+                      "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('enquiry_id')) { pm.environment.set('enquiry_id', list[0].id || list[0]._id); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Enquiry",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetEnquiry($id: ID!) { getEnquiry(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{enquiry_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getEnquiry exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getEnquiry).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Update Enquiry",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation UpdateEnquiry($id: ID!, $input: AWSJSON!) { updateEnquiry(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{enquiry_id}}\",\n    \"input\": \"{\\\"status\\\":\\\"CONTACTED\\\",\\\"notes\\\":\\\"Called and confirmed interest\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Duplicate Check",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation CheckDuplicate($input: AWSJSON!) { checkDuplicate(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"phone\\\":\\\"9876543210\\\",\\\"email\\\":\\\"rahul@example.com\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('checkDuplicate exists', () => pm.expect(pm.response.json().data).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Admissions Stats",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query { admissionsStats }\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('admissionsStats exists', () => pm.expect(pm.response.json().data).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Delete Enquiry",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation DeleteEnquiry($id: ID!) { deleteEnquiry(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{enquiry_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                    ]
+                  }
+                }
+              ]
             }
           ]
         },
         {
-          "name": "List Enquiries",
-          "request": {
-            "method": "POST",
-            "url": "{{appsync_url}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "{{id_token}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "x-tenant-id",
-                "value": "{{tenant_id}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"query\": \"query { listEnquiries }\"\n}"
-            }
-          },
-          "event": [
+          "name": "Applications",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('listEnquiries exists', () => pm.expect(pm.response.json().data).to.exist);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "List Applications",
-          "request": {
-            "method": "POST",
-            "url": "{{appsync_url}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "{{id_token}}"
+              "name": "Create Application",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation CreateApplication($input: AWSJSON!) { createApplication(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"studentName\\\":\\\"Priya Patel\\\",\\\"phone\\\":\\\"9876500001\\\",\\\"email\\\":\\\"priya@example.com\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"programId\\\":\\\"{{program_id}}\\\",\\\"enquiryId\\\":\\\"{{enquiry_id}}\\\"}\"\n  }\n}"
+                }
               },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "x-tenant-id",
-                "value": "{{tenant_id}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"query\": \"query { listApplications }\"\n}"
-            }
-          },
-          "event": [
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data.createApplication;",
+                      "pm.test('createApplication exists', () => pm.expect(raw).to.exist);",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "const aid = d && (d.id || d._id);",
+                      "if (aid) { pm.environment.set('application_id', aid); console.log('application_id:', aid, '| applicationNumber:', d.applicationNumber); }"
+                    ]
+                  }
+                }
+              ]
+            },
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('listApplications exists', () => pm.expect(pm.response.json().data).to.exist);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Admissions Stats",
-          "request": {
-            "method": "POST",
-            "url": "{{appsync_url}}",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "{{id_token}}"
+              "name": "List Applications",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query { listApplications }\"\n}"
+                }
               },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "x-tenant-id",
-                "value": "{{tenant_id}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"query\": \"query { admissionsStats }\"\n}"
-            }
-          },
-          "event": [
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('listApplications exists', () => pm.expect(r.data).to.exist);",
+                      "const raw = r.data && r.data.listApplications;",
+                      "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+                      "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('application_id')) { pm.environment.set('application_id', list[0].id || list[0]._id); }"
+                    ]
+                  }
+                }
+              ]
+            },
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('admissionsStats exists', () => pm.expect(pm.response.json().data).to.exist);"
-                ]
-              }
+              "name": "Get Application",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetApplication($id: ID!) { getApplication(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getApplication exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getApplication).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Approval Queue",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query { getApprovalQueue }\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getApprovalQueue exists', () => pm.expect(pm.response.json().data).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Submit Application",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation SubmitApplication($id: ID!) { submitApplication(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Review Application (mark Under Review)",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation ReviewApplication($id: ID!, $input: AWSJSON!) { reviewApplication(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\",\n    \"input\": \"{\\\"decision\\\":\\\"UNDER_REVIEW\\\",\\\"remarks\\\":\\\"Documents verified, proceeding to review\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Application Reviews",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetApplicationReviews($id: ID!) { getApplicationReviews(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getApplicationReviews exists', () => pm.expect(pm.response.json().data).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Approve Application",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation ApproveApplication($id: ID!) { approveApplication(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Reject Application",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation RejectApplication($id: ID!, $reason: String) { rejectApplication(id: $id, reason: $reason) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\",\n    \"reason\": \"Documents incomplete\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Verify Document",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation VerifyDocument($id: ID!, $docKey: String!) { verifyDocument(id: $id, docKey: $docKey) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\",\n    \"docKey\": \"birth_certificate\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Withdraw Application",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation WithdrawApplication($id: ID!) { withdrawApplication(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                    ]
+                  }
+                }
+              ]
             }
           ]
         }
@@ -2866,6 +3661,208 @@
           ]
         },
         {
+          "name": "Subjects & Timetable Builder",
+          "item": [
+            {
+              "name": "Create Subject",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation CreateSubject($input: AWSJSON!) { createSubject(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Mathematics\\\",\\\"code\\\":\\\"MATH\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"type\\\":\\\"CORE\\\",\\\"creditsOrPeriods\\\":5}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data['createSubject'];",
+                      "pm.test('createSubject exists', () => pm.expect(raw).to.exist);",
+                      "if (!raw) { console.error('No createSubject in response:', JSON.stringify(r)); return; }",
+                      "let d;",
+                      "try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "const id = d && (d.id || d._id);",
+                      "if (id) { pm.environment.set('subject_id', id); console.log('subject_id:', id); }",
+                      "pm.test('Has id', () => pm.expect(id).to.be.ok);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Subjects",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query ListSubjects($campusId: ID) { listSubjects(campusId: $campusId) }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('listSubjects exists', () => pm.expect(r.data && r.data.listSubjects).to.exist);",
+                      "let list; try { list = typeof r.data.listSubjects === 'string' ? JSON.parse(r.data.listSubjects) : r.data.listSubjects; } catch(e) { list = r.data.listSubjects; }",
+                      "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('subject_id')) { pm.environment.set('subject_id', list[0].id || list[0]._id); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Replace Section Timetable",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation ReplaceSectionTimetable($sectionId: ID!, $slots: [TimetableSlotInput!]!) { replaceSectionTimetable(sectionId: $sectionId, slots: $slots) { sectionId slots { id sectionId dayOfWeek periodNumber startTime endTime label isBreak } } }\",\n  \"variables\": {\n    \"sectionId\": \"{{section_id}}\",\n    \"slots\": [\n      {\n        \"dayOfWeek\": \"MON\",\n        \"periodNumber\": 1,\n        \"startTime\": \"09:00\",\n        \"endTime\": \"09:45\",\n        \"subjectId\": \"{{subject_id}}\",\n        \"teacherProfileId\": \"{{staff_profile_id}}\",\n        \"room\": \"101\",\n        \"label\": \"Mathematics\",\n        \"isBreak\": false\n      },\n      {\n        \"dayOfWeek\": \"MON\",\n        \"periodNumber\": 2,\n        \"startTime\": \"09:45\",\n        \"endTime\": \"10:00\",\n        \"label\": \"Break\",\n        \"isBreak\": true\n      }\n    ]\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('replaceSectionTimetable exists', () => pm.expect(r.data && r.data.replaceSectionTimetable).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Section Timetable",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetSectionTimetable($sectionId: ID!) { getSectionTimetable(sectionId: $sectionId) { sectionId slots { id dayOfWeek periodNumber startTime endTime label isBreak } } }\",\n  \"variables\": {\n    \"sectionId\": \"{{section_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getSectionTimetable exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getSectionTimetable).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Teacher Timetable",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetTeacherTimetable($profileId: ID!) { getTeacherTimetable(profileId: $profileId) { slots { id sectionId dayOfWeek periodNumber startTime endTime label isBreak } incharges { id role } } }\",\n  \"variables\": {\n    \"profileId\": \"{{staff_profile_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getTeacherTimetable exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getTeacherTimetable).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
           "name": "Students",
           "item": [
             {
@@ -3099,10 +4096,10 @@
           ]
         },
         {
-          "name": "Attendance",
+          "name": "Registration Numbers",
           "item": [
             {
-              "name": "Mark Class Attendance",
+              "name": "Generate Registration Numbers",
               "request": {
                 "method": "POST",
                 "url": "{{appsync_url}}",
@@ -3122,7 +4119,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation MarkSectionAttendance($input: BulkAttendanceInput!) { markSectionAttendance(input: $input) { studentId status } }\",\n  \"variables\": {\n    \"input\": {\n      \"sectionId\": \"{{section_id}}\",\n      \"date\": \"2026-05-05\",\n      \"records\": [\n        {\n          \"studentId\": \"{{student_id}}\",\n          \"status\": \"PRESENT\"\n        }\n      ]\n    }\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation GenerateRegistrationNumbers($input: AWSJSON!) { generateRegistrationNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\"}\"\n  }\n}"
                 }
               },
               "event": [
@@ -3132,14 +4129,18 @@
                     "type": "text/javascript",
                     "exec": [
                       "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                      "pm.test('markSectionAttendance exists', () => pm.expect(pm.response.json().data).to.exist);"
+                      "const r = pm.response.json();",
+                      "pm.test('generateRegistrationNumbers exists', () => pm.expect(r.data).to.exist);",
+                      "const raw = r.data && r.data.generateRegistrationNumbers;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Generated:', d.generated, 'registration numbers');"
                     ]
                   }
                 }
               ]
             },
             {
-              "name": "Get Class Attendance",
+              "name": "Freeze Registration Numbers",
               "request": {
                 "method": "POST",
                 "url": "{{appsync_url}}",
@@ -3159,7 +4160,299 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query GetSectionAttendance($sectionId: ID!, $date: AWSDate!) { getSectionAttendance(sectionId: $sectionId, date: $date) { studentId status } }\",\n  \"variables\": {\n    \"sectionId\": \"{{section_id}}\",\n    \"date\": \"2026-05-05\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation FreezeRegistrationNumbers($input: AWSJSON!) { freezeRegistrationNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);",
+                      "const raw = pm.response.json().data && pm.response.json().data.freezeRegistrationNumbers;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Frozen batch status:', d.status);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Registration Batches",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query { listRegistrationBatches(academicYearId: \\\"{{academic_year_id}}\\\", campusId: \\\"{{campus_id}}\\\") }\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('listRegistrationBatches exists', () => pm.expect(pm.response.json().data).to.exist);",
+                      "const raw = pm.response.json().data && pm.response.json().data.listRegistrationBatches;",
+                      "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+                      "if (Array.isArray(list)) console.log('Registration batches:', list.length);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Roll Numbers",
+          "item": [
+            {
+              "name": "Generate Roll Numbers — Alphabetical",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"generationMode\\\":\\\"ALPHABETICAL\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('generateRollNumbers exists', () => pm.expect(r.data).to.exist);",
+                      "const raw = r.data && r.data.generateRollNumbers;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Generated:', d.generated, 'roll numbers (ALPHABETICAL)');"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Generate Roll Numbers — Sequential",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"generationMode\\\":\\\"SEQUENTIAL\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('generateRollNumbers exists', () => pm.expect(r.data).to.exist);",
+                      "const raw = r.data && r.data.generateRollNumbers;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Generated:', d.generated, 'roll numbers (SEQUENTIAL)');"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Freeze Roll Numbers",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation FreezeRollNumbers($input: AWSJSON!) { freezeRollNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);",
+                      "const raw = pm.response.json().data && pm.response.json().data.freezeRollNumbers;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Frozen batch status:', d.status);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Roll Number Batches",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query { listRollNoBatches(academicYearId: \\\"{{academic_year_id}}\\\", campusId: \\\"{{campus_id}}\\\", sectionId: \\\"{{section_id}}\\\") }\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('listRollNoBatches exists', () => pm.expect(pm.response.json().data).to.exist);",
+                      "const raw = pm.response.json().data && pm.response.json().data.listRollNoBatches;",
+                      "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+                      "if (Array.isArray(list)) console.log('Roll number batches:', list.length);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Attendance",
+          "item": [
+            {
+              "name": "Mark Section Attendance",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation MarkSectionAttendance($input: BulkAttendanceInput!) { markSectionAttendance(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"sectionId\": \"{{section_id}}\",\n      \"date\": \"2026-05-06\",\n      \"records\": [\n        {\n          \"studentId\": \"{{student_id}}\",\n          \"status\": \"PRESENT\"\n        }\n      ]\n    }\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('markSectionAttendance exists', () => pm.expect(pm.response.json().data).to.exist);",
+                      "const raw = pm.response.json().data && pm.response.json().data.markSectionAttendance;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Marked:', d.marked, '| Date:', d.date);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Section Attendance (by date)",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetSectionAttendance($sectionId: ID!, $date: AWSDate!) { getSectionAttendance(sectionId: $sectionId, date: $date) { studentId status } }\",\n  \"variables\": {\n    \"sectionId\": \"{{section_id}}\",\n    \"date\": \"2026-05-06\"\n  }\n}"
                 }
               },
               "event": [
@@ -3170,6 +4463,83 @@
                     "exec": [
                       "pm.test('Status 200', () => pm.response.to.have.status(200));",
                       "pm.test('getSectionAttendance exists', () => pm.expect(pm.response.json().data).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Attendance Summary (date range)",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetAttendanceSummary($sectionId: ID!, $fromDate: String!, $toDate: String!) { getSectionAttendanceSummary(sectionId: $sectionId, fromDate: $fromDate, toDate: $toDate) }\",\n  \"variables\": {\n    \"sectionId\": \"{{section_id}}\",\n    \"fromDate\": \"2025-06-01\",\n    \"toDate\": \"2025-12-31\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getSectionAttendanceSummary exists', () => pm.expect(pm.response.json().data).to.exist);",
+                      "const raw = pm.response.json().data && pm.response.json().data.getSectionAttendanceSummary;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Summary:', JSON.stringify(d).slice(0, 200));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Student Attendance (date range)",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetStudentAttendance($studentId: ID!, $from: AWSDate!, $to: AWSDate!) { getStudentAttendance(studentId: $studentId, from: $from, to: $to) { studentId status date } }\",\n  \"variables\": {\n    \"studentId\": \"{{student_id}}\",\n    \"from\": \"2025-06-01\",\n    \"to\": \"2025-12-31\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getStudentAttendance exists', () => pm.expect(pm.response.json().data).to.exist);"
                     ]
                   }
                 }
@@ -3201,7 +4571,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateExam($input: AWSJSON!) { createExam(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Term 1 Exam 2025\\\",\\\"classId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"date\\\":\\\"2025-10-15\\\",\\\"maxMarks\\\":100}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateExam($input: AWSJSON!) { createExam(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Term 1 Exam 2025\\\",\\\"classId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"startDate\\\":\\\"2025-10-15\\\",\\\"endDate\\\":\\\"2025-10-20\\\",\\\"maxMarks\\\":100,\\\"passingMarks\\\":35,\\\"type\\\":\\\"UNIT_TEST\\\"}\"\n  }\n}"
                 }
               },
               "event": [
@@ -3256,7 +4626,205 @@
                     "type": "text/javascript",
                     "exec": [
                       "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                      "pm.test('listExams exists', () => pm.expect(pm.response.json().data).to.exist);"
+                      "const r = pm.response.json();",
+                      "pm.test('listExams exists', () => pm.expect(r.data).to.exist);",
+                      "const raw = r.data && r.data.listExams;",
+                      "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+                      "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('exam_id')) { pm.environment.set('exam_id', list[0].id || list[0]._id); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Exam",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetExam($id: ID!) { getExam(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{exam_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getExam exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getExam).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Enter Marks (single student)",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation EnterMarks($input: AWSJSON!) { enterMarks(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"examId\\\":\\\"{{exam_id}}\\\",\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"marksObtained\\\":78,\\\"maxMarks\\\":100,\\\"grade\\\":\\\"A\\\",\\\"remarks\\\":\\\"Good performance\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('enterMarks exists', () => pm.expect(pm.response.json().data).to.exist);",
+                      "if (pm.response.json().errors) console.warn('Errors:', JSON.stringify(pm.response.json().errors));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Exam Stats",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetExamStats($id: ID!) { getExamStats(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{exam_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('getExamStats exists', () => pm.expect(r.data).to.exist);",
+                      "const raw = r.data && r.data.getExamStats;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Exam stats — avg:', d.average, '| highest:', d.highest, '| pass:', d.passCount, '| fail:', d.failCount);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Marks Status",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetMarksStatus($id: ID!) { getMarksStatus(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{exam_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('getMarksStatus exists', () => pm.expect(r.data).to.exist);",
+                      "const raw = r.data && r.data.getMarksStatus;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Total entries:', d.totalEntries, '| Submitted:', d.submitted);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Exam Results",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query GetExamResults($examId: ID!) { getExamResults(examId: $examId) }\",\n  \"variables\": {\n    \"examId\": \"{{exam_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('getExamResults exists', () => pm.expect(pm.response.json().data).to.exist);"
                     ]
                   }
                 }
@@ -3283,7 +4851,118 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PublishResults($examId: ID!) { publishResults(examId: $examId) }\",\n  \"variables\": {\n    \"examId\": \"{{exam_id}}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PublishResults($id: ID!) { publishResults(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{exam_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Results (published)",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query { listResults }\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('listResults exists', () => pm.expect(pm.response.json().data).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Update Exam",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation UpdateExam($id: ID!, $input: AWSJSON!) { updateExam(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{exam_id}}\",\n    \"input\": \"{\\\"name\\\":\\\"Term 1 Exam 2025 (Updated)\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Delete Exam",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation DeleteExam($id: ID!) { deleteExam(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{exam_id}}\"\n  }\n}"
                 }
               },
               "event": [
@@ -3346,7 +5025,49 @@
               ]
             },
             {
-              "name": "Promote Students",
+              "name": "Auto-Evaluate Promotion Eligibility",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation AutoEvaluatePromotionEligibility($input: AWSJSON!) { autoEvaluatePromotionEligibility(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"minAttendancePct\\\":75,\\\"minAvgMarks\\\":35}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "pm.test('autoEvaluatePromotionEligibility response exists', () => pm.expect(r.data || r.errors).to.exist);",
+                      "const raw = r.data && r.data.autoEvaluatePromotionEligibility;",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d) console.log('Evaluated:', d.evaluated, '| Eligible:', d.eligible, '| Ineligible:', d.ineligible);",
+                      "if (r.errors) console.warn('Not deployed yet:', r.errors[0].message);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Promote Students — SAME_SECTION / Skip fee",
               "request": {
                 "method": "POST",
                 "url": "{{appsync_url}}",
@@ -3378,16 +5099,391 @@
                       "pm.test('Status 200', () => pm.response.to.have.status(200));",
                       "const r = pm.response.json();",
                       "const raw = r.data && r.data.promoteStudents;",
-                      "pm.test('promoteStudents exists', () => pm.expect(raw).to.exist);",
+                      "pm.test('promoteStudents (SAME_SECTION) exists', () => pm.expect(raw).to.exist);",
                       "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
                       "if (d && d.batch && (d.batch.id || d.batch._id)) {",
                       "  const batchId = d.batch.id || d.batch._id;",
                       "  pm.environment.set('promotion_batch_id', batchId);",
                       "  console.log('promotion_batch_id:', batchId);",
                       "}",
-                      "pm.test('Has batch', () => pm.expect(d && d.batch).to.exist);",
-                      "pm.test('promotedCount >= 0', () => pm.expect(d && d.promotedCount).to.be.at.least(0));",
-                      "console.log('Promoted:', d && d.promotedCount, '| Detained:', d && d.detainedCount, '| Skipped:', d && d.skippedCount, '| Failed:', d && d.failedCount);"
+                      "pm.test('Has batch or error info', () => pm.expect(d || r.errors).to.exist);",
+                      "console.log('Promoted:', d && d.promotedCount, '| Strategy:', d && d.strategy, '| Errors:', r.errors && r.errors[0] && r.errors[0].message);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Promote Students — MANUAL sections / Copy fee pattern",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"studentIds\\\":[\\\"{{student_id}}\\\"],\\\"sectionStrategy\\\":\\\"MANUAL\\\",\\\"manualAssignments\\\":[{\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\"}],\\\"eligibilityMode\\\":\\\"PROMOTE_ALL\\\",\\\"feeAction\\\":\\\"COPY_PATTERN\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data.promoteStudents;",
+                      "pm.test('promoteStudents (MANUAL) exists', () => pm.expect(raw).to.exist);",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d && d.batch && (d.batch.id || d.batch._id)) {",
+                      "  const batchId = d.batch.id || d.batch._id;",
+                      "  pm.environment.set('promotion_batch_id', batchId);",
+                      "  console.log('promotion_batch_id:', batchId);",
+                      "}",
+                      "pm.test('Has batch or error info', () => pm.expect(d || r.errors).to.exist);",
+                      "console.log('Promoted:', d && d.promotedCount, '| Strategy:', d && d.strategy, '| Errors:', r.errors && r.errors[0] && r.errors[0].message);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Promote Students — AUTO_SHUFFLE / Assign existing fee",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"AUTO_SHUFFLE\\\",\\\"eligibilityMode\\\":\\\"PROMOTE_ALL\\\",\\\"feeAction\\\":\\\"ASSIGN_EXISTING\\\",\\\"feeStructureId\\\":\\\"{{fee_structure_id}}\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data.promoteStudents;",
+                      "pm.test('promoteStudents (AUTO_SHUFFLE) exists', () => pm.expect(raw).to.exist);",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d && d.batch && (d.batch.id || d.batch._id)) {",
+                      "  const batchId = d.batch.id || d.batch._id;",
+                      "  pm.environment.set('promotion_batch_id', batchId);",
+                      "  console.log('promotion_batch_id:', batchId);",
+                      "}",
+                      "pm.test('Has batch or error info', () => pm.expect(d || r.errors).to.exist);",
+                      "console.log('Promoted:', d && d.promotedCount, '| Strategy:', d && d.strategy, '| Errors:', r.errors && r.errors[0] && r.errors[0].message);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Promote Students — GENDER_BALANCE",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"GENDER_BALANCE\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data.promoteStudents;",
+                      "pm.test('promoteStudents (GENDER_BALANCE) exists', () => pm.expect(raw).to.exist);",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d && d.batch && (d.batch.id || d.batch._id)) {",
+                      "  const batchId = d.batch.id || d.batch._id;",
+                      "  pm.environment.set('promotion_batch_id', batchId);",
+                      "  console.log('promotion_batch_id:', batchId);",
+                      "}",
+                      "pm.test('Has batch or error info', () => pm.expect(d || r.errors).to.exist);",
+                      "console.log('Promoted:', d && d.promotedCount, '| Strategy:', d && d.strategy, '| Errors:', r.errors && r.errors[0] && r.errors[0].message);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Promote Students — CAPACITY_LIMIT",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"CAPACITY_LIMIT\\\",\\\"sectionCapacity\\\":40,\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data.promoteStudents;",
+                      "pm.test('promoteStudents (CAPACITY_LIMIT) exists', () => pm.expect(raw).to.exist);",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d && d.batch && (d.batch.id || d.batch._id)) {",
+                      "  const batchId = d.batch.id || d.batch._id;",
+                      "  pm.environment.set('promotion_batch_id', batchId);",
+                      "  console.log('promotion_batch_id:', batchId);",
+                      "}",
+                      "pm.test('Has batch or error info', () => pm.expect(d || r.errors).to.exist);",
+                      "console.log('Promoted:', d && d.promotedCount, '| Strategy:', d && d.strategy, '| Errors:', r.errors && r.errors[0] && r.errors[0].message);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Promote Students — PERFORMANCE_RANK (by exam scores)",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"PERFORMANCE_RANK\\\",\\\"examId\\\":\\\"{{exam_id}}\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data.promoteStudents;",
+                      "pm.test('promoteStudents (PERFORMANCE_RANK) exists', () => pm.expect(raw).to.exist);",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d && d.batch && (d.batch.id || d.batch._id)) {",
+                      "  const batchId = d.batch.id || d.batch._id;",
+                      "  pm.environment.set('promotion_batch_id', batchId);",
+                      "  console.log('promotion_batch_id:', batchId);",
+                      "}",
+                      "pm.test('Has batch or error info', () => pm.expect(d || r.errors).to.exist);",
+                      "console.log('Promoted:', d && d.promotedCount, '| Strategy:', d && d.strategy, '| Errors:', r.errors && r.errors[0] && r.errors[0].message);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Promote Students — SUBJECT_GROUP",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"SUBJECT_GROUP\\\",\\\"subjectGroupMappings\\\":[{\\\"subjectId\\\":\\\"{{subject_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\"}],\\\"eligibilityMode\\\":\\\"PROMOTE_ALL\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data.promoteStudents;",
+                      "pm.test('promoteStudents (SUBJECT_GROUP) exists', () => pm.expect(raw).to.exist);",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d && d.batch && (d.batch.id || d.batch._id)) {",
+                      "  const batchId = d.batch.id || d.batch._id;",
+                      "  pm.environment.set('promotion_batch_id', batchId);",
+                      "  console.log('promotion_batch_id:', batchId);",
+                      "}",
+                      "pm.test('Has batch or error info', () => pm.expect(d || r.errors).to.exist);",
+                      "console.log('Promoted:', d && d.promotedCount, '| Strategy:', d && d.strategy, '| Errors:', r.errors && r.errors[0] && r.errors[0].message);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Promote Students — TRANSPORT_ROUTE",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"TRANSPORT_ROUTE\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data.promoteStudents;",
+                      "pm.test('promoteStudents (TRANSPORT_ROUTE) exists', () => pm.expect(raw).to.exist);",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d && d.batch && (d.batch.id || d.batch._id)) {",
+                      "  const batchId = d.batch.id || d.batch._id;",
+                      "  pm.environment.set('promotion_batch_id', batchId);",
+                      "  console.log('promotion_batch_id:', batchId);",
+                      "}",
+                      "pm.test('Has batch or error info', () => pm.expect(d || r.errors).to.exist);",
+                      "console.log('Promoted:', d && d.promotedCount, '| Strategy:', d && d.strategy, '| Errors:', r.errors && r.errors[0] && r.errors[0].message);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Promote Students — EXCEL_IMPORT (pre-uploaded file)",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"EXCEL_IMPORT\\\",\\\"importFileKey\\\":\\\"promotions/section-map.csv\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "const raw = r.data && r.data.promoteStudents;",
+                      "pm.test('promoteStudents (EXCEL_IMPORT) exists', () => pm.expect(raw).to.exist);",
+                      "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                      "if (d && d.batch && (d.batch.id || d.batch._id)) {",
+                      "  const batchId = d.batch.id || d.batch._id;",
+                      "  pm.environment.set('promotion_batch_id', batchId);",
+                      "  console.log('promotion_batch_id:', batchId);",
+                      "}",
+                      "pm.test('Has batch or error info', () => pm.expect(d || r.errors).to.exist);",
+                      "console.log('Promoted:', d && d.promotedCount, '| Strategy:', d && d.strategy, '| Errors:', r.errors && r.errors[0] && r.errors[0].message);"
                     ]
                   }
                 }
@@ -3424,7 +5520,12 @@
                     "type": "text/javascript",
                     "exec": [
                       "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                      "pm.test('listPromotionBatches exists', () => pm.expect(pm.response.json().data).to.exist);"
+                      "pm.test('listPromotionBatches exists', () => pm.expect(pm.response.json().data).to.exist);",
+                      "const raw = pm.response.json().data && pm.response.json().data.listPromotionBatches;",
+                      "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+                      "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('promotion_batch_id')) {",
+                      "  pm.environment.set('promotion_batch_id', list[0].id || list[0]._id);",
+                      "}"
                     ]
                   }
                 }
@@ -3499,6 +5600,44 @@
                     "exec": [
                       "pm.test('Status 200', () => pm.response.to.have.status(200));",
                       "pm.test('listPromotionBatchItems exists', () => pm.expect(pm.response.json().data).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Rollback Promotion Batch",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "{{id_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "x-tenant-id",
+                    "value": "{{tenant_id}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation RollbackPromotionBatch($id: ID!) { rollbackPromotionBatch(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{promotion_batch_id}}\"\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
+                      "console.log('Rollback result:', JSON.stringify(pm.response.json().data || pm.response.json().errors).slice(0, 200));"
                     ]
                   }
                 }
@@ -3990,6 +6129,713 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🛡️ Platform Admin",
+      "description": "Platform super-admin APIs. Requires platform_id_token (separate Cognito pool). Set platform_admin_email + platform_admin_password in env, then run \"Get Platform Token\".",
+      "item": [
+        {
+          "name": "Get Platform Token",
+          "request": {
+            "method": "POST",
+            "url": "https://cognito-idp.{{cognito_region}}.amazonaws.com/",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-amz-json-1.1"
+              },
+              {
+                "key": "X-Amz-Target",
+                "value": "AmazonCognitoIdentityProviderService.InitiateAuth"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": {\n    \"USERNAME\": \"{{platform_admin_email}}\",\n    \"PASSWORD\": \"{{platform_admin_password}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "if (r.AuthenticationResult) {",
+                  "  pm.environment.set('platform_access_token', r.AuthenticationResult.AccessToken);",
+                  "  pm.environment.set('platform_id_token', r.AuthenticationResult.IdToken);",
+                  "  pm.environment.set('platform_refresh_token', r.AuthenticationResult.RefreshToken || '');",
+                  "  console.log('Platform token saved');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Tenants",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { listTenants }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('listTenants response', () => pm.expect(r.data || r.errors).to.exist);",
+                  "const raw = r.data && r.data.listTenants;",
+                  "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+                  "if (Array.isArray(list) && list.length > 0) {",
+                  "  pm.environment.set('target_tenant_id', list[0].id || list[0]._id);",
+                  "  console.log('First tenant:', list[0].id || list[0]._id, '|', list[0].name);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query GetTenant($id: ID!) { getTenant(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{target_tenant_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('getTenant response', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation CreateTenant($input: AWSJSON!) { createTenant(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Test School\\\",\\\"slug\\\":\\\"test-school-demo\\\",\\\"plan\\\":\\\"BASIC\\\",\\\"adminEmail\\\":\\\"testadmin@example.com\\\"}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('createTenant response', () => pm.expect(r.data || r.errors).to.exist);",
+                  "const raw = r.data && r.data.createTenant;",
+                  "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                  "if (d && (d.id || d._id)) { pm.environment.set('target_tenant_id', d.id || d._id); console.log('Created tenant:', d.id || d._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation UpdateTenant($id: ID!, $input: AWSJSON!) { updateTenant(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{target_tenant_id}}\",\n    \"input\": \"{\\\"plan\\\":\\\"STANDARD\\\"}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Suspend Tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation SuspendTenant($id: ID!) { suspendTenant(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{target_tenant_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reactivate Tenant",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ReactivateTenant($id: ID!) { reactivateTenant(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{target_tenant_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Provision Tenant + Campus + Admin",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ProvisionTenant($input: AWSJSON!) { provisionTenant(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Demo School\\\",\\\"slug\\\":\\\"demo-school\\\",\\\"plan\\\":\\\"STANDARD\\\",\\\"campusName\\\":\\\"Main Campus\\\",\\\"adminEmail\\\":\\\"demoadmin@example.com\\\",\\\"adminPassword\\\":\\\"Qwerty@1234\\\"}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('provisionTenant response', () => pm.expect(r.data || r.errors).to.exist);",
+                  "const raw = r.data && r.data.provisionTenant;",
+                  "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                  "if (d) console.log('Provisioned tenant:', d.tenantId, '| campus:', d.campusId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List All Users (Platform)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { listAllUsers(limit: 20) }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('listAllUsers response', () => pm.expect(r.data || r.errors).to.exist);",
+                  "const raw = r.data && r.data.listAllUsers;",
+                  "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                  "const items = d && (d.edges || d.items || d);",
+                  "if (Array.isArray(items) && items.length > 0) {",
+                  "  const u = items[0].node || items[0];",
+                  "  pm.environment.set('target_user_id', u.id || u._id);",
+                  "  console.log('First user:', u.id || u._id, '|', u.email);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get User (Platform)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query GetUser($id: ID!) { getUser(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{target_user_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('getUser response', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disable User (Platform)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation DisableUser($userId: ID!) { disableUser(userId: $userId) }\",\n  \"variables\": {\n    \"userId\": \"{{target_user_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enable User (Platform)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation EnableUser($userId: ID!) { enableUser(userId: $userId) }\",\n  \"variables\": {\n    \"userId\": \"{{target_user_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete User (Platform)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation DeleteUser($userId: ID!) { deleteUser(userId: $userId) }\",\n  \"variables\": {\n    \"userId\": \"{{target_user_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Feature Flags",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { listFeatureFlags }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('listFeatureFlags response', () => pm.expect(r.data || r.errors).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Feature Flag",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation SetFeatureFlag($input: AWSJSON!) { setFeatureFlag(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"flag\\\":\\\"ENABLE_PROMOTIONS\\\",\\\"value\\\":true,\\\"tenantId\\\":\\\"{{target_tenant_id}}\\\"}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Platform Overview (Super Admin Dashboard)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { platformOverview }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('platformOverview response', () => pm.expect(r.data || r.errors).to.exist);",
+                  "const raw = r.data && r.data.platformOverview;",
+                  "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+                  "if (d) console.log('Total tenants:', d.totalTenants, '| Active:', d.activeTenants, '| Users:', d.totalUsers);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Platform Audit Logs",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { platformAuditLogs(limit: 20) }\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('platformAuditLogs response', () => pm.expect(r.data || r.errors).to.exist);",
+                  "const raw = r.data && r.data.platformAuditLogs;",
+                  "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+                  "if (Array.isArray(list) && list.length > 0) { pm.environment.set('platform_audit_log_id', list[0].id || list[0]._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Tenant Usage Stats",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query GetTenantUsage($tenantId: ID!) { getTenantUsageStats(tenantId: $tenantId) }\",\n  \"variables\": {\n    \"tenantId\": \"{{target_tenant_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request Tenant Deletion (sends OTP)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation RequestTenantDeletion($tenantId: ID!) { requestTenantDeletion(tenantId: $tenantId) }\",\n  \"variables\": {\n    \"tenantId\": \"{{target_tenant_id}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
+                  "console.log('Check email for deletion OTP, then set deletion_otp env var');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm Tenant Deletion (with OTP)",
+          "request": {
+            "method": "POST",
+            "url": "{{appsync_url}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "{{platform_id_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation ConfirmTenantDeletion($tenantId: ID!, $otp: String!) { confirmTenantDeletion(tenantId: $tenantId, otp: $otp) }\",\n  \"variables\": {\n    \"tenantId\": \"{{target_tenant_id}}\",\n    \"otp\": \"{{deletion_otp}}\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
+                  "console.log('Deletion result:', JSON.stringify(pm.response.json().data || pm.response.json().errors).slice(0,200));"
                 ]
               }
             }

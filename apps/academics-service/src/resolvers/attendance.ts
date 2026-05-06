@@ -1,8 +1,61 @@
-import { AcademicsRepo, Attendance, Student } from '@vebgenix/db';
+import { AcademicsRepo, Attendance, Section, Student } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 import { Types } from 'mongoose';
+
+function toPlainDoc(doc: unknown): Record<string, unknown> {
+  return (doc as { toObject?: () => Record<string, unknown> }).toObject?.()
+    ?? (doc as Record<string, unknown>);
+}
+
+function asId(value: unknown): string {
+  return value == null ? '' : String(value);
+}
+
+function asDate(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().split('T')[0];
+  return new Date(value as string).toISOString().split('T')[0];
+}
+
+function toAttendanceStudentInfo(studentId: string, student?: Record<string, unknown>) {
+  const firstName = student?.firstName as string | undefined;
+  const lastName  = student?.lastName  as string | undefined;
+  return {
+    id:                 asId(student?._id ?? student?.id ?? studentId),
+    firstName,
+    lastName,
+    fullName:           (student?.fullName as string | undefined) || [firstName, lastName].filter(Boolean).join(' ') || 'Unknown',
+    registrationNumber: student?.registrationNumber,
+    admissionNumber:    student?.admissionNumber ?? student?.admissionNo,
+  };
+}
+
+async function toAttendanceRecords(rows: unknown[], tenantId: string) {
+  const docs = rows.map(toPlainDoc);
+  const studentIds = Array.from(new Set(docs.map(r => asId(r.studentId)).filter(Boolean)));
+  const students = studentIds.length > 0
+    ? await Student.find({ tenantId, _id: { $in: studentIds.map(id => new Types.ObjectId(id)) } })
+      .select('_id firstName lastName fullName registrationNumber admissionNumber admissionNo')
+      .lean()
+    : [];
+  const studentMap = new Map(students.map(s => [s._id.toString(), s as Record<string, unknown>]));
+
+  return docs.map(row => {
+    const studentId = asId(row.studentId);
+    return {
+      id:        asId(row._id ?? row.id),
+      studentId,
+      student:   toAttendanceStudentInfo(studentId, studentMap.get(studentId)),
+      sectionId: asId(row.sectionId),
+      campusId:  asId(row.campusId),
+      date:      asDate(row.date),
+      status:    row.status,
+      remarks:   row.remarks,
+      markedBy:  row.markedBy ? asId(row.markedBy) : null,
+    };
+  });
+}
 
 export async function resolveAttendance(
   operation: string,
@@ -15,19 +68,23 @@ export async function resolveAttendance(
     // ── Read: by section / date ───────────────────────────────────────────────
     case 'getSectionAttendance':
     case 'getClassAttendance':                               // alias — same semantics
-    case 'GET:/api/tenant/sections/:sectionId/attendance':
-      return AcademicsRepo.listAttendance(
+    case 'GET:/api/tenant/sections/:sectionId/attendance': {
+      const rows = await AcademicsRepo.listAttendance(
         tenantId,
         { sectionId: args.sectionId as string },
         new Date(args.date as string),
       );
+      return toAttendanceRecords(rows, tenantId);
+    }
 
-    case 'listAttendance':
-      return AcademicsRepo.listAttendance(
+    case 'listAttendance': {
+      const rows = await AcademicsRepo.listAttendance(
         tenantId,
         { classId: args.classId as string },
         new Date(args.date as string),
       );
+      return toAttendanceRecords(rows, tenantId);
+    }
 
     // ── Read: by student + date range ─────────────────────────────────────────
     case 'getStudentAttendance':
@@ -39,7 +96,8 @@ export async function resolveAttendance(
         date: { $gte: new Date(from), $lte: new Date(to) },
       })
         .sort({ date: 1 })
-        .lean();
+        .lean()
+        .then(rows => toAttendanceRecords(rows, tenantId));
     }
 
     // ── Mark attendance ───────────────────────────────────────────────────────
@@ -53,11 +111,16 @@ export async function resolveAttendance(
         records: Array<{ studentId: string; status: string; remarks?: string }>;
       };
       if (!Array.isArray(records)) throw new AppError('BAD_REQUEST', 'records array required');
+      if (records.length === 0) throw new AppError('BAD_REQUEST', 'records array cannot be empty');
       const date      = new Date(input.date as string);
       const sectionId = (input.sectionId ?? args.sectionId) as string;
       const campusId  = (input.campusId  ?? args.campusId)  as string | undefined;
       const sectionObjectId = new Types.ObjectId(sectionId);
-      const campusObjectId  = campusId ? new Types.ObjectId(campusId) : undefined;
+      const section = await Section.findOne({ tenantId, _id: sectionObjectId }).lean();
+      if (!section) throw new AppError('NOT_FOUND', 'Section not found');
+      const classObjectId  = new Types.ObjectId(String((input.classId ?? section.classId) as string));
+      const campusObjectId = new Types.ObjectId(String(campusId ?? section.campusId));
+      const studentObjectIds = records.map(r => new Types.ObjectId(r.studentId));
       const ops = records.map(r => ({
         updateOne: {
           filter: { tenantId, studentId: new Types.ObjectId(r.studentId), date },
@@ -66,6 +129,7 @@ export async function resolveAttendance(
               tenantId,
               studentId: new Types.ObjectId(r.studentId),
               sectionId: sectionObjectId,
+              classId:   classObjectId,
               campusId:  campusObjectId,
               date,
               status:   r.status,
@@ -76,8 +140,13 @@ export async function resolveAttendance(
           upsert: true,
         },
       }));
-      const { modifiedCount, upsertedCount } = await Attendance.bulkWrite(ops as never);
-      return { marked: modifiedCount + upsertedCount, date: date.toISOString() };
+      await Attendance.bulkWrite(ops as never);
+      const rows = await Attendance.find({
+        tenantId,
+        studentId: { $in: studentObjectIds },
+        date,
+      }).lean();
+      return toAttendanceRecords(rows, tenantId);
     }
 
     // ── Summaries ─────────────────────────────────────────────────────────────

@@ -19,7 +19,10 @@ export async function resolveExams(
     case 'createExam': {
       authorize(ctx, 'academics.exams.update');
       const input = (args.input as Record<string, unknown>) ?? args;
-      return AcademicsRepo.createExam(tenantId, input as object);
+      return AcademicsRepo.createExam(tenantId, {
+        ...input,
+        createdBy: ctx.membership!.profileId,
+      });
     }
 
     case 'updateExam':

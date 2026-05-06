@@ -10,11 +10,14 @@ export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 export interface ITimetableSlot {
   day:        DayOfWeek;
   period:     number;      // 1-based period index
-  subjectId:  string;
-  subjectName:string;
-  teacherId:  string;      // Employee profileId
-  teacherName:string;
+  subjectId?:  string;
+  subjectName?:string;
+  teacherId?:  string;      // Employee profileId
+  teacherName?:string;
   roomId?:    string;
+  room?:      string;
+  label?:     string;
+  isBreak:    boolean;
   startTime:  string;      // "09:00"
   endTime:    string;      // "09:45"
 }
@@ -34,11 +37,14 @@ export interface ITimetable extends Document {
 const SlotSchema = new Schema<ITimetableSlot>({
   day:         { type: String, enum: ['MON','TUE','WED','THU','FRI','SAT','SUN'], required: true },
   period:      { type: Number, required: true },
-  subjectId:   { type: String, required: true },
-  subjectName: { type: String, required: true },
-  teacherId:   { type: String, required: true },
-  teacherName: { type: String, required: true },
+  subjectId:   { type: String },
+  subjectName: { type: String },
+  teacherId:   { type: String },
+  teacherName: { type: String },
   roomId:      { type: String },
+  room:        { type: String },
+  label:       { type: String },
+  isBreak:     { type: Boolean, default: false },
   startTime:   { type: String, required: true },
   endTime:     { type: String, required: true },
 }, { _id: false });
