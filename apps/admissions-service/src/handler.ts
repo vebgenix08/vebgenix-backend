@@ -19,6 +19,14 @@ import { CreateApplication } from './use-cases/CreateApplication';
 import { ReviewApplication } from './use-cases/ReviewApplication';
 import { Types } from 'mongoose';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 
 function parseEvent(event: Record<string, unknown>) {
   if (event.info) {
@@ -71,23 +79,24 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if (args.status)   filter.status   = args.status;
         if (args.campusId) filter.campusId  = args.campusId;
         if (args.programId) filter.programId = args.programId;
-        return AdmissionsRepo.listEnquiries(tenantId, filter);
+        const enquiryList = await AdmissionsRepo.listEnquiries(tenantId, filter);
+        return (enquiryList as unknown[]).map(d => toGql(d));
       }
 
       case 'getEnquiry':
       case 'GET:/api/admissions/enquiries/:id':
         authorize(ctx, 'admissions.enquiry.read');
-        return AdmissionsRepo.findEnquiryById(tenantId, args.id as string);
+        return toGql(await AdmissionsRepo.findEnquiryById(tenantId, args.id as string));
 
       case 'createEnquiry':
       case 'POST:/api/admissions/enquiries':
-        return CreateEnquiry.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateEnquiry.execute>[1]);
+        return toGql(await CreateEnquiry.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateEnquiry.execute>[1]));
 
       case 'updateEnquiry':
       case 'PATCH:/api/admissions/enquiries/:id': {
         authorize(ctx, 'admissions.enquiry.update');
         const { id, ...update } = args as Record<string, unknown>;
-        return AdmissionsRepo.updateEnquiry(tenantId, id as string, update);
+        return toGql(await AdmissionsRepo.updateEnquiry(tenantId, id as string, update));
       }
 
       case 'deleteEnquiry':
@@ -99,7 +108,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'checkDuplicate':
       case 'POST:/api/admissions/duplicate-check':
         authorize(ctx, 'admissions.enquiry.read');
-        return AdmissionsRepo.findDuplicateEnquiry(tenantId, args.phone as string, args.email as string | undefined);
+        return toGql(await AdmissionsRepo.findDuplicateEnquiry(tenantId, args.phone as string, args.email as string | undefined));
 
       // ── Applications ─────────────────────────────────────────────────────────
       case 'listApplications':
@@ -108,25 +117,27 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const filter: Record<string, unknown> = {};
         if (args.status)   filter.status   = args.status;
         if (args.campusId) filter.campusId  = args.campusId;
-        return AdmissionsRepo.listApplications(tenantId, filter);
+        const appList = await AdmissionsRepo.listApplications(tenantId, filter);
+        return (appList as unknown[]).map(d => toGql(d));
       }
 
       case 'getApprovalQueue':
       case 'GET:/api/admissions/applications/approval-queue': {
         authorize(ctx, 'admissions.application.review');
-        return AdmissionsRepo.listApplications(tenantId, {
+        const queueList = await AdmissionsRepo.listApplications(tenantId, {
           status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] },
         });
+        return (queueList as unknown[]).map(d => toGql(d));
       }
 
       case 'getApplication':
       case 'GET:/api/admissions/applications/:id':
         authorize(ctx, 'admissions.application.read');
-        return AdmissionsRepo.findApplicationById(tenantId, args.id as string);
+        return toGql(await AdmissionsRepo.findApplicationById(tenantId, args.id as string));
 
       case 'createApplication':
       case 'POST:/api/admissions/applications':
-        return CreateApplication.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateApplication.execute>[1]);
+        return toGql(await CreateApplication.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateApplication.execute>[1]));
 
       case 'submitApplication':
       case 'POST:/api/admissions/applications/:id/submit': {
@@ -134,18 +145,18 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const app = await AdmissionsRepo.findApplicationById(tenantId, args.id as string);
         if (!app) throw new AppError('NOT_FOUND', 'Application not found');
         if (app.status !== 'DRAFT') throw new AppError('BAD_REQUEST', `Cannot submit — status is ${app.status}`);
-        return AdmissionsRepo.updateApplication(tenantId, args.id as string, {
+        return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, {
           status: 'SUBMITTED',
           submittedAt: new Date(),
-        });
+        }));
       }
 
       case 'reviewApplication':
       case 'POST:/api/admissions/applications/:id/review':
-        return ReviewApplication.execute(ctx, {
+        return toGql(await ReviewApplication.execute(ctx, {
           applicationId: args.id as string,
           ...(args as object),
-        } as Parameters<typeof ReviewApplication.execute>[1]);
+        } as Parameters<typeof ReviewApplication.execute>[1]));
 
       case 'getApplicationReviews':
       case 'GET:/api/admissions/applications/:id/reviews': {
@@ -164,28 +175,28 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if (['ENROLLED', 'WITHDRAWN'].includes(app.status)) {
           throw new AppError('BAD_REQUEST', `Cannot withdraw — status is ${app.status}`);
         }
-        return AdmissionsRepo.updateApplication(tenantId, args.id as string, { status: 'WITHDRAWN' });
+        return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, { status: 'WITHDRAWN' }));
       }
 
       case 'approveApplication':
       case 'POST:/api/admissions/applications/:id/approve': {
         authorize(ctx, 'admissions.application.approve');
-        return AdmissionsRepo.updateApplication(tenantId, args.id as string, {
+        return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, {
           status:     'APPROVED',
           approvedAt: new Date(),
           approvedBy: new Types.ObjectId(ctx.membership!.profileId),
-        });
+        }));
       }
 
       case 'rejectApplication':
       case 'POST:/api/admissions/applications/:id/reject': {
         authorize(ctx, 'admissions.application.approve');
-        return AdmissionsRepo.updateApplication(tenantId, args.id as string, {
+        return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, {
           status:     'REJECTED',
           rejectedAt: new Date(),
           rejectedBy: new Types.ObjectId(ctx.membership!.profileId),
           rejectionReason: args.reason as string | undefined,
-        });
+        }));
       }
 
       // ── Document workflow ────────────────────────────────────────────────────
@@ -200,7 +211,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const docIndex = docs.findIndex((d) => d.id?.toString() === docKey || d.key === docKey || d.type === docKey);
         if (docIndex === -1) throw new AppError('NOT_FOUND', `Document "${docKey}" not found on this application`);
         docs[docIndex] = { ...docs[docIndex], verified: true, verifiedAt: new Date(), verifiedBy: ctx.membership!.profileId };
-        return AdmissionsRepo.updateApplication(tenantId, appId, { documents: docs as never });
+        return toGql(await AdmissionsRepo.updateApplication(tenantId, appId, { documents: docs as never }));
       }
 
       case 'getUploadUrl':

@@ -2,6 +2,14 @@ import { Class } from '@vebgenix/db';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 export async function resolveClasses(
   operation: string,
   args: Record<string, unknown>,
@@ -14,39 +22,41 @@ export async function resolveClasses(
       const filter: Record<string, unknown> = { tenantId, isActive: true };
       if (args.campusId)  filter.campusId  = args.campusId;
       if (args.programId) filter.programId = args.programId;
-      return Class.find(filter).sort({ name: 1 }).lean();
+      const docs = await Class.find(filter).sort({ name: 1 }).lean();
+      return docs.map(d => toGql(d));
     }
 
     case 'getClass':
     case 'GET:/api/tenant/classes/:classId':
-      return Class.findOne({ tenantId, _id: args.classId ?? args.id }).lean();
+      return toGql(await Class.findOne({ tenantId, _id: args.classId ?? args.id }).lean());
 
     case 'createClass':
     case 'POST:/api/tenant/classes': {
       authorize(ctx, 'academics.classes.create');
       const input = (args.input as Record<string, unknown>) ?? args;
-      return Class.create({ ...input, tenantId });
+      const doc = await Class.create({ ...input, tenantId });
+      return toGql(doc.toObject());
     }
 
     case 'updateClass':
     case 'PATCH:/api/tenant/classes/:classId': {
       authorize(ctx, 'academics.classes.update');
       const input = (args.input as Record<string, unknown>) ?? args;
-      return Class.findOneAndUpdate(
+      return toGql(await Class.findOneAndUpdate(
         { tenantId, _id: args.classId ?? args.id },
         { $set: input },
         { new: true },
-      ).lean();
+      ).lean());
     }
 
     case 'deleteClass':
     case 'DELETE:/api/tenant/classes/:classId':
       authorize(ctx, 'academics.classes.delete');
-      return Class.findOneAndUpdate(
+      return toGql(await Class.findOneAndUpdate(
         { tenantId, _id: args.classId ?? args.id },
         { $set: { isActive: false } },
         { new: true },
-      ).lean();
+      ).lean());
 
     default:
       return undefined;

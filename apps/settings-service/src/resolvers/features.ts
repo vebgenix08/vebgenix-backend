@@ -2,6 +2,14 @@ import { TenantFeature } from '@vebgenix/db';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 /** All platform features that can be toggled per-tenant. */
 const AVAILABLE_FEATURES = [
   {
@@ -82,7 +90,7 @@ export async function resolveFeatures(
     case 'getTenantFeatures':
     case 'GET:/api/admin/settings/features': {
       const doc = await TenantFeature.findOne({ tenantId }).lean();
-      return doc ?? { tenantId, features: {} };
+      return toGql(doc) ?? { tenantId, features: {} };
     }
 
     case 'updateTenantFeatures':
@@ -91,11 +99,11 @@ export async function resolveFeatures(
       const tid = (args.id as string) ?? tenantId;
       if (!ctx.isPlatformAdmin) authorize(ctx, 'tenant.settings.update');
       const features = (args.features as Record<string, boolean>) ?? args;
-      return TenantFeature.findOneAndUpdate(
+      return toGql(await TenantFeature.findOneAndUpdate(
         { tenantId: tid },
         { $set: { features, updatedBy: ctx.membership?.profileId ?? ctx.userId } },
         { upsert: true, new: true },
-      ).lean();
+      ).lean());
     }
 
     default:

@@ -29,7 +29,7 @@ export async function resolvePrograms(
       const input = (args.input as Record<string, unknown>) ?? args;
       try {
         const doc = await Program.create({ ...input, tenantId });
-        const obj = doc.toObject() as Record<string, unknown>;
+        const obj = doc.toObject() as unknown as Record<string, unknown>;
         return { ...obj, id: String(obj._id) };
       } catch (e: unknown) {
         const err = e as { code?: number; message?: string; errors?: Record<string, { message: string }> };

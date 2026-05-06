@@ -4,6 +4,14 @@ import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 import { CreateFeeHead } from '../use-cases/CreateFeeHead';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 export async function resolveFeeHeads(
   operation: string,
   args: Record<string, unknown>,
@@ -16,20 +24,22 @@ export async function resolveFeeHeads(
       authorize(ctx, 'finance.fee_head.read');
       const filters: { feeCategoryId?: string; activeOnly?: boolean } = {};
       if (args.feeCategoryId) filters.feeCategoryId = args.feeCategoryId as string;
-      // schema exposes `isActive`; also accept legacy `activeOnly`
       const activeFlag = args.isActive ?? args.activeOnly;
       if (activeFlag === false || activeFlag === 'false') filters.activeOnly = false;
-      return FinanceRepo.listFeeHeadsFiltered(tenantId, filters);
+      const docs = await FinanceRepo.listFeeHeadsFiltered(tenantId, filters);
+      return (docs as unknown[]).map(d => toGql(d));
     }
 
     case 'getFeeHead':
     case 'GET:/api/admin/finance/fee-heads/:id':
       authorize(ctx, 'finance.fee_head.read');
-      return FinanceRepo.findFeeHeadById(tenantId, args.id as string);
+      return toGql(await FinanceRepo.findFeeHeadById(tenantId, args.id as string));
 
     case 'createFeeHead':
-    case 'POST:/api/admin/finance/fee-heads':
-      return CreateFeeHead.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateFeeHead.execute>[1]);
+    case 'POST:/api/admin/finance/fee-heads': {
+      const result = await CreateFeeHead.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateFeeHead.execute>[1]);
+      return toGql(result);
+    }
 
     case 'updateFeeHead':
     case 'PATCH:/api/admin/finance/fee-heads/:id': {
@@ -41,7 +51,7 @@ export async function resolveFeeHeads(
       const existing = await FinanceRepo.findFeeHeadById(tenantId, id);
       if (!existing) throw new AppError('NOT_FOUND', 'Fee head not found');
       if (typeof update.code === 'string') update.code = update.code.toUpperCase();
-      return FinanceRepo.updateFeeHead(tenantId, id, update);
+      return toGql(await FinanceRepo.updateFeeHead(tenantId, id, update));
     }
 
     case 'deleteFeeHead':
@@ -51,7 +61,7 @@ export async function resolveFeeHeads(
       if (!id) throw new AppError('BAD_REQUEST', 'id is required');
       const existing = await FinanceRepo.findFeeHeadById(tenantId, id);
       if (!existing) throw new AppError('NOT_FOUND', 'Fee head not found');
-      return FinanceRepo.deleteFeeHead(tenantId, id);
+      return toGql(await FinanceRepo.deleteFeeHead(tenantId, id));
     }
 
     default:

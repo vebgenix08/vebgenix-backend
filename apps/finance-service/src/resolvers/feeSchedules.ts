@@ -3,6 +3,14 @@ import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 export async function resolveFeeSchedules(
   operation: string,
   args: Record<string, unknown>,
@@ -16,7 +24,8 @@ export async function resolveFeeSchedules(
       const filter: Record<string, unknown> = {};
       if (args.academicYearId) filter.academicYearId = args.academicYearId;
       if (args.feeStructureId) filter.feeStructureId = args.feeStructureId;
-      return FinanceRepo.listFeeSchedules(tenantId, filter);
+      const docs = await FinanceRepo.listFeeSchedules(tenantId, filter);
+      return (docs as unknown[]).map(d => toGql(d));
     }
 
     case 'createFeeSchedule':
@@ -38,7 +47,7 @@ export async function resolveFeeSchedules(
           throw new AppError('BAD_REQUEST', 'minimumPercentage must be between 1 and 100 when collectionType is PARTIAL_WITH_MINIMUM_PERCENTAGE');
         }
       }
-      return FinanceRepo.createFeeSchedule(tenantId, { ...payload, createdBy: ctx.membership!.profileId });
+      return toGql(await FinanceRepo.createFeeSchedule(tenantId, { ...payload, createdBy: ctx.membership!.profileId }));
     }
 
     case 'updateFeeSchedule':
@@ -63,7 +72,7 @@ export async function resolveFeeSchedules(
           throw new AppError('BAD_REQUEST', 'minimumPercentage must be between 1 and 100 when collectionType is PARTIAL_WITH_MINIMUM_PERCENTAGE');
         }
       }
-      return FinanceRepo.updateFeeSchedule(tenantId, id, update);
+      return toGql(await FinanceRepo.updateFeeSchedule(tenantId, id, update));
     }
 
     case 'deleteFeeSchedule':
@@ -73,7 +82,7 @@ export async function resolveFeeSchedules(
       if (!id) throw new AppError('BAD_REQUEST', 'id is required');
       const existing = await FinanceRepo.listFeeSchedules(tenantId, { _id: id });
       if (!existing.length) throw new AppError('NOT_FOUND', 'Fee schedule not found');
-      return FinanceRepo.deleteFeeSchedule(tenantId, id);
+      return toGql(await FinanceRepo.deleteFeeSchedule(tenantId, id));
     }
 
     case 'addScheduleSlot':
@@ -83,7 +92,7 @@ export async function resolveFeeSchedules(
       if (!schedule.length) throw new AppError('NOT_FOUND', 'Fee schedule not found');
       const slots = (schedule[0].slots ?? []) as object[];
       slots.push(args.slot as object ?? { dueDate: args.dueDate, amount: args.amount, label: args.label });
-      return FinanceRepo.updateFeeSchedule(tenantId, args.id as string, { slots: slots as never });
+      return toGql(await FinanceRepo.updateFeeSchedule(tenantId, args.id as string, { slots: slots as never }));
     }
 
     case 'deleteScheduleSlot':
@@ -95,7 +104,7 @@ export async function resolveFeeSchedules(
       const idx     = parseInt(args.slotIndex as string, 10);
       if (idx < 0 || idx >= slots.length) throw new AppError('BAD_REQUEST', 'Invalid slot index');
       slots.splice(idx, 1);
-      return FinanceRepo.updateFeeSchedule(tenantId, args.id as string, { slots: slots as never });
+      return toGql(await FinanceRepo.updateFeeSchedule(tenantId, args.id as string, { slots: slots as never }));
     }
 
     default:

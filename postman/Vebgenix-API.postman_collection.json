@@ -26,7 +26,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": {\n    \"USERNAME\": \"{{admin_email}}\",\n    \"PASSWORD\": \"{{admin_password}}\"\n  }\n}"
+              "raw": {
+                "AuthFlow": "USER_PASSWORD_AUTH",
+                "ClientId": "{{cognito_client_id}}",
+                "AuthParameters": {
+                  "USERNAME": "{{admin_email}}",
+                  "PASSWORD": "{{admin_password}}"
+                }
+              }
             }
           },
           "event": [
@@ -69,7 +76,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"Username\": \"{{forgot_password_email}}\"\n}"
+              "raw": {
+                "ClientId": "{{cognito_client_id}}",
+                "Username": "{{forgot_password_email}}"
+              }
             }
           },
           "event": [
@@ -103,7 +113,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"Username\": \"{{forgot_password_email}}\",\n  \"ConfirmationCode\": \"{{password_reset_code}}\",\n  \"Password\": \"{{new_password}}\"\n}"
+              "raw": {
+                "ClientId": "{{cognito_client_id}}",
+                "Username": "{{forgot_password_email}}",
+                "ConfirmationCode": "{{password_reset_code}}",
+                "Password": "{{new_password}}"
+              }
             }
           },
           "event": [
@@ -135,7 +150,11 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"AccessToken\": \"{{access_token}}\",\n  \"PreviousPassword\": \"{{previous_password}}\",\n  \"ProposedPassword\": \"{{proposed_password}}\"\n}"
+              "raw": {
+                "AccessToken": "{{access_token}}",
+                "PreviousPassword": "{{previous_password}}",
+                "ProposedPassword": "{{proposed_password}}"
+              }
             }
           },
           "event": [
@@ -167,7 +186,13 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"AuthFlow\": \"REFRESH_TOKEN_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": {\n    \"REFRESH_TOKEN\": \"{{refresh_token}}\"\n  }\n}"
+              "raw": {
+                "AuthFlow": "REFRESH_TOKEN_AUTH",
+                "ClientId": "{{cognito_client_id}}",
+                "AuthParameters": {
+                  "REFRESH_TOKEN": "{{refresh_token}}"
+                }
+              }
             }
           },
           "event": [
@@ -215,7 +240,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateAcademicYear($input: AWSJSON!) { createAcademicYear(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"2025-26\\\",\\\"startDate\\\":\\\"2025-06-01\\\",\\\"endDate\\\":\\\"2026-05-31\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation CreateAcademicYear($input: AWSJSON!) { createAcademicYear(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"2025-26\",\n      \"startDate\": \"2025-06-01\",\n      \"endDate\": \"2026-05-31\"\n    }\n  }\n}"
             }
           },
           "event": [
@@ -343,7 +368,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateCampus($input: AWSJSON!) { createCampus(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Main Campus\\\",\\\"code\\\":\\\"MAIN\\\",\\\"type\\\":\\\"SCHOOL\\\",\\\"address\\\":\\\"Bengaluru, Karnataka\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation CreateCampus($input: AWSJSON!) { createCampus(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Main Campus\",\n      \"code\": \"MAIN\",\n      \"type\": \"SCHOOL\",\n      \"address\": \"Bengaluru, Karnataka\"\n    }\n  }\n}"
             }
           },
           "event": [
@@ -430,7 +455,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateProgram($input: AWSJSON!) { createProgram(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"School Program\\\",\\\"code\\\":\\\"SCH\\\",\\\"type\\\":\\\"SCHOOL\\\",\\\"durationYears\\\":12}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation CreateProgram($input: AWSJSON!) { createProgram(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"School Program\",\n      \"code\": \"SCH\",\n      \"type\": \"SCHOOL\",\n      \"durationYears\": 12\n    }\n  }\n}"
             }
           },
           "event": [
@@ -561,7 +586,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation UpdateProgram($id: ID!, $input: AWSJSON!) { updateProgram(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{program_id}}\",\n    \"input\": \"{\\\"durationYears\\\":13}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation UpdateProgram($id: ID!, $input: AWSJSON!) { updateProgram(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{program_id}}\",\n    \"input\": {\n      \"durationYears\": 13\n    }\n  }\n}"
             }
           },
           "event": [
@@ -713,7 +738,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation UpdateTenantFeatures($input: AWSJSON!) { updateTenantFeatures(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"admissions\\\":true,\\\"finance\\\":true,\\\"academics\\\":true,\\\"communications\\\":true}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation UpdateTenantFeatures($input: AWSJSON!) { updateTenantFeatures(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"admissions\": true,\n      \"finance\": true,\n      \"academics\": true,\n      \"communications\": true\n    }\n  }\n}"
             }
           },
           "event": [
@@ -915,7 +940,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation InviteStaff($input: AWSJSON!) { inviteStaff(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"email\\\":\\\"{{staff_email}}\\\",\\\"fullName\\\":\\\"Test Teacher\\\",\\\"roleIds\\\":[],\\\"campusIds\\\":[\\\"{{campus_id}}\\\"],\\\"allCampuses\\\":false}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation InviteStaff($input: AWSJSON!) { inviteStaff(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"email\": \"{{staff_email}}\",\n      \"fullName\": \"Test Teacher\",\n      \"roleIds\": [],\n      \"campusIds\": [\n        \"{{campus_id}}\"\n      ],\n      \"allCampuses\": false\n    }\n  }\n}"
             }
           },
           "event": [
@@ -1203,7 +1228,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateEnquiry($input: AWSJSON!) { createEnquiry(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"studentName\\\":\\\"Rahul Sharma\\\",\\\"phone\\\":\\\"9876543210\\\",\\\"email\\\":\\\"rahul@example.com\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"source\\\":\\\"WALK_IN\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateEnquiry($input: AWSJSON!) { createEnquiry(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"studentName\": \"Rahul Sharma\",\n      \"phone\": \"9876543210\",\n      \"email\": \"rahul@example.com\",\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"source\": \"WALK_IN\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -1323,7 +1348,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateEnquiry($id: ID!, $input: AWSJSON!) { updateEnquiry(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{enquiry_id}}\",\n    \"input\": \"{\\\"status\\\":\\\"CONTACTED\\\",\\\"notes\\\":\\\"Called and confirmed interest\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateEnquiry($id: ID!, $input: AWSJSON!) { updateEnquiry(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{enquiry_id}}\",\n    \"input\": {\n      \"status\": \"CONTACTED\",\n      \"notes\": \"Called and confirmed interest\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -1360,7 +1385,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CheckDuplicate($input: AWSJSON!) { checkDuplicate(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"phone\\\":\\\"9876543210\\\",\\\"email\\\":\\\"rahul@example.com\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CheckDuplicate($input: AWSJSON!) { checkDuplicate(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"phone\": \"9876543210\",\n      \"email\": \"rahul@example.com\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -1476,7 +1501,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateApplication($input: AWSJSON!) { createApplication(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"studentName\\\":\\\"Priya Patel\\\",\\\"phone\\\":\\\"9876500001\\\",\\\"email\\\":\\\"priya@example.com\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"programId\\\":\\\"{{program_id}}\\\",\\\"enquiryId\\\":\\\"{{enquiry_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateApplication($input: AWSJSON!) { createApplication(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"studentName\": \"Priya Patel\",\n      \"phone\": \"9876500001\",\n      \"email\": \"priya@example.com\",\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"programId\": \"{{program_id}}\",\n      \"enquiryId\": \"{{enquiry_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -1670,7 +1695,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation ReviewApplication($id: ID!, $input: AWSJSON!) { reviewApplication(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\",\n    \"input\": \"{\\\"decision\\\":\\\"UNDER_REVIEW\\\",\\\"remarks\\\":\\\"Documents verified, proceeding to review\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation ReviewApplication($id: ID!, $input: AWSJSON!) { reviewApplication(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{application_id}}\",\n    \"input\": {\n      \"decision\": \"UNDER_REVIEW\",\n      \"remarks\": \"Documents verified, proceeding to review\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -1818,7 +1843,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation VerifyDocument($applicationId: ID!, $documentId: ID!, $input: AWSJSON!) { verifyDocument(applicationId: $applicationId, documentId: $documentId, input: $input) }\",\n  \"variables\": {\n    \"applicationId\": \"{{application_id}}\",\n    \"documentId\": \"birth_certificate\",\n    \"input\": \"{\\\"verified\\\":true,\\\"remarks\\\":\\\"Document looks valid\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation VerifyDocument($applicationId: ID!, $documentId: ID!, $input: AWSJSON!) { verifyDocument(applicationId: $applicationId, documentId: $documentId, input: $input) }\",\n  \"variables\": {\n    \"applicationId\": \"{{application_id}}\",\n    \"documentId\": \"birth_certificate\",\n    \"input\": {\n      \"verified\": true,\n      \"remarks\": \"Document looks valid\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -1902,7 +1927,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateFeeCategory($input: AWSJSON!) { createFeeCategory(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"General Fees\\\",\\\"moduleType\\\":\\\"FEE\\\",\\\"feeType\\\":\\\"GENERAL\\\",\\\"invoicePrefix\\\":\\\"GF/INV\\\",\\\"receiptPrefix\\\":\\\"GF/REC\\\",\\\"defaultAllocationMethod\\\":\\\"PRO_RATA\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateFeeCategory($input: AWSJSON!) { createFeeCategory(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"General Fees\",\n      \"moduleType\": \"FEE\",\n      \"feeType\": \"GENERAL\",\n      \"invoicePrefix\": \"GF/INV\",\n      \"receiptPrefix\": \"GF/REC\",\n      \"defaultAllocationMethod\": \"PRO_RATA\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -1984,7 +2009,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateFeeCategory($id: ID!, $input: AWSJSON!) { updateFeeCategory(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_category_id}}\",\n    \"input\": \"{\\\"defaultAllocationMethod\\\":\\\"PRO_RATA\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateFeeCategory($id: ID!, $input: AWSJSON!) { updateFeeCategory(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_category_id}}\",\n    \"input\": {\n      \"defaultAllocationMethod\": \"PRO_RATA\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2106,7 +2131,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateFeeHead($input: AWSJSON!) { createFeeHead(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Tuition Fee\\\",\\\"prefix\\\":\\\"TF\\\",\\\"type\\\":\\\"RECURRING\\\",\\\"feeCategoryId\\\":\\\"{{fee_category_id}}\\\",\\\"isMandatory\\\":true,\\\"isRefundable\\\":false,\\\"priorityOrder\\\":1}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateFeeHead($input: AWSJSON!) { createFeeHead(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Tuition Fee\",\n      \"prefix\": \"TF\",\n      \"type\": \"RECURRING\",\n      \"feeCategoryId\": \"{{fee_category_id}}\",\n      \"isMandatory\": true,\n      \"isRefundable\": false,\n      \"priorityOrder\": 1\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2151,7 +2176,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateFeeHead($id: ID!, $input: AWSJSON!) { updateFeeHead(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_head_id}}\",\n    \"input\": \"{\\\"priorityOrder\\\":1}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateFeeHead($id: ID!, $input: AWSJSON!) { updateFeeHead(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_head_id}}\",\n    \"input\": {\n      \"priorityOrder\": 1\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2273,7 +2298,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateFeeSchedule($input: AWSJSON!) { createFeeSchedule(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Annual Plan 2025-26\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"feeCategoryId\\\":\\\"{{fee_category_id}}\\\",\\\"collectionType\\\":\\\"PARTIAL_ALLOWED\\\",\\\"allowPartialPayment\\\":true,\\\"graceDays\\\":5,\\\"slots\\\":[{\\\"name\\\":\\\"Term 1\\\",\\\"dueDate\\\":\\\"2025-07-31\\\",\\\"percentOfTotal\\\":50},{\\\"name\\\":\\\"Term 2\\\",\\\"dueDate\\\":\\\"2025-12-31\\\",\\\"percentOfTotal\\\":50}]}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateFeeSchedule($input: AWSJSON!) { createFeeSchedule(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Annual Plan 2025-26\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"feeCategoryId\": \"{{fee_category_id}}\",\n      \"collectionType\": \"PARTIAL_ALLOWED\",\n      \"allowPartialPayment\": true,\n      \"graceDays\": 5,\n      \"slots\": [\n        {\n          \"name\": \"Term 1\",\n          \"dueDate\": \"2025-07-31\",\n          \"percentOfTotal\": 50\n        },\n        {\n          \"name\": \"Term 2\",\n          \"dueDate\": \"2025-12-31\",\n          \"percentOfTotal\": 50\n        }\n      ]\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2318,7 +2343,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateFeeSchedule($id: ID!, $input: AWSJSON!) { updateFeeSchedule(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_schedule_id}}\",\n    \"input\": \"{\\\"graceDays\\\":7}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateFeeSchedule($id: ID!, $input: AWSJSON!) { updateFeeSchedule(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_schedule_id}}\",\n    \"input\": {\n      \"graceDays\": 7\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2434,7 +2459,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateFeeStructure($input: AWSJSON!) { createFeeStructure(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Grade 10 Annual Fee 2025-26\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"classId\\\":\\\"{{class_id}}\\\",\\\"feeCategoryId\\\":\\\"{{fee_category_id}}\\\",\\\"feeScheduleId\\\":\\\"{{fee_schedule_id}}\\\",\\\"allocationMethod\\\":\\\"PRO_RATA\\\",\\\"components\\\":[{\\\"feeHeadId\\\":\\\"{{fee_head_id}}\\\",\\\"feeHeadName\\\":\\\"Tuition Fee\\\",\\\"amount\\\":50000,\\\"isOptional\\\":false,\\\"priorityOrder\\\":1}]}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateFeeStructure($input: AWSJSON!) { createFeeStructure(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Grade 10 Annual Fee 2025-26\",\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"classId\": \"{{class_id}}\",\n      \"feeCategoryId\": \"{{fee_category_id}}\",\n      \"feeScheduleId\": \"{{fee_schedule_id}}\",\n      \"allocationMethod\": \"PRO_RATA\",\n      \"components\": [\n        {\n          \"feeHeadId\": \"{{fee_head_id}}\",\n          \"feeHeadName\": \"Tuition Fee\",\n          \"amount\": 50000,\n          \"isOptional\": false,\n          \"priorityOrder\": 1\n        }\n      ]\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2516,7 +2541,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateFeeStructure($id: ID!, $input: AWSJSON!) { updateFeeStructure(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_structure_id}}\",\n    \"input\": \"{\\\"name\\\":\\\"Grade 10 Annual Fee 2025-26\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateFeeStructure($id: ID!, $input: AWSJSON!) { updateFeeStructure(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_structure_id}}\",\n    \"input\": {\n      \"name\": \"Grade 10 Annual Fee 2025-26\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2590,7 +2615,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CopyFeePatternToNextYear($input: AWSJSON!) { copyFeePatternToNextYear(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CopyFeePatternToNextYear($input: AWSJSON!) { copyFeePatternToNextYear(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2711,7 +2736,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateFeeAssignment($input: AWSJSON!) { createFeeAssignment(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"feeStructureId\\\":\\\"{{fee_structure_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateFeeAssignment($input: AWSJSON!) { createFeeAssignment(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"studentId\": \"{{student_id}}\",\n      \"feeStructureId\": \"{{fee_structure_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2793,7 +2818,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation BulkAssignFeeStructure($input: AWSJSON!) { bulkAssignFeeStructure(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"studentIds\\\":[\\\"{{student_id}}\\\"],\\\"feeStructureId\\\":\\\"{{fee_structure_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation BulkAssignFeeStructure($input: AWSJSON!) { bulkAssignFeeStructure(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"studentIds\": [\n        \"{{student_id}}\"\n      ],\n      \"feeStructureId\": \"{{fee_structure_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3081,7 +3106,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateOneOffCharge($input: AWSJSON!) { createOneOffCharge(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"classId\\\":\\\"{{class_id}}\\\",\\\"amount\\\":500,\\\"description\\\":\\\"Library fine\\\",\\\"feeHeadId\\\":\\\"{{fee_head_id}}\\\",\\\"feeHeadName\\\":\\\"Tuition Fee\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateOneOffCharge($input: AWSJSON!) { createOneOffCharge(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"studentId\": \"{{student_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"classId\": \"{{class_id}}\",\n      \"amount\": 500,\n      \"description\": \"Library fine\",\n      \"feeHeadId\": \"{{fee_head_id}}\",\n      \"feeHeadName\": \"Tuition Fee\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3118,7 +3143,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation ReviseInvoice($id: ID!, $input: AWSJSON!) { reviseInvoice(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{invoice_id}}\",\n    \"input\": \"{\\\"newAmount\\\":48000,\\\"reason\\\":\\\"Scholarship discount applied\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation ReviseInvoice($id: ID!, $input: AWSJSON!) { reviseInvoice(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{invoice_id}}\",\n    \"input\": {\n      \"newAmount\": 48000,\n      \"reason\": \"Scholarship discount applied\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3197,7 +3222,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation RecordPayment($input: AWSJSON!) { recordPayment(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"invoiceId\\\":\\\"{{invoice_id}}\\\",\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"amount\\\":10000,\\\"method\\\":\\\"CASH\\\",\\\"remarks\\\":\\\"Partial payment — Term 1\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation RecordPayment($input: AWSJSON!) { recordPayment(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"invoiceId\": \"{{invoice_id}}\",\n      \"studentId\": \"{{student_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"amount\": 10000,\n      \"method\": \"CASH\",\n      \"remarks\": \"Partial payment — Term 1\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3241,7 +3266,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation RecordPayment($input: AWSJSON!) { recordPayment(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"invoiceId\\\":\\\"{{invoice_id}}\\\",\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"amount\\\":5000,\\\"method\\\":\\\"UPI\\\",\\\"referenceNumber\\\":\\\"UPI123456\\\",\\\"allocationMode\\\":\\\"MANUAL\\\",\\\"remarks\\\":\\\"UPI payment — manual allocation\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation RecordPayment($input: AWSJSON!) { recordPayment(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"invoiceId\": \"{{invoice_id}}\",\n      \"studentId\": \"{{student_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"amount\": 5000,\n      \"method\": \"UPI\",\n      \"referenceNumber\": \"UPI123456\",\n      \"allocationMode\": \"MANUAL\",\n      \"remarks\": \"UPI payment — manual allocation\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3278,7 +3303,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CollectPaymentByStudent($studentId: ID!, $input: AWSJSON!) { collectPaymentByStudent(studentId: $studentId, input: $input) }\",\n  \"variables\": {\n    \"studentId\": \"{{student_id}}\",\n    \"input\": \"{\\\"amount\\\":5000,\\\"method\\\":\\\"CASH\\\",\\\"remarks\\\":\\\"Bulk collect across all outstanding invoices\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CollectPaymentByStudent($studentId: ID!, $input: AWSJSON!) { collectPaymentByStudent(studentId: $studentId, input: $input) }\",\n  \"variables\": {\n    \"studentId\": \"{{student_id}}\",\n    \"input\": {\n      \"amount\": 5000,\n      \"method\": \"CASH\",\n      \"remarks\": \"Bulk collect across all outstanding invoices\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3516,7 +3541,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation VerifyPaymentSignature($input: AWSJSON!) { verifyPaymentSignature(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"razorpayOrderId\\\":\\\"order_test_id\\\",\\\"razorpayPaymentId\\\":\\\"pay_test_id\\\",\\\"razorpaySignature\\\":\\\"test_signature\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation VerifyPaymentSignature($input: AWSJSON!) { verifyPaymentSignature(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"razorpayOrderId\": \"order_test_id\",\n      \"razorpayPaymentId\": \"pay_test_id\",\n      \"razorpaySignature\": \"test_signature\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3682,7 +3707,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Grade 10\\\",\\\"code\\\":\\\"G10\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"programId\\\":\\\"{{program_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Grade 10\",\n      \"code\": \"G10\",\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"programId\": \"{{program_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3771,7 +3796,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateSection($classId: ID!, $input: AWSJSON!) { createSection(classId: $classId, input: $input) }\",\n  \"variables\": {\n    \"classId\": \"{{class_id}}\",\n    \"input\": \"{\\\"name\\\":\\\"A\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"capacity\\\":40}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateSection($classId: ID!, $input: AWSJSON!) { createSection(classId: $classId, input: $input) }\",\n  \"variables\": {\n    \"classId\": \"{{class_id}}\",\n    \"input\": {\n      \"name\": \"A\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"capacity\": 40\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3865,7 +3890,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateSubject($input: AWSJSON!) { createSubject(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Mathematics\\\",\\\"code\\\":\\\"MATH\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"type\\\":\\\"CORE\\\",\\\"creditsOrPeriods\\\":5}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateSubject($input: AWSJSON!) { createSubject(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Mathematics\",\n      \"code\": \"MATH\",\n      \"campusId\": \"{{campus_id}}\",\n      \"type\": \"CORE\",\n      \"creditsOrPeriods\": 5\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4067,7 +4092,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation EnrollStudent($input: AWSJSON!) { enrollStudent(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"firstName\\\":\\\"Arjun\\\",\\\"lastName\\\":\\\"Kumar\\\",\\\"dateOfBirth\\\":\\\"2010-03-15\\\",\\\"gender\\\":\\\"MALE\\\",\\\"phone\\\":\\\"9876543210\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"classId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"guardians\\\":[{\\\"name\\\":\\\"Ravi Kumar\\\",\\\"relation\\\":\\\"Father\\\",\\\"phone\\\":\\\"9876543211\\\"}]}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation EnrollStudent($input: AWSJSON!) { enrollStudent(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"firstName\": \"Arjun\",\n      \"lastName\": \"Kumar\",\n      \"dateOfBirth\": \"2010-03-15\",\n      \"gender\": \"MALE\",\n      \"phone\": \"9876543210\",\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"classId\": \"{{class_id}}\",\n      \"sectionId\": \"{{section_id}}\",\n      \"guardians\": [\n        {\n          \"name\": \"Ravi Kumar\",\n          \"relation\": \"Father\",\n          \"phone\": \"9876543211\"\n        }\n      ]\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4147,7 +4172,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateStudent($id: ID!, $input: AWSJSON!) { updateStudent(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{student_id}}\",\n    \"input\": \"{\\\"phone\\\":\\\"9876543212\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateStudent($id: ID!, $input: AWSJSON!) { updateStudent(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{student_id}}\",\n    \"input\": {\n      \"phone\": \"9876543212\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4184,7 +4209,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation AssignStudentClass($studentId: ID!, $input: AWSJSON!) { assignStudentClass(studentId: $studentId, input: $input) }\",\n  \"variables\": {\n    \"studentId\": \"{{student_id}}\",\n    \"input\": \"{\\\"classId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation AssignStudentClass($studentId: ID!, $input: AWSJSON!) { assignStudentClass(studentId: $studentId, input: $input) }\",\n  \"variables\": {\n    \"studentId\": \"{{student_id}}\",\n    \"input\": {\n      \"classId\": \"{{class_id}}\",\n      \"sectionId\": \"{{section_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4300,7 +4325,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation GenerateRegistrationNumbers($input: AWSJSON!) { generateRegistrationNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation GenerateRegistrationNumbers($input: AWSJSON!) { generateRegistrationNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"gradeId\": \"{{class_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4341,7 +4366,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation FreezeRegistrationNumbers($input: AWSJSON!) { freezeRegistrationNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation FreezeRegistrationNumbers($input: AWSJSON!) { freezeRegistrationNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"gradeId\": \"{{class_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4426,7 +4451,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"generationMode\\\":\\\"ALPHABETICAL\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"gradeId\": \"{{class_id}}\",\n      \"sectionId\": \"{{section_id}}\",\n      \"generationMode\": \"ALPHABETICAL\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4467,7 +4492,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"generationMode\\\":\\\"SEQUENTIAL\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"gradeId\": \"{{class_id}}\",\n      \"sectionId\": \"{{section_id}}\",\n      \"generationMode\": \"SEQUENTIAL\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4508,7 +4533,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation FreezeRollNumbers($input: AWSJSON!) { freezeRollNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation FreezeRollNumbers($input: AWSJSON!) { freezeRollNumbers(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"gradeId\": \"{{class_id}}\",\n      \"sectionId\": \"{{section_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4755,7 +4780,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateExam($input: AWSJSON!) { createExam(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Term 1 Exam 2025\\\",\\\"classId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"startDate\\\":\\\"2025-10-15\\\",\\\"endDate\\\":\\\"2025-10-20\\\",\\\"maxMarks\\\":100,\\\"passingMarks\\\":35,\\\"type\\\":\\\"UNIT_TEST\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateExam($input: AWSJSON!) { createExam(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Term 1 Exam 2025\",\n      \"classId\": \"{{class_id}}\",\n      \"sectionId\": \"{{section_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"startDate\": \"2025-10-15\",\n      \"endDate\": \"2025-10-20\",\n      \"maxMarks\": 100,\n      \"passingMarks\": 35,\n      \"type\": \"UNIT_TEST\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4878,7 +4903,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation EnterMarks($examId: ID!, $input: AWSJSON!) { enterMarks(examId: $examId, input: $input) }\",\n  \"variables\": {\n    \"examId\": \"{{exam_id}}\",\n    \"input\": \"{\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"marksObtained\\\":78,\\\"maxMarks\\\":100,\\\"grade\\\":\\\"A\\\",\\\"remarks\\\":\\\"Good performance\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation EnterMarks($examId: ID!, $input: AWSJSON!) { enterMarks(examId: $examId, input: $input) }\",\n  \"variables\": {\n    \"examId\": \"{{exam_id}}\",\n    \"input\": {\n      \"studentId\": \"{{student_id}}\",\n      \"marksObtained\": 78,\n      \"maxMarks\": 100,\n      \"grade\": \"A\",\n      \"remarks\": \"Good performance\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5109,7 +5134,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateExam($id: ID!, $input: AWSJSON!) { updateExam(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{exam_id}}\",\n    \"input\": \"{\\\"name\\\":\\\"Term 1 Exam 2025 (Updated)\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateExam($id: ID!, $input: AWSJSON!) { updateExam(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{exam_id}}\",\n    \"input\": {\n      \"name\": \"Term 1 Exam 2025 (Updated)\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5188,7 +5213,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation SetStudentPromotionEligibility($input: AWSJSON!) { setStudentPromotionEligibility(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"updates\\\":[{\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"eligibility\\\":\\\"ELIGIBLE\\\"}]}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation SetStudentPromotionEligibility($input: AWSJSON!) { setStudentPromotionEligibility(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"updates\": [\n        {\n          \"studentId\": \"{{student_id}}\",\n          \"eligibility\": \"ELIGIBLE\"\n        }\n      ]\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5229,7 +5254,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation AutoEvaluatePromotionEligibility($input: AWSJSON!) { autoEvaluatePromotionEligibility(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"gradeId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"minAttendancePct\\\":75,\\\"minAvgMarks\\\":35}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation AutoEvaluatePromotionEligibility($input: AWSJSON!) { autoEvaluatePromotionEligibility(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"gradeId\": \"{{class_id}}\",\n      \"sectionId\": \"{{section_id}}\",\n      \"minAttendancePct\": 75,\n      \"minAvgMarks\": 35\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5271,7 +5296,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"studentIds\\\":[\\\"{{student_id}}\\\"],\\\"sectionStrategy\\\":\\\"SAME_SECTION\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"fromGradeId\": \"{{class_id}}\",\n      \"toGradeId\": \"{{to_class_id}}\",\n      \"studentIds\": [\n        \"{{student_id}}\"\n      ],\n      \"sectionStrategy\": \"SAME_SECTION\",\n      \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n      \"feeAction\": \"SKIP\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5318,7 +5343,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"studentIds\\\":[\\\"{{student_id}}\\\"],\\\"sectionStrategy\\\":\\\"MANUAL\\\",\\\"manualAssignments\\\":[{\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\"}],\\\"eligibilityMode\\\":\\\"PROMOTE_ALL\\\",\\\"feeAction\\\":\\\"COPY_PATTERN\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"fromGradeId\": \"{{class_id}}\",\n      \"toGradeId\": \"{{to_class_id}}\",\n      \"studentIds\": [\n        \"{{student_id}}\"\n      ],\n      \"sectionStrategy\": \"MANUAL\",\n      \"manualAssignments\": [\n        {\n          \"studentId\": \"{{student_id}}\",\n          \"sectionId\": \"{{section_id}}\"\n        }\n      ],\n      \"eligibilityMode\": \"PROMOTE_ALL\",\n      \"feeAction\": \"COPY_PATTERN\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5365,7 +5390,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"AUTO_SHUFFLE\\\",\\\"eligibilityMode\\\":\\\"PROMOTE_ALL\\\",\\\"feeAction\\\":\\\"ASSIGN_EXISTING\\\",\\\"feeStructureId\\\":\\\"{{fee_structure_id}}\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"fromGradeId\": \"{{class_id}}\",\n      \"toGradeId\": \"{{to_class_id}}\",\n      \"sectionStrategy\": \"AUTO_SHUFFLE\",\n      \"eligibilityMode\": \"PROMOTE_ALL\",\n      \"feeAction\": \"ASSIGN_EXISTING\",\n      \"feeStructureId\": \"{{fee_structure_id}}\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5412,7 +5437,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"GENDER_BALANCE\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"fromGradeId\": \"{{class_id}}\",\n      \"toGradeId\": \"{{to_class_id}}\",\n      \"sectionStrategy\": \"GENDER_BALANCE\",\n      \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n      \"feeAction\": \"SKIP\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5459,7 +5484,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"CAPACITY_LIMIT\\\",\\\"sectionCapacity\\\":40,\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"fromGradeId\": \"{{class_id}}\",\n      \"toGradeId\": \"{{to_class_id}}\",\n      \"sectionStrategy\": \"CAPACITY_LIMIT\",\n      \"sectionCapacity\": 40,\n      \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n      \"feeAction\": \"SKIP\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5506,7 +5531,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"PERFORMANCE_RANK\\\",\\\"examId\\\":\\\"{{exam_id}}\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"fromGradeId\": \"{{class_id}}\",\n      \"toGradeId\": \"{{to_class_id}}\",\n      \"sectionStrategy\": \"PERFORMANCE_RANK\",\n      \"examId\": \"{{exam_id}}\",\n      \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n      \"feeAction\": \"SKIP\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5553,7 +5578,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"SUBJECT_GROUP\\\",\\\"subjectGroupMappings\\\":[{\\\"subjectId\\\":\\\"{{subject_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\"}],\\\"eligibilityMode\\\":\\\"PROMOTE_ALL\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"fromGradeId\": \"{{class_id}}\",\n      \"toGradeId\": \"{{to_class_id}}\",\n      \"sectionStrategy\": \"SUBJECT_GROUP\",\n      \"subjectGroupMappings\": [\n        {\n          \"subjectId\": \"{{subject_id}}\",\n          \"sectionId\": \"{{section_id}}\"\n        }\n      ],\n      \"eligibilityMode\": \"PROMOTE_ALL\",\n      \"feeAction\": \"SKIP\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5600,7 +5625,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"TRANSPORT_ROUTE\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"fromGradeId\": \"{{class_id}}\",\n      \"toGradeId\": \"{{to_class_id}}\",\n      \"sectionStrategy\": \"TRANSPORT_ROUTE\",\n      \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n      \"feeAction\": \"SKIP\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5647,7 +5672,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fromAcademicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"toAcademicYearId\\\":\\\"{{to_academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"fromGradeId\\\":\\\"{{class_id}}\\\",\\\"toGradeId\\\":\\\"{{to_class_id}}\\\",\\\"sectionStrategy\\\":\\\"EXCEL_IMPORT\\\",\\\"importFileKey\\\":\\\"promotions/section-map.csv\\\",\\\"eligibilityMode\\\":\\\"USE_ENROLLMENT_ELIGIBILITY\\\",\\\"feeAction\\\":\\\"SKIP\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fromAcademicYearId\": \"{{academic_year_id}}\",\n      \"toAcademicYearId\": \"{{to_academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"fromGradeId\": \"{{class_id}}\",\n      \"toGradeId\": \"{{to_class_id}}\",\n      \"sectionStrategy\": \"EXCEL_IMPORT\",\n      \"importFileKey\": \"promotions/section-map.csv\",\n      \"eligibilityMode\": \"USE_ENROLLMENT_ELIGIBILITY\",\n      \"feeAction\": \"SKIP\"\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -5855,7 +5880,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateAnnouncement($input: AWSJSON!) { createAnnouncement(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"title\\\":\\\"School Notice — Test\\\",\\\"content\\\":\\\"This is a test announcement.\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"targetAudience\\\":\\\"ALL\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation CreateAnnouncement($input: AWSJSON!) { createAnnouncement(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"title\": \"School Notice — Test\",\n      \"content\": \"This is a test announcement.\",\n      \"campusId\": \"{{campus_id}}\",\n      \"targetAudience\": \"ALL\"\n    }\n  }\n}"
             }
           },
           "event": [
@@ -6008,7 +6033,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation GetUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"fileName\\\":\\\"test-document.pdf\\\",\\\"contentType\\\":\\\"application/pdf\\\",\\\"folder\\\":\\\"documents\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation GetUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"fileName\": \"test-document.pdf\",\n      \"contentType\": \"application/pdf\",\n      \"folder\": \"documents\"\n    }\n  }\n}"
             }
           },
           "event": [
@@ -6090,7 +6115,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateResultBatch($input: AWSJSON!) { createResultBatch(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"examId\\\":\\\"{{exam_id}}\\\",\\\"classId\\\":\\\"{{class_id}}\\\",\\\"sectionId\\\":\\\"{{section_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation CreateResultBatch($input: AWSJSON!) { createResultBatch(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"examId\": \"{{exam_id}}\",\n      \"classId\": \"{{class_id}}\",\n      \"sectionId\": \"{{section_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\"\n    }\n  }\n}"
             }
           },
           "event": [
@@ -6156,7 +6181,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query GetPublicResult($token: String!) { getPublicResult(token: $token) }\",\n  \"variables\": {\n    \"token\": \"sample_result_token\"\n  }\n}"
+              "raw": {
+                "query": "query GetPublicResult($token: String!) { getPublicResult(token: $token) }",
+                "variables": {
+                  "token": "sample_result_token"
+                }
+              }
             }
           },
           "event": [
@@ -6272,7 +6302,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation MergeStudents($input: AWSJSON!) { mergeStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"primaryStudentId\\\":\\\"{{student_id}}\\\",\\\"duplicateStudentIds\\\":[]}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation MergeStudents($input: AWSJSON!) { mergeStudents(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"primaryStudentId\": \"{{student_id}}\",\n      \"duplicateStudentIds\": []\n    }\n  }\n}"
             }
           },
           "event": [
@@ -6306,7 +6336,9 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query { health }\"\n}"
+              "raw": {
+                "query": "query { health }"
+              }
             }
           },
           "event": [
@@ -6344,7 +6376,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"AuthFlow\": \"USER_PASSWORD_AUTH\",\n  \"ClientId\": \"{{cognito_client_id}}\",\n  \"AuthParameters\": {\n    \"USERNAME\": \"{{platform_admin_email}}\",\n    \"PASSWORD\": \"{{platform_admin_password}}\"\n  }\n}"
+              "raw": {
+                "AuthFlow": "USER_PASSWORD_AUTH",
+                "ClientId": "{{cognito_client_id}}",
+                "AuthParameters": {
+                  "USERNAME": "{{platform_admin_email}}",
+                  "PASSWORD": "{{platform_admin_password}}"
+                }
+              }
             }
           },
           "event": [
@@ -6456,7 +6495,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateTenant($input: AWSJSON!) { createTenant(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Test School\\\",\\\"slug\\\":\\\"test-school-demo\\\",\\\"plan\\\":\\\"BASIC\\\",\\\"adminEmail\\\":\\\"testadmin@example.com\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation CreateTenant($input: AWSJSON!) { createTenant(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Test School\",\n      \"slug\": \"test-school-demo\",\n      \"plan\": \"BASIC\",\n      \"adminEmail\": \"testadmin@example.com\"\n    }\n  }\n}"
             }
           },
           "event": [
@@ -6493,7 +6532,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation UpdateTenant($id: ID!, $input: AWSJSON!) { updateTenant(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{target_tenant_id}}\",\n    \"input\": \"{\\\"plan\\\":\\\"STANDARD\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation UpdateTenant($id: ID!, $input: AWSJSON!) { updateTenant(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{target_tenant_id}}\",\n    \"input\": {\n      \"plan\": \"STANDARD\"\n    }\n  }\n}"
             }
           },
           "event": [
@@ -6592,7 +6631,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation ProvisionTenant($input: AWSJSON!) { provisionTenant(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Demo School\\\",\\\"slug\\\":\\\"demo-school\\\",\\\"plan\\\":\\\"STANDARD\\\",\\\"campusName\\\":\\\"Main Campus\\\",\\\"adminEmail\\\":\\\"demoadmin@example.com\\\",\\\"adminPassword\\\":\\\"Qwerty@1234\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation ProvisionTenant($input: AWSJSON!) { provisionTenant(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Demo School\",\n      \"slug\": \"demo-school\",\n      \"plan\": \"STANDARD\",\n      \"campusName\": \"Main Campus\",\n      \"adminEmail\": \"demoadmin@example.com\",\n      \"adminPassword\": \"Qwerty@1234\"\n    }\n  }\n}"
             }
           },
           "event": [
@@ -6837,7 +6876,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation SetFeatureFlag($input: AWSJSON!) { setFeatureFlag(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"flag\\\":\\\"ENABLE_PROMOTIONS\\\",\\\"value\\\":true,\\\"tenantId\\\":\\\"{{target_tenant_id}}\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation SetFeatureFlag($input: AWSJSON!) { setFeatureFlag(input: $input) }\",\n  \"variables\": {\n    \"input\": {\n      \"flag\": \"ENABLE_PROMOTIONS\",\n      \"value\": true,\n      \"tenantId\": \"{{target_tenant_id}}\"\n    }\n  }\n}"
             }
           },
           "event": [

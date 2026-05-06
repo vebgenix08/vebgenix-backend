@@ -5,6 +5,14 @@ import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
 import { CreateInvoice } from '../use-cases/CreateInvoice';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 export async function resolveInvoices(
   operation: string,
   args: Record<string, unknown>,
@@ -19,18 +27,20 @@ export async function resolveInvoices(
       if (args.studentId) filter.studentId = args.studentId;
       if (args.status)    filter.status    = args.status;
       if (args.campusId)  filter.campusId  = args.campusId;
-      return FinanceRepo.listInvoices(tenantId, filter);
+      const docs = await FinanceRepo.listInvoices(tenantId, filter);
+      return (docs as unknown[]).map(d => toGql(d));
     }
 
     case 'getInvoice':
     case 'GET:/api/admin/finance/invoices/:id':
       authorize(ctx, 'finance.invoice.read');
-      return FinanceRepo.findInvoiceById(tenantId, args.id as string);
+      return toGql(await FinanceRepo.findInvoiceById(tenantId, args.id as string));
 
     case 'getStudentInvoices':
     case 'GET:/api/admin/finance/students/:studentId/invoices': {
       authorize(ctx, 'finance.invoice.read');
-      return FinanceRepo.listInvoices(tenantId, { studentId: args.studentId });
+      const docs = await FinanceRepo.listInvoices(tenantId, { studentId: args.studentId });
+      return (docs as unknown[]).map(d => toGql(d));
     }
 
     case 'createInvoice':
@@ -44,18 +54,18 @@ export async function resolveInvoices(
       authorize(ctx, 'finance.invoice.update');
       const update = { ...(((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>) };
       delete update.id;
-      return FinanceRepo.updateInvoice(tenantId, args.id as string, update);
+      return toGql(await FinanceRepo.updateInvoice(tenantId, args.id as string, update));
     }
 
     case 'cancelInvoice':
     case 'POST:/api/admin/finance/invoices/:id/cancel': {
       authorize(ctx, 'finance.invoice.update');
-      return FinanceRepo.updateInvoice(tenantId, args.id as string, {
+      return toGql(await FinanceRepo.updateInvoice(tenantId, args.id as string, {
         status: 'CANCELLED',
         cancelledAt: new Date(),
         cancelledBy: new Types.ObjectId(ctx.membership!.profileId),
         cancelReason: args.reason as string | undefined,
-      });
+      }));
     }
 
     case 'reviseInvoice':
@@ -67,7 +77,6 @@ export async function resolveInvoices(
       const previousAmount = invoice.netAmount;
       const newAmount      = input.newAmount as number;
       const difference     = newAmount - previousAmount;
-      // Record revision audit trail
       await FinanceRepo.createFeeRevision(tenantId, {
         studentId:   invoice.studentId.toString(),
         invoiceId:   invoice._id.toString(),
@@ -77,24 +86,27 @@ export async function resolveInvoices(
         difference,
         reason: input.reason as string,
       });
-      return FinanceRepo.updateInvoice(tenantId, args.id as string, {
+      return toGql(await FinanceRepo.updateInvoice(tenantId, args.id as string, {
         netAmount: newAmount,
         dueAmount: newAmount - invoice.paidAmount,
-      });
+      }));
     }
 
     case 'getFeeRevisions':
-    case 'GET:/api/admin/finance/invoices/:id/revisions':
+    case 'GET:/api/admin/finance/invoices/:id/revisions': {
       authorize(ctx, 'finance.invoice.read');
-      return FinanceRepo.listFeeRevisions(tenantId, { invoiceId: args.id });
+      const docs = await FinanceRepo.listFeeRevisions(tenantId, { invoiceId: args.id });
+      return (docs as unknown[]).map(d => toGql(d));
+    }
 
     case 'createOneOffCharge':
     case 'POST:/api/admin/finance/invoices/one-off': {
       authorize(ctx, 'finance.invoice.create');
-      return CreateInvoice.execute(ctx, {
+      const result = await CreateInvoice.execute(ctx, {
         ...(((args.input as Record<string, unknown>) ?? args) as object),
         isOneOff: true,
       } as Parameters<typeof CreateInvoice.execute>[1]);
+      return toGql(result);
     }
 
     case 'bulkCreateCharge':

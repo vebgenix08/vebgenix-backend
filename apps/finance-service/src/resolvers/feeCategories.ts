@@ -5,6 +5,14 @@ import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 import { Types } from 'mongoose';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 export async function resolveFeeCategories(
   operation: string,
   args: Record<string, unknown>,
@@ -16,7 +24,8 @@ export async function resolveFeeCategories(
     case 'GET:/api/admin/finance/fee-categories': {
       authorize(ctx, 'finance.fee_category.read');
       const activeOnly = args.activeOnly !== 'false' && args.activeOnly !== false;
-      return FinanceRepo.listFeeCategories(tenantId, activeOnly);
+      const docs = await FinanceRepo.listFeeCategories(tenantId, activeOnly);
+      return (docs as unknown[]).map(d => toGql(d));
     }
 
     case 'getFeeCategory':
@@ -26,7 +35,7 @@ export async function resolveFeeCategories(
       if (!id) throw new AppError('BAD_REQUEST', 'id is required');
       const category = await FinanceRepo.findFeeCategoryById(tenantId, id);
       if (!category) throw new AppError('NOT_FOUND', 'Fee category not found');
-      return category;
+      return toGql(category);
     }
 
     case 'createFeeCategory':
@@ -57,11 +66,11 @@ export async function resolveFeeCategories(
 
       await AuditLogger.logTenantAction({
         ctx, action: 'FEE_CATEGORY_CREATED',
-        entityType: 'FeeCategory', entityId: category._id.toString(), entityName: name,
+        entityType: 'FeeCategory', entityId: (category as { _id: { toString(): string } })._id.toString(), entityName: name,
         after: input as unknown as Record<string, unknown>,
       });
 
-      return category;
+      return toGql(category);
     }
 
     case 'updateFeeCategory':
@@ -83,7 +92,7 @@ export async function resolveFeeCategories(
         before: existing.toObject(), after: update,
       });
 
-      return updated;
+      return toGql(updated);
     }
 
     case 'deleteFeeCategory':
@@ -103,7 +112,7 @@ export async function resolveFeeCategories(
         before: existing.toObject(), after: { isActive: false },
       });
 
-      return deleted;
+      return toGql(deleted);
     }
 
     default:

@@ -3,6 +3,14 @@ import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 export async function resolveSections(
   operation: string,
   args: Record<string, unknown>,
@@ -15,16 +23,19 @@ export async function resolveSections(
       const filter: Record<string, unknown> = { tenantId, isActive: true };
       if (args.academicYearId) filter.academicYearId = args.academicYearId;
       if (args.classId)        filter.classId        = args.classId;
-      return Section.find(filter).sort({ displayName: 1 }).lean();
+      const docs = await Section.find(filter).sort({ displayName: 1 }).lean();
+      return docs.map(d => toGql(d));
     }
 
     case 'listSections':
-    case 'GET:/api/tenant/classes/:classId/sections':
-      return Section.find({ tenantId, classId: args.classId, isActive: true }).sort({ name: 1 }).lean();
+    case 'GET:/api/tenant/classes/:classId/sections': {
+      const docs = await Section.find({ tenantId, classId: args.classId, isActive: true }).sort({ name: 1 }).lean();
+      return docs.map(d => toGql(d));
+    }
 
     case 'getSection':
     case 'GET:/api/tenant/sections/:sectionId':
-      return Section.findOne({ tenantId, _id: args.sectionId ?? args.id }).lean();
+      return toGql(await Section.findOne({ tenantId, _id: args.sectionId ?? args.id }).lean());
 
     case 'createSection':
     case 'POST:/api/tenant/classes/:classId/sections': {
@@ -33,47 +44,48 @@ export async function resolveSections(
       if (!classDoc) throw new AppError('NOT_FOUND', 'Class not found');
       const input       = (args.input as Record<string, unknown>) ?? args;
       const displayName = `${classDoc.name} — ${input.name}`;
-      return Section.create({ ...input, tenantId, classId: args.classId, displayName });
+      const doc = await Section.create({ ...input, tenantId, classId: args.classId, displayName });
+      return toGql(doc.toObject());
     }
 
     case 'updateSection':
     case 'PATCH:/api/tenant/classes/:classId/sections/:sectionId': {
       authorize(ctx, 'academics.sections.update');
       const input = (args.input as Record<string, unknown>) ?? args;
-      return Section.findOneAndUpdate(
+      return toGql(await Section.findOneAndUpdate(
         { tenantId, _id: args.sectionId ?? args.id },
         { $set: input },
         { new: true },
-      ).lean();
+      ).lean());
     }
 
     case 'deleteSection':
     case 'DELETE:/api/tenant/classes/:classId/sections/:sectionId':
       authorize(ctx, 'academics.sections.delete');
-      return Section.findOneAndUpdate(
+      return toGql(await Section.findOneAndUpdate(
         { tenantId, _id: args.sectionId ?? args.id },
         { $set: { isActive: false } },
         { new: true },
-      ).lean();
+      ).lean());
 
     case 'setSectionIncharge':
     case 'assignSectionIncharge':
     case 'POST:/api/tenant/sections/:sectionId/incharges':
       authorize(ctx, 'academics.sections.update');
-      return Section.findOneAndUpdate(
+      return toGql(await Section.findOneAndUpdate(
         { tenantId, _id: args.sectionId },
         { $set: { classTeacherId: args.profileId ?? args.teacherId } },
         { new: true },
-      ).lean();
+      ).lean());
 
     case 'removeSectionIncharge':
     case 'DELETE:/api/tenant/sections/:sectionId/incharges/:inchargeId':
       authorize(ctx, 'academics.sections.update');
-      return Section.findOneAndUpdate(
+      return toGql(await Section.findOneAndUpdate(
         { tenantId, _id: args.sectionId },
         { $unset: { classTeacherId: '' } },
         { new: true },
-      ).lean();
+      ).lean());
 
     default:
       return undefined;

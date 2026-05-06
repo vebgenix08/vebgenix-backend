@@ -3,6 +3,14 @@ import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 export async function resolveExams(
   operation: string,
   args: Record<string, unknown>,
@@ -10,55 +18,59 @@ export async function resolveExams(
   tenantId: string,
 ): Promise<unknown> {
   switch (operation) {
-    case 'listExams':
-      return AcademicsRepo.listExams(tenantId, (args.filter ?? {}) as Record<string, unknown>);
+    case 'listExams': {
+      const docs = await AcademicsRepo.listExams(tenantId, (args.filter ?? {}) as Record<string, unknown>);
+      return (docs as unknown[]).map(d => toGql(d));
+    }
 
     case 'getExam':
-      return AcademicsRepo.findExamById(tenantId, args.id as string);
+      return toGql(await AcademicsRepo.findExamById(tenantId, args.id as string));
 
     case 'createExam': {
       authorize(ctx, 'academics.exams.update');
       const input = (args.input as Record<string, unknown>) ?? args;
-      return AcademicsRepo.createExam(tenantId, {
+      return toGql(await AcademicsRepo.createExam(tenantId, {
         ...input,
         createdBy: ctx.membership!.profileId,
-      });
+      }));
     }
 
     case 'updateExam':
     case 'PATCH:/api/admin/exams/:id': {
       authorize(ctx, 'academics.exams.update');
       const input = (args.input as Record<string, unknown>) ?? args;
-      return Exam.findOneAndUpdate({ tenantId, _id: args.id }, { $set: input }, { new: true }).lean();
+      return toGql(await Exam.findOneAndUpdate({ tenantId, _id: args.id }, { $set: input }, { new: true }).lean());
     }
 
     case 'deleteExam':
     case 'DELETE:/api/admin/exams/:id':
       authorize(ctx, 'academics.exams.delete');
-      return Exam.findOneAndDelete({ tenantId, _id: args.id }).lean();
+      return toGql(await Exam.findOneAndDelete({ tenantId, _id: args.id }).lean());
 
     case 'enterMarks':
     case 'submitMarks':
-      return AcademicsRepo.addMarksEntry(
+      return toGql(await AcademicsRepo.addMarksEntry(
         tenantId,
         (args.examId ?? args.id) as string,
         args as object,
-      );
+      ));
 
     case 'publishResults':
-      return AcademicsRepo.publishExam(tenantId, args.id as string, ctx.membership!.profileId);
+      return toGql(await AcademicsRepo.publishExam(tenantId, args.id as string, ctx.membership!.profileId));
 
-    case 'listResults':
-      return AcademicsRepo.listExams(tenantId, {
+    case 'listResults': {
+      const docs = await AcademicsRepo.listExams(tenantId, {
         status: 'RESULTS_PUBLISHED',
         ...((args.filter as object) ?? {}),
       });
+      return (docs as unknown[]).map(d => toGql(d));
+    }
 
     case 'getExamResults':
     case 'GET:/api/admin/exams/:examId/results': {
       const exam = await AcademicsRepo.findExamById(tenantId, (args.examId ?? args.id) as string);
       if (!exam) throw new AppError('NOT_FOUND', 'Exam not found');
-      return exam;
+      return toGql(exam);
     }
 
     case 'getExamStats':

@@ -6,6 +6,14 @@ import { RecordPayment } from '../use-cases/RecordPayment';
 import { createRazorpayOrder, verifyRazorpaySignature } from '../razorpay';
 import { Types } from 'mongoose';
 
+/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 export async function resolvePayments(
   operation: string,
   args: Record<string, unknown>,
@@ -14,8 +22,14 @@ export async function resolvePayments(
 ): Promise<unknown> {
   switch (operation) {
     case 'recordPayment':
-    case 'POST:/api/admin/finance/payments':
-      return RecordPayment.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof RecordPayment.execute>[1]);
+    case 'POST:/api/admin/finance/payments': {
+      const result = await RecordPayment.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof RecordPayment.execute>[1]);
+      return {
+        payment:       toGql(result.payment),
+        receiptNumber: result.receiptNumber,
+        allocations:   (result.allocations as unknown[]).map(d => toGql(d)),
+      };
+    }
 
     case 'listPayments':
     case 'GET:/api/admin/finance/payments': {
@@ -24,13 +38,14 @@ export async function resolvePayments(
       if (args.invoiceId) filter.invoiceId = args.invoiceId;
       if (args.studentId) filter.studentId = args.studentId;
       if (args.status)    filter.status    = args.status;
-      return FinanceRepo.listPayments(tenantId, filter);
+      const docs = await FinanceRepo.listPayments(tenantId, filter);
+      return (docs as unknown[]).map(d => toGql(d));
     }
 
     case 'getPayment':
     case 'GET:/api/admin/finance/payments/:id':
       authorize(ctx, 'finance.payment.read');
-      return FinanceRepo.findPaymentById(tenantId, args.id as string);
+      return toGql(await FinanceRepo.findPaymentById(tenantId, args.id as string));
 
     case 'createPaymentOrder':
     case 'POST:/api/finance/payments/create-order': {
@@ -45,7 +60,6 @@ export async function resolvePayments(
         receipt:  `inv_${invoice._id.toString().slice(-8)}`,
         notes:    { invoiceId: invoice._id.toString(), tenantId, studentId: invoice.studentId.toString() },
       });
-      // Pre-create payment record in PENDING state
       const payment = await FinanceRepo.createPayment(tenantId, {
         campusId:        invoice.campusId,
         studentId:       invoice.studentId,
@@ -60,7 +74,7 @@ export async function resolvePayments(
         razorpayOrderId: order.id,
         collectedBy:     new Types.ObjectId(ctx.membership!.profileId),
       });
-      return { orderId: order.id, amount: order.amount, currency: order.currency, paymentId: payment._id };
+      return { orderId: order.id, amount: order.amount, currency: order.currency, paymentId: String((payment as { _id: unknown })._id) };
     }
 
     case 'verifyPaymentSignature':
@@ -77,7 +91,7 @@ export async function resolvePayments(
       const payment = await FinanceRepo.findPaymentByRazorpayOrderId(razorpayOrderId);
       if (!payment) throw new AppError('NOT_FOUND', 'Payment record not found');
       await RecordPayment.applyOnlineSuccess(tenantId, payment._id.toString(), razorpayPaymentId, razorpaySignature);
-      return { success: true, paymentId: payment._id };
+      return { success: true, paymentId: String(payment._id) };
     }
 
     case 'listReceipts':
@@ -86,19 +100,18 @@ export async function resolvePayments(
       const filter: Record<string, unknown> = {};
       if (args.studentId) filter.studentId = args.studentId;
       if (args.invoiceId) filter.invoiceId = args.invoiceId;
-      // Receipts = successful payments with a receipt number
-      return FinanceRepo.listPayments(tenantId, { ...filter, status: 'SUCCESS', receiptNumber: { $exists: true, $ne: null } });
+      const docs = await FinanceRepo.listPayments(tenantId, { ...filter, status: 'SUCCESS', receiptNumber: { $exists: true, $ne: null } });
+      return (docs as unknown[]).map(d => toGql(d));
     }
 
     case 'getReceipt':
     case 'GET:/api/admin/finance/receipts/:id': {
       authorize(ctx, 'finance.payment.read');
-      return FinanceRepo.findPaymentById(tenantId, args.id as string);
+      return toGql(await FinanceRepo.findPaymentById(tenantId, args.id as string));
     }
 
     case 'collectPaymentByStudent':
     case 'POST:/api/admin/finance/students/:studentId/collect': {
-      // Collect payment across ALL outstanding invoices for a student (oldest first)
       authorize(ctx, 'finance.payment.create');
       const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
       const studentId = (args.studentId ?? args.id) as string;
@@ -122,7 +135,7 @@ export async function resolvePayments(
           method:      method as 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI' | 'CARD' | 'ONLINE',
           remarks:     input.remarks as string | undefined,
         });
-        payments.push(result.payment);
+        payments.push(toGql(result.payment));
         remaining -= toPay;
       }
       return { payments, totalCollected: (input.amount as number) - remaining, remainingAmount: remaining };
@@ -137,7 +150,7 @@ export async function resolvePayments(
         status: { $in: ['PENDING', 'ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
       });
       const totalDue = (overdueInvoices as { dueAmount: number }[]).reduce((s, i) => s + i.dueAmount, 0);
-      return { studentId, invoices: overdueInvoices, totalDue };
+      return { studentId, invoices: (overdueInvoices as unknown[]).map(d => toGql(d)), totalDue };
     }
 
     default:
