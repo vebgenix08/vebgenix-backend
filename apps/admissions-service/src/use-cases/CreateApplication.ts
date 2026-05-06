@@ -1,5 +1,5 @@
 import { AuthContext } from '@vebgenix/auth';
-import { AdmissionsRepo } from '@vebgenix/db';
+import { AdmissionsRepo, Application } from '@vebgenix/db';
 import { AuditLogger } from '@vebgenix/audit';
 import { authorize } from '@vebgenix/permissions';
 import { getTenantId } from '@vebgenix/tenant';
@@ -48,6 +48,18 @@ export class CreateApplication {
 
     if (!resolvedName)  throw new AppError('BAD_REQUEST', 'studentName is required');
     if (!resolvedPhone) throw new AppError('BAD_REQUEST', 'phone is required');
+
+    // Duplicate guard — check for existing active application with same phone in same academic year
+    const dupApp = await (Application as unknown as { findOne: (q: Record<string, unknown>) => Promise<unknown> }).findOne({
+      tenantId,
+      academicYearId: new Types.ObjectId(input.academicYearId),
+      phone: resolvedPhone,
+      status: { $nin: ['REJECTED', 'WITHDRAWN'] },
+    });
+    if (dupApp) {
+      const d = dupApp as unknown as Record<string, unknown>;
+      throw new AppError('CONFLICT', `An application already exists for this phone number (status: ${d.status}). Application #: ${d.applicationNumber}`);
+    }
 
     const applicationNumber = await generateApplicationNo(tenantId, input.academicYearId);
 

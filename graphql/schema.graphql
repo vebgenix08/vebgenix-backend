@@ -203,6 +203,7 @@ input CreateAcademicYearInput {
 type Campus {
   id: ID!
   name: String!
+  code: String!
   type: String!
   address: String
   phone: String
@@ -212,6 +213,7 @@ type Campus {
 
 input CreateCampusInput {
   name: String!
+  code: String!
   type: String!
   address: String
   city: String
@@ -861,13 +863,13 @@ type Query {
   listCertificates(studentId: ID!): AWSJSON
 
   # Settings
-  listAcademicYears: [AcademicYear!]!
-  getAcademicYear(id: ID!): AcademicYear
-  listCampuses: [Campus!]!
-  getCampus(id: ID!): Campus
+  listAcademicYears: AWSJSON
+  getAcademicYear(id: ID!): AWSJSON
+  listCampuses: AWSJSON
+  getCampus(id: ID!): AWSJSON
   listPrograms(campusId: ID): AWSJSON
   getProgram(id: ID!): AWSJSON
-  listTemplates(type: String): [Template!]!
+  listTemplates(type: String): AWSJSON
   getTemplate(id: ID!): AWSJSON
   getTenantFeatures: AWSJSON
 
@@ -895,6 +897,9 @@ type Query {
   getDuplicateEnquiryReport(campusId: ID): AWSJSON
   getDuplicateStudentReport(campusId: ID): AWSJSON
 
+  # Identity — roles
+  listRoles: AWSJSON
+
   # Storage
   generateDownloadUrl(key: String!): AWSJSON
 
@@ -908,7 +913,7 @@ type Mutation {
   updateUser(input: UpdateUserInput!): User!
   deactivateUser(id: ID!): Boolean
   reactivateUser(id: ID!): Boolean
-  inviteStaff(input: InviteStaffInput!): InviteStaffPayload!
+  inviteStaff(input: AWSJSON!): AWSJSON
   updateEmployee(id: ID!, input: AWSJSON!): AWSJSON
   addCampusAccess(userId: ID!, campusId: ID!): AWSJSON
   removeCampusAccess(userId: ID!, campusId: ID!): Boolean
@@ -1058,11 +1063,11 @@ type Mutation {
   approveCertificate(studentId: ID!, certificateId: ID!): AWSJSON
 
   # Settings
-  createAcademicYear(input: CreateAcademicYearInput!): AcademicYear!
-  updateAcademicYear(id: ID!, input: AWSJSON!): AcademicYear
-  setActiveAcademicYear(id: ID!): AcademicYear
-  createCampus(input: CreateCampusInput!): Campus!
-  updateCampus(id: ID!, input: CreateCampusInput!): Campus!
+  createAcademicYear(input: AWSJSON!): AWSJSON
+  updateAcademicYear(id: ID!, input: AWSJSON!): AWSJSON
+  setActiveAcademicYear(id: ID!): AWSJSON
+  createCampus(input: AWSJSON!): AWSJSON
+  updateCampus(id: ID!, input: AWSJSON!): AWSJSON
   deactivateCampus(id: ID!): Boolean
   createProgram(input: AWSJSON!): AWSJSON
   updateProgram(id: ID!, input: AWSJSON!): AWSJSON
@@ -1106,7 +1111,7 @@ type Mutation {
   bulkDeleteInactiveEnquiries(input: AWSJSON): AWSJSON
 
   # Invites
-  acceptInvite(token: String!, password: String): AcceptInvitePayload!
+  acceptInvite(token: String!, password: String): AWSJSON
 
   # Legacy portal
   enableStudentPortal(studentId: ID!, email: String!): PortalEnablementPayload!

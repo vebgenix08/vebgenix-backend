@@ -219,6 +219,19 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       }
 
       // ── Roles ──────────────────────────────────────────────────────────────
+      case 'listRoles': {
+        // Returns predefined role types available for staff invitation
+        return [
+          { id: 'TENANT_ADMIN', roleName: 'Tenant Admin', permissions: ['*'], description: 'Full access to all tenant features' },
+          { id: 'PRINCIPAL',    roleName: 'Principal',    permissions: ['academics.*', 'admissions.*', 'finance.read'], description: 'School principal' },
+          { id: 'TEACHER',      roleName: 'Teacher',      permissions: ['academics.classes.read', 'academics.attendance.mark', 'academics.exams.update'], description: 'Class teacher / subject teacher' },
+          { id: 'ACCOUNTANT',   roleName: 'Accountant',   permissions: ['finance.*'], description: 'Finance and fee management' },
+          { id: 'ADMISSIONS_OFFICER', roleName: 'Admissions Officer', permissions: ['admissions.*'], description: 'Manages enquiries and applications' },
+          { id: 'RECEPTIONIST', roleName: 'Receptionist', permissions: ['admissions.enquiry.*', 'admissions.application.read'], description: 'Front-desk reception' },
+          { id: 'STAFF',        roleName: 'Staff',        permissions: ['academics.read'], description: 'General staff with read-only access' },
+        ];
+      }
+
       case 'assignRole':
       case 'POST:/api/admin/users/:id/roles': {
         authorize(ctx, 'identity.roles.assign');

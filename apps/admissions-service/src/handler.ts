@@ -93,7 +93,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'deleteEnquiry':
       case 'DELETE:/api/admissions/enquiries/:id':
         authorize(ctx, 'admissions.enquiry.delete');
-        return AdmissionsRepo.deleteEnquiry(tenantId, args.id as string);
+        await AdmissionsRepo.deleteEnquiry(tenantId, args.id as string);
+        return true;
 
       case 'checkDuplicate':
       case 'POST:/api/admissions/duplicate-check':
@@ -149,7 +150,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'getApplicationReviews':
       case 'GET:/api/admissions/applications/:id/reviews': {
         authorize(ctx, 'admissions.application.read');
-        const app = await AdmissionsRepo.findApplicationById(tenantId, args.id as string);
+        const appId = (args.applicationId ?? args.id) as string;
+        const app = await AdmissionsRepo.findApplicationById(tenantId, appId);
         if (!app) throw new AppError('NOT_FOUND', 'Application not found');
         return app.reviews ?? [];
       }
@@ -190,14 +192,15 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'verifyDocument':
       case 'POST:/api/admissions/applications/:id/documents/:docKey/verify': {
         authorize(ctx, 'admissions.application.review');
-        const app = await AdmissionsRepo.findApplicationById(tenantId, args.id as string);
+        const appId  = (args.applicationId ?? args.id) as string;
+        const docKey = (args.documentId ?? args.docKey ?? args.docType) as string;
+        const app = await AdmissionsRepo.findApplicationById(tenantId, appId);
         if (!app) throw new AppError('NOT_FOUND', 'Application not found');
-        const docKey     = args.docKey as string;
-        const docs       = (app.documents ?? []) as unknown as Array<Record<string, unknown>>;
-        const docIndex   = docs.findIndex((d) => d.key === docKey || d.type === docKey);
-        if (docIndex === -1) throw new AppError('NOT_FOUND', 'Document not found');
+        const docs     = (app.documents ?? []) as unknown as Array<Record<string, unknown>>;
+        const docIndex = docs.findIndex((d) => d.id?.toString() === docKey || d.key === docKey || d.type === docKey);
+        if (docIndex === -1) throw new AppError('NOT_FOUND', `Document "${docKey}" not found on this application`);
         docs[docIndex] = { ...docs[docIndex], verified: true, verifiedAt: new Date(), verifiedBy: ctx.membership!.profileId };
-        return AdmissionsRepo.updateApplication(tenantId, args.id as string, { documents: docs as never });
+        return AdmissionsRepo.updateApplication(tenantId, appId, { documents: docs as never });
       }
 
       case 'getUploadUrl':

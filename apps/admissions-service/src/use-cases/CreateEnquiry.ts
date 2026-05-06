@@ -3,6 +3,7 @@ import { AdmissionsRepo } from '@vebgenix/db';
 import { AuditLogger } from '@vebgenix/audit';
 import { authorize } from '@vebgenix/permissions';
 import { getTenantId } from '@vebgenix/tenant';
+import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
 
 export interface CreateEnquiryInput {
@@ -21,6 +22,13 @@ export class CreateEnquiry {
   static async execute(ctx: AuthContext, input: CreateEnquiryInput) {
     authorize(ctx, 'admissions.enquiry.create');
     const tenantId = getTenantId(ctx);
+
+    // Duplicate guard — same phone within this tenant
+    const dup = await AdmissionsRepo.findDuplicateEnquiry(tenantId, input.phone, input.email);
+    if (dup) {
+      const dup2 = dup as unknown as Record<string, unknown>;
+      throw new AppError('CONFLICT', `An enquiry already exists for this contact (phone: ${input.phone}). Existing ID: ${String(dup2._id ?? dup2.id)}`);
+    }
 
     const enquiry = await AdmissionsRepo.createEnquiry(tenantId, {
       campusId:       new Types.ObjectId(input.campusId),

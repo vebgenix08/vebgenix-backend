@@ -203,6 +203,7 @@ input CreateAcademicYearInput {
 type Campus {
   id: ID!
   name: String!
+  code: String!
   type: String!
   address: String
   phone: String
@@ -212,6 +213,7 @@ type Campus {
 
 input CreateCampusInput {
   name: String!
+  code: String!
   type: String!
   address: String
   phone: String

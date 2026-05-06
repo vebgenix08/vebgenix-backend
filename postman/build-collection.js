@@ -222,35 +222,40 @@ const SETTINGS = {
   item: [
     mkReq(
       'Create Academic Year',
-      'mutation CreateAcademicYear($input: CreateAcademicYearInput!) { createAcademicYear(input: $input) { id name startDate endDate isActive } }',
-      { input: { name: '2025-26', startDate: '2025-06-01', endDate: '2026-05-31' } },
+      'mutation CreateAcademicYear($input: AWSJSON!) { createAcademicYear(input: $input) }',
+      { input: JSON.stringify({ name: '2025-26', startDate: '2025-06-01', endDate: '2026-05-31' }) },
       okTest([
         "const r = pm.response.json();",
-        "const y = r.data && r.data.createAcademicYear;",
-        "pm.test('createAcademicYear exists', () => pm.expect(y).to.exist);",
+        "const raw = r.data && r.data.createAcademicYear;",
+        "pm.test('createAcademicYear exists', () => pm.expect(raw).to.exist);",
+        "let y; try { y = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { y = raw; }",
         "if (y && y.id) { pm.environment.set('academic_year_id', y.id); console.log('academic_year_id:', y.id); }",
+        "pm.test('Has id', () => pm.expect(y && y.id).to.be.ok);",
       ])
     ),
     mkReq(
       'Set Active Academic Year',
-      'mutation SetActiveAcademicYear($id: ID!) { setActiveAcademicYear(id: $id) { id name isActive } }',
+      'mutation SetActiveAcademicYear($id: ID!) { setActiveAcademicYear(id: $id) }',
       { id: '{{academic_year_id}}' },
       okTest([
         "const r = pm.response.json();",
-        "const y = r.data && r.data.setActiveAcademicYear;",
-        "pm.test('setActiveAcademicYear exists', () => pm.expect(y).to.exist);",
+        "const raw = r.data && r.data.setActiveAcademicYear;",
+        "pm.test('setActiveAcademicYear exists', () => pm.expect(raw).to.exist);",
+        "let y; try { y = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { y = raw; }",
         "pm.test('isActive is true', () => pm.expect(y && y.isActive).to.be.true);",
       ])
     ),
     mkReq(
       'List Academic Years',
-      'query { listAcademicYears { id name startDate endDate isActive } }',
+      'query { listAcademicYears }',
       null,
       okTest([
         "const r = pm.response.json();",
-        "const list = r.data && r.data.listAcademicYears;",
+        "const raw = r.data && r.data.listAcademicYears;",
+        "pm.test('listAcademicYears exists', () => pm.expect(raw).to.exist);",
+        "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
         "pm.test('listAcademicYears is array', () => pm.expect(list).to.be.an('array'));",
-        "if (list && list.length > 0) {",
+        "if (Array.isArray(list) && list.length > 0) {",
         "  pm.environment.set('academic_year_id', list[0].id);",
         "  console.log('academic_year_id (from list):', list[0].id, list[0].name);",
         "}",
@@ -258,26 +263,28 @@ const SETTINGS = {
     ),
     mkReq(
       'Create Campus',
-      // Returns typed Campus! — use only fields guaranteed in deployed schema
-      'mutation CreateCampus($input: CreateCampusInput!) { createCampus(input: $input) { id name isActive } }',
-      { input: { name: 'Main Campus', code: 'MAIN', type: 'SCHOOL', address: 'Bengaluru, Karnataka' } },
+      'mutation CreateCampus($input: AWSJSON!) { createCampus(input: $input) }',
+      { input: JSON.stringify({ name: 'Main Campus', code: 'MAIN', type: 'SCHOOL', address: 'Bengaluru, Karnataka' }) },
       okTest([
         "const r = pm.response.json();",
-        "const campus = r.data && r.data.createCampus;",
-        "pm.test('createCampus exists', () => pm.expect(campus).to.exist);",
+        "const raw = r.data && r.data.createCampus;",
+        "pm.test('createCampus exists', () => pm.expect(raw).to.exist);",
+        "let campus; try { campus = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { campus = raw; }",
         "if (campus && campus.id) { pm.environment.set('campus_id', campus.id); console.log('campus_id:', campus.id); }",
+        "pm.test('Has id', () => pm.expect(campus && campus.id).to.be.ok);",
       ])
     ),
     mkReq(
       'List Campuses',
-      // Returns [Campus!]! — use only minimal fields in case deployed schema is older
-      'query { listCampuses { id name isActive } }',
+      'query { listCampuses }',
       null,
       okTest([
         "const r = pm.response.json();",
-        "const list = r.data && r.data.listCampuses;",
+        "const raw = r.data && r.data.listCampuses;",
+        "pm.test('listCampuses exists', () => pm.expect(raw).to.exist);",
+        "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
         "pm.test('listCampuses is array', () => pm.expect(list).to.be.an('array'));",
-        "if (list && list.length > 0 && !pm.environment.get('campus_id')) {",
+        "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('campus_id')) {",
         "  pm.environment.set('campus_id', list[0].id);",
         "  console.log('campus_id (from list):', list[0].id);",
         "}",
@@ -306,6 +313,37 @@ const SETTINGS = {
         "  pm.environment.set('program_id', list[0].id || list[0]._id);",
         "  console.log('program_id (from list):', list[0].id || list[0]._id);",
         "}",
+      ])
+    ),
+    mkReq(
+      'Get Program',
+      'query GetProgram($id: ID!) { getProgram(id: $id) }',
+      { id: '{{program_id}}' },
+      okTest([
+        "const r = pm.response.json();",
+        "pm.test('getProgram exists', () => pm.expect(r.data && r.data.getProgram).to.exist);",
+        "const raw = r.data && r.data.getProgram;",
+        "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+        "if (d) console.log('Program:', d.name, '| code:', d.code);",
+      ])
+    ),
+    mkReq(
+      'Update Program',
+      'mutation UpdateProgram($id: ID!, $input: AWSJSON!) { updateProgram(id: $id, input: $input) }',
+      { id: '{{program_id}}', input: JSON.stringify({ durationYears: 13 }) },
+      okTest([
+        "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);",
+        "const raw = pm.response.json().data && pm.response.json().data.updateProgram;",
+        "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+        "if (d) console.log('Updated program:', d.name, '| durationYears:', d.durationYears);",
+      ])
+    ),
+    mkReq(
+      'Delete Program',
+      'mutation DeleteProgram($id: ID!) { deleteProgram(id: $id) }',
+      { id: '{{program_id}}' },
+      okTest([
+        "pm.test('deleteProgram returned boolean', () => pm.expect(pm.response.json().data && pm.response.json().data.deleteProgram).to.be.a('boolean'));",
       ])
     ),
     mkReq(
@@ -346,7 +384,11 @@ const SETTINGS = {
       'query { listTemplates }',
       null,
       okTest([
-        "pm.test('listTemplates exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "const r = pm.response.json();",
+        "pm.test('listTemplates exists', () => pm.expect(r.data).to.exist);",
+        "const raw = r.data && r.data.listTemplates;",
+        "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+        "if (Array.isArray(list)) console.log('Templates count:', list.length);",
       ])
     ),
   ],
@@ -382,11 +424,13 @@ const IDENTITY = {
     ),
     mkReq(
       'Invite Staff / Onboard Staff',
-      'mutation InviteStaff($input: InviteStaffInput!) { inviteStaff(input: $input) { success membershipId } }',
-      { input: { email: '{{staff_email}}', fullName: 'Test Teacher', roleIds: [], campusIds: ['{{campus_id}}'], allCampuses: false } },
+      'mutation InviteStaff($input: AWSJSON!) { inviteStaff(input: $input) }',
+      { input: JSON.stringify({ email: '{{staff_email}}', fullName: 'Test Teacher', roleIds: [], campusIds: ['{{campus_id}}'], allCampuses: false }) },
       okTest([
         "const r = pm.response.json();",
-        "const d = r.data && r.data.inviteStaff;",
+        "const raw = r.data && r.data.inviteStaff;",
+        "pm.test('inviteStaff exists', () => pm.expect(raw).to.exist);",
+        "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
         "pm.test('inviteStaff succeeds', () => pm.expect(d && d.success).to.be.true);",
         "if (d && d.membershipId) { pm.environment.set('staff_profile_id', d.membershipId); console.log('staff_profile_id:', d.membershipId); }",
         "if (r.errors) console.warn('Errors:', JSON.stringify(r.errors));",
@@ -432,10 +476,27 @@ const IDENTITY = {
     ),
     mkReq(
       'Accept Invite',
-      'mutation AcceptInvite($token: String!) { acceptInvite(token: $token) { success email isExistingUser } }',
+      'mutation AcceptInvite($token: String!) { acceptInvite(token: $token) }',
       { token: '{{staff_email}}' },
       okTest([
-        "pm.test('acceptInvite succeeds', () => pm.expect(pm.response.json().data && pm.response.json().data.acceptInvite && pm.response.json().data.acceptInvite.success).to.be.true);",
+        "const r = pm.response.json();",
+        "const raw = r.data && r.data.acceptInvite;",
+        "pm.test('acceptInvite exists', () => pm.expect(raw).to.exist);",
+        "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+        "pm.test('acceptInvite succeeds', () => pm.expect(d && d.success).to.be.true);",
+      ])
+    ),
+    mkReq(
+      'List Roles',
+      'query { listRoles }',
+      null,
+      okTest([
+        "const r = pm.response.json();",
+        "const raw = r.data && r.data.listRoles;",
+        "pm.test('listRoles exists', () => pm.expect(raw).to.exist);",
+        "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
+        "pm.test('listRoles is array', () => pm.expect(list).to.be.an('array'));",
+        "if (Array.isArray(list)) console.log('Roles:', list.map(r => r.roleName).join(', '));",
       ])
     ),
   ],

@@ -1,5 +1,6 @@
 import { AcademicYear } from '@vebgenix/db';
 import { authorize } from '@vebgenix/permissions';
+import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 
 function toGql(doc: Record<string, unknown> | null) {
@@ -32,6 +33,8 @@ export async function resolveAcademicYears(
     case 'POST:/api/admin/settings/academic-years': {
       authorize(ctx, 'settings.academic_year.create');
       const input = (args.input as Record<string, unknown>) ?? args;
+      const existing = await AcademicYear.findOne({ tenantId, name: input.name as string });
+      if (existing) throw new AppError('CONFLICT', `Academic year "${input.name}" already exists`);
       const doc = await AcademicYear.create({ ...input, tenantId });
       return toGql(doc.toObject() as unknown as Record<string, unknown>);
     }
