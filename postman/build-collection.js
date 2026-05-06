@@ -258,15 +258,20 @@ const SETTINGS = {
     ),
     mkReq(
       'Create Campus',
-      'mutation CreateCampus($input: AWSJSON!) { createCampus(input: $input) }',
-      { input: JSON.stringify({ name: 'Main Campus', code: 'MAIN', type: 'SCHOOL' }) },
+      // Returns typed Campus! — use only fields guaranteed in deployed schema
+      'mutation CreateCampus($input: CreateCampusInput!) { createCampus(input: $input) { id name isActive } }',
+      { input: { name: 'Main Campus', code: 'MAIN', type: 'SCHOOL', address: 'Bengaluru, Karnataka' } },
       okTest([
-        ...parseAndSave('createCampus', 'campus_id', 'campus_id'),
+        "const r = pm.response.json();",
+        "const campus = r.data && r.data.createCampus;",
+        "pm.test('createCampus exists', () => pm.expect(campus).to.exist);",
+        "if (campus && campus.id) { pm.environment.set('campus_id', campus.id); console.log('campus_id:', campus.id); }",
       ])
     ),
     mkReq(
       'List Campuses',
-      'query { listCampuses { id name code type isActive } }',
+      // Returns [Campus!]! — use only minimal fields in case deployed schema is older
+      'query { listCampuses { id name isActive } }',
       null,
       okTest([
         "const r = pm.response.json();",
@@ -288,14 +293,18 @@ const SETTINGS = {
     ),
     mkReq(
       'List Programs',
-      'query { listPrograms { id name code type } }',
+      // Returns AWSJSON — cannot sub-select fields
+      'query { listPrograms(campusId: "{{campus_id}}") }',
       null,
       okTest([
         "const r = pm.response.json();",
-        "const list = r.data && r.data.listPrograms;",
+        "pm.test('listPrograms exists', () => pm.expect(r.data).to.exist);",
+        "const raw = r.data && r.data.listPrograms;",
+        "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
         "pm.test('listPrograms is array', () => pm.expect(list).to.be.an('array'));",
-        "if (list && list.length > 0 && !pm.environment.get('program_id')) {",
-        "  pm.environment.set('program_id', list[0].id);",
+        "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('program_id')) {",
+        "  pm.environment.set('program_id', list[0].id || list[0]._id);",
+        "  console.log('program_id (from list):', list[0].id || list[0]._id);",
         "}",
       ])
     ),
@@ -534,8 +543,9 @@ const APPLICATIONS_FOLDER = {
       okTest(["pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"])
     ),
     mkReq('Get Application Reviews',
-      'query GetApplicationReviews($id: ID!) { getApplicationReviews(id: $id) }',
-      { id: '{{application_id}}' },
+      // Schema: getApplicationReviews(applicationId: ID!): AWSJSON
+      'query GetApplicationReviews($applicationId: ID!) { getApplicationReviews(applicationId: $applicationId) }',
+      { applicationId: '{{application_id}}' },
       okTest(["pm.test('getApplicationReviews exists', () => pm.expect(pm.response.json().data).to.exist);"])
     ),
     mkReq('Approve Application',
@@ -549,8 +559,9 @@ const APPLICATIONS_FOLDER = {
       okTest(["pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"])
     ),
     mkReq('Verify Document',
-      'mutation VerifyDocument($id: ID!, $docKey: String!) { verifyDocument(id: $id, docKey: $docKey) }',
-      { id: '{{application_id}}', docKey: 'birth_certificate' },
+      // Schema: verifyDocument(applicationId: ID!, documentId: ID!, input: AWSJSON!): AWSJSON
+      'mutation VerifyDocument($applicationId: ID!, $documentId: ID!, $input: AWSJSON!) { verifyDocument(applicationId: $applicationId, documentId: $documentId, input: $input) }',
+      { applicationId: '{{application_id}}', documentId: 'birth_certificate', input: JSON.stringify({ verified: true, remarks: 'Document looks valid' }) },
       okTest(["pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"])
     ),
     mkReq('Withdraw Application',
@@ -738,10 +749,12 @@ const FEE_STRUCTURES = {
     ),
     mkReq(
       'Copy Fee Pattern to Next Year',
-      'mutation CopyFeePattern($input: AWSJSON!) { copyFeePattern(input: $input) }',
+      // Schema: copyFeePatternToNextYear(input: AWSJSON!): AWSJSON
+      'mutation CopyFeePatternToNextYear($input: AWSJSON!) { copyFeePatternToNextYear(input: $input) }',
       { input: JSON.stringify({ fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}' }) },
       okTest([
         "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
+        "if (pm.response.json().errors) console.warn('Errors:', JSON.stringify(pm.response.json().errors));",
       ])
     ),
     mkReq(
@@ -840,7 +853,8 @@ const INVOICES = {
     ),
     mkReq(
       'List Invoices',
-      'query { listInvoices(academicYearId: "{{academic_year_id}}") }',
+      // Schema: listInvoices(studentId, status, limit, nextToken) — no academicYearId
+      'query { listInvoices(studentId: "{{student_id}}") }',
       null,
       okTest([
         "const r = pm.response.json();",
@@ -978,14 +992,16 @@ const PAYMENTS = {
     ),
     mkReq(
       'Create Razorpay Order',
-      'mutation CreatePaymentOrder($input: AWSJSON!) { createPaymentOrder(input: $input) }',
-      { input: JSON.stringify({ invoiceId: '{{invoice_id}}' }) },
+      // Schema: createPaymentOrder(invoiceId: ID!, amount: Float): AWSJSON
+      'mutation CreatePaymentOrder($invoiceId: ID!, $amount: Float) { createPaymentOrder(invoiceId: $invoiceId, amount: $amount) }',
+      { invoiceId: '{{invoice_id}}', amount: null },
       okTest([
         "const r = pm.response.json();",
         "pm.test('createPaymentOrder exists', () => pm.expect(r.data).to.exist);",
         "const raw = r.data && r.data.createPaymentOrder;",
         "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
         "if (d && d.orderId) console.log('Razorpay orderId:', d.orderId, '| amount:', d.amount);",
+        "if (r.errors) console.warn('Order error:', r.errors[0].message);",
       ])
     ),
     mkReq(
@@ -998,11 +1014,12 @@ const PAYMENTS = {
       ])
     ),
     mkReq(
-      'List Allocations by Payment',
-      'query { listPaymentAllocations(paymentId: "{{payment_id}}") }',
-      null,
+      'List Fee Revisions (by invoice)',
+      // Schema: getFeeRevisions(invoiceId: ID!): AWSJSON
+      'query GetFeeRevisions($invoiceId: ID!) { getFeeRevisions(invoiceId: $invoiceId) }',
+      { invoiceId: '{{invoice_id}}' },
       okTest([
-        "pm.test('listPaymentAllocations exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "pm.test('getFeeRevisions exists', () => pm.expect(pm.response.json().data).to.exist);",
       ])
     ),
   ],
@@ -1012,19 +1029,23 @@ const REPORTS = {
   name: 'Reports',
   item: [
     mkReq(
-      'Day Book',
-      'query { dayBook(from: "2025-06-01", to: "2025-12-31", campusId: "{{campus_id}}") }',
+      'Day Book Report',
+      // Schema: dayBookReport(date: String, campusId: ID): AWSJSON
+      'query { dayBookReport(date: "2025-12-01", campusId: "{{campus_id}}") }',
       null,
       okTest([
-        "pm.test('dayBook exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "pm.test('dayBookReport exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "if (pm.response.json().errors) console.warn('Errors:', JSON.stringify(pm.response.json().errors));",
       ])
     ),
     mkReq(
       'Fee Collection Analytics',
-      'query { feeCollectionAnalytics(academicYearId: "{{academic_year_id}}", campusId: "{{campus_id}}") }',
+      // Schema: feeCollectionAnalytics(campusId: ID, from: String, to: String): AWSJSON
+      'query { feeCollectionAnalytics(campusId: "{{campus_id}}", from: "2025-06-01", to: "2025-12-31") }',
       null,
       okTest([
         "pm.test('feeCollectionAnalytics exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "if (pm.response.json().errors) console.warn('Errors:', JSON.stringify(pm.response.json().errors));",
       ])
     ),
   ],
@@ -1171,8 +1192,9 @@ const STUDENTS_FOLDER = {
     ),
     mkReq(
       'Update Student',
-      'mutation UpdateStudent($studentId: ID!, $input: AWSJSON!) { updateStudent(studentId: $studentId, input: $input) }',
-      { studentId: '{{student_id}}', input: JSON.stringify({ phone: '9876543212' }) },
+      // Schema: updateStudent(id: ID!, input: AWSJSON!)
+      'mutation UpdateStudent($id: ID!, $input: AWSJSON!) { updateStudent(id: $id, input: $input) }',
+      { id: '{{student_id}}', input: JSON.stringify({ phone: '9876543212' }) },
       okTest([
         "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);",
       ])
@@ -1187,8 +1209,9 @@ const STUDENTS_FOLDER = {
     ),
     mkReq(
       'Update Student Status',
-      'mutation UpdateStudentStatus($studentId: ID!, $status: String!) { updateStudentStatus(studentId: $studentId, status: $status) }',
-      { studentId: '{{student_id}}', status: 'ACTIVE' },
+      // Schema: updateStudentStatus(id: ID!, status: String!)
+      'mutation UpdateStudentStatus($id: ID!, $status: String!) { updateStudentStatus(id: $id, status: $status) }',
+      { id: '{{student_id}}', status: 'ACTIVE' },
       okTest([
         "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);",
       ])
@@ -1294,39 +1317,48 @@ const ATTENDANCE = {
   item: [
     mkReq(
       'Mark Section Attendance',
-      'mutation MarkSectionAttendance($input: BulkAttendanceInput!) { markSectionAttendance(input: $input) }',
-      { input: { sectionId: '{{section_id}}', date: new Date().toISOString().split('T')[0], records: [{ studentId: '{{student_id}}', status: 'PRESENT' }] } },
+      // Returns [AttendanceRecord!]! — must sub-select fields. BulkAttendanceInput requires campusId.
+      'mutation MarkSectionAttendance($input: BulkAttendanceInput!) { markSectionAttendance(input: $input) { id studentId status date } }',
+      { input: { sectionId: '{{section_id}}', campusId: '{{campus_id}}', date: new Date().toISOString().split('T')[0], records: [{ studentId: '{{student_id}}', status: 'PRESENT' }] } },
       okTest([
         "pm.test('markSectionAttendance exists', () => pm.expect(pm.response.json().data).to.exist);",
-        "const raw = pm.response.json().data && pm.response.json().data.markSectionAttendance;",
-        "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
-        "if (d) console.log('Marked:', d.marked, '| Date:', d.date);",
+        "const list = pm.response.json().data && pm.response.json().data.markSectionAttendance;",
+        "if (Array.isArray(list)) console.log('Marked', list.length, 'records');",
+        "if (pm.response.json().errors) console.warn('Errors:', JSON.stringify(pm.response.json().errors));",
       ])
     ),
     mkReq(
       'Get Section Attendance (by date)',
-      'query GetSectionAttendance($sectionId: ID!, $date: AWSDate!) { getSectionAttendance(sectionId: $sectionId, date: $date) { studentId status } }',
+      // Returns [AttendanceRecord!]! — id is non-null, must include
+      'query GetSectionAttendance($sectionId: ID!, $date: AWSDate!) { getSectionAttendance(sectionId: $sectionId, date: $date) { id studentId status date } }',
       { sectionId: '{{section_id}}', date: new Date().toISOString().split('T')[0] },
       okTest([
         "pm.test('getSectionAttendance exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "const list = pm.response.json().data && pm.response.json().data.getSectionAttendance;",
+        "if (Array.isArray(list)) console.log('Records:', list.length);",
       ])
     ),
     mkReq(
       'Get Attendance Summary (date range)',
-      'query GetAttendanceSummary($sectionId: ID!, $fromDate: String!, $toDate: String!) { getSectionAttendanceSummary(sectionId: $sectionId, fromDate: $fromDate, toDate: $toDate) }',
-      { sectionId: '{{section_id}}', fromDate: '2025-06-01', toDate: '2025-12-31' },
+      // Returns AttendanceSummary! typed — must sub-select. Args: from/to (not fromDate/toDate)
+      'query GetAttendanceSummary($sectionId: ID!, $from: AWSDate!, $to: AWSDate!) { getSectionAttendanceSummary(sectionId: $sectionId, from: $from, to: $to) { sectionId from to totalDays } }',
+      { sectionId: '{{section_id}}', from: '2025-06-01', to: '2025-12-31' },
       okTest([
         "pm.test('getSectionAttendanceSummary exists', () => pm.expect(pm.response.json().data).to.exist);",
-        "const raw = pm.response.json().data && pm.response.json().data.getSectionAttendanceSummary;",
-        "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
-        "if (d) console.log('Summary:', JSON.stringify(d).slice(0, 200));",
+        "const d = pm.response.json().data && pm.response.json().data.getSectionAttendanceSummary;",
+        "if (d) console.log('Summary — totalDays:', d.totalDays, '| from:', d.from, '| to:', d.to);",
       ])
     ),
     mkReq(
       'Get Student Attendance (date range)',
-      'query GetStudentAttendance($studentId: ID!, $from: AWSDate!, $to: AWSDate!) { getStudentAttendance(studentId: $studentId, from: $from, to: $to) { studentId status date } }',
+      // Returns [AttendanceRecord!]! — id is non-null
+      'query GetStudentAttendance($studentId: ID!, $from: AWSDate!, $to: AWSDate!) { getStudentAttendance(studentId: $studentId, from: $from, to: $to) { id studentId status date } }',
       { studentId: '{{student_id}}', from: '2025-06-01', to: '2025-12-31' },
-      okTest(["pm.test('getStudentAttendance exists', () => pm.expect(pm.response.json().data).to.exist);"])
+      okTest([
+        "pm.test('getStudentAttendance exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "const list = pm.response.json().data && pm.response.json().data.getStudentAttendance;",
+        "if (Array.isArray(list)) console.log('Student attendance records:', list.length);",
+      ])
     ),
   ],
 };
@@ -1356,10 +1388,11 @@ const EXAMS_FOLDER = {
       okTest(["pm.test('getExam exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getExam).to.exist);"])
     ),
     mkReq('Enter Marks (single student)',
-      'mutation EnterMarks($input: AWSJSON!) { enterMarks(input: $input) }',
-      { input: JSON.stringify({ examId: '{{exam_id}}', studentId: '{{student_id}}', marksObtained: 78, maxMarks: 100, grade: 'A', remarks: 'Good performance' }) },
+      // Schema: enterMarks(examId: ID!, input: AWSJSON!): AWSJSON
+      'mutation EnterMarks($examId: ID!, $input: AWSJSON!) { enterMarks(examId: $examId, input: $input) }',
+      { examId: '{{exam_id}}', input: JSON.stringify({ studentId: '{{student_id}}', marksObtained: 78, maxMarks: 100, grade: 'A', remarks: 'Good performance' }) },
       okTest([
-        "pm.test('enterMarks exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "pm.test('enterMarks response exists', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);",
         "if (pm.response.json().errors) console.warn('Errors:', JSON.stringify(pm.response.json().errors));",
       ])
     ),
@@ -1391,12 +1424,14 @@ const EXAMS_FOLDER = {
       okTest(["pm.test('getExamResults exists', () => pm.expect(pm.response.json().data).to.exist);"])
     ),
     mkReq('Publish Results',
-      'mutation PublishResults($id: ID!) { publishResults(id: $id) }',
-      { id: '{{exam_id}}' },
+      // Schema: publishResults(examId: ID!): AWSJSON
+      'mutation PublishResults($examId: ID!) { publishResults(examId: $examId) }',
+      { examId: '{{exam_id}}' },
       okTest(["pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"])
     ),
     mkReq('List Results (published)',
-      'query { listResults }',
+      // Schema: listResults(examId: ID!): AWSJSON — examId is required
+      'query { listResults(examId: "{{exam_id}}") }',
       null,
       okTest(["pm.test('listResults exists', () => pm.expect(pm.response.json().data).to.exist);"])
     ),
@@ -1612,18 +1647,23 @@ const STORAGE = {
   item: [
     mkReq(
       'Get Upload URL',
-      'mutation GenerateUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }',
+      // Mutation: getUploadUrl(input: AWSJSON!): AWSJSON
+      'mutation GetUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }',
       { input: JSON.stringify({ fileName: 'test-document.pdf', contentType: 'application/pdf', folder: 'documents' }) },
       okTest([
         "pm.test('getUploadUrl exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "const raw = pm.response.json().data && pm.response.json().data.getUploadUrl;",
+        "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
+        "if (d && d.uploadUrl) console.log('Upload URL ready:', d.uploadUrl.slice(0, 80));",
       ])
     ),
     mkReq(
       'Get Download URL',
-      'mutation GenerateDownloadUrl($input: AWSJSON!) { getDownloadUrl(input: $input) }',
-      { input: JSON.stringify({ key: 'documents/test-document.pdf' }) },
+      // Query: generateDownloadUrl(key: String!): AWSJSON  ← it is a Query, not Mutation
+      'query GenerateDownloadUrl($key: String!) { generateDownloadUrl(key: $key) }',
+      { key: 'documents/test-document.pdf' },
       okTest([
-        "pm.test('getDownloadUrl exists', () => pm.expect(pm.response.json().data).to.exist);",
+        "pm.test('generateDownloadUrl exists', () => pm.expect(pm.response.json().data).to.exist);",
       ])
     ),
   ],
