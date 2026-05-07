@@ -30,10 +30,12 @@ const env = { account: config.account, region: config.region };
 Object.entries(config.tags).forEach(([k, v]) => cdk.Tags.of(app).add(k, v));
 
 // 1. Network: VPC + SGs (+ VPC endpoints when enableNat:true)
-const networkStack = new NetworkStack(app, `VebgenixNetwork-${config.stage}`, {
-  env,
-  config,
-});
+//    Only created when NAT is enabled OR a database is inside the VPC.
+//    When enableNat:false + no DB, all Lambdas run outside VPC — no VPC cost.
+const needsVpc = config.enableNat || config.enableDatabase || config.enableEc2Postgres;
+const networkStack = needsVpc
+  ? new NetworkStack(app, `VebgenixNetwork-${config.stage}`, { env, config })
+  : undefined;
 
 // 2. Stable third-party Node.js packages shared through a Lambda Layer
 const runtimeDepsStack = new RuntimeDepsStack(app, `VebgenixRuntimeDeps-${config.stage}`, {
@@ -47,10 +49,10 @@ const authStack = new AuthStack(app, `VebgenixAuth-${config.stage}`, {
   env,
   config,
   runtimeDepsLayer: runtimeDepsStack.layer,
-  ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
+  ...(networkStack ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
 });
 authStack.addDependency(runtimeDepsStack);
-if (config.enableNat) {
+if (networkStack) {
   authStack.addDependency(networkStack);
 }
 
@@ -65,10 +67,10 @@ const asyncStack = new AsyncStack(app, `VebgenixAsync-${config.stage}`, {
   env,
   config,
   runtimeDepsLayer: runtimeDepsStack.layer,
-  ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
+  ...(networkStack ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
 });
 asyncStack.addDependency(runtimeDepsStack);
-if (config.enableNat) {
+if (networkStack) {
   asyncStack.addDependency(networkStack);
 }
 
@@ -85,21 +87,15 @@ const appSyncStack = new AppSyncStack(app, `VebgenixAppSync-${config.stage}`, {
   config,
   userPool:        authStack.userPool,
   runtimeDepsLayer: runtimeDepsStack.layer,
-  ...(config.enableNat ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
+  ...(networkStack ? { vpc: networkStack.vpc, sgLambda: networkStack.sgLambda } : {}),
   eventBus:        asyncStack.eventBus,
   documentsBucket: storageStack.bucket,
 });
 appSyncStack.addDependency(authStack);
 appSyncStack.addDependency(asyncStack);
 appSyncStack.addDependency(runtimeDepsStack);
-if (config.enableNat) {
+if (networkStack) {
   appSyncStack.addDependency(networkStack);
-} else {
-  // Existing deployments may still import sgLambda from Network. Update the
-  // consuming stacks first, then let Network remove the now-unused export.
-  networkStack.addDependency(authStack);
-  networkStack.addDependency(asyncStack);
-  networkStack.addDependency(appSyncStack);
 }
 
 // 8. Frontend: S3 Bucket + CloudFront Distribution
