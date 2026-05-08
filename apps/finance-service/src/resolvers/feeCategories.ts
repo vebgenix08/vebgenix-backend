@@ -48,7 +48,7 @@ export async function resolveFeeCategories(
         throw new AppError('BAD_REQUEST', 'name, feeType, invoicePrefix, and receiptPrefix are required');
       }
 
-      const existing = await FinanceRepo.listFeeCategories(tenantId, false);
+      const existing = await FinanceRepo.listFeeCategories(tenantId, true);
       if ((existing as { name: string }[]).some(c => c.name.toLowerCase() === name.toLowerCase())) {
         throw new AppError('CONFLICT', `Fee category "${name}" already exists`);
       }
