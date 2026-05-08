@@ -556,7 +556,7 @@ export class PromoteStudents {
     const tenantId  = getTenantId(ctx);
     const profileId = ctx.membership!.profileId;
 
-    if (!input.studentIds.length) {
+    if (!input.studentIds?.length) {
       throw new AppError('BAD_REQUEST', 'studentIds must not be empty');
     }
 
