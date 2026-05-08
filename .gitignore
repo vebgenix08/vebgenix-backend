@@ -50,3 +50,6 @@ apps/*/dist/
 
 # Claude Code local data (worktrees, session files, etc.)
 .claude/
+
+postman/reports/
+postman/newman-results*.txt
