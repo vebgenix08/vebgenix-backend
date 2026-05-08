@@ -14,6 +14,14 @@ import { resolveContext } from '@vebgenix/auth';
 import { AppError, isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 import { authorize } from '@vebgenix/permissions';
+
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 function parseEvent(event: Record<string, unknown>) {
   if (event.info) {
     const info = event.info as Record<string, string>;
@@ -43,7 +51,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       if (!token) throw new AppError('BAD_REQUEST', 'Token is required');
       const batch  = await PublishedResultBatch.findOne({ publicToken: token, status: 'PUBLISHED' }).lean();
       if (!batch) throw new AppError('NOT_FOUND', 'Result not found or not published');
-      return batch;
+      return toGql(batch);
     }
 
     // ── All other routes require auth ────────────────────────────────────────
@@ -59,25 +67,27 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if (args.status)         filter.status         = args.status;
         if (args.academicYearId) filter.academicYearId = args.academicYearId;
         if (args.examId)         filter.examId         = args.examId;
-        return PublishedResultBatch.find(filter).sort({ createdAt: -1 }).lean();
+        const docs = await PublishedResultBatch.find(filter).sort({ createdAt: -1 }).lean();
+        return docs.map(d => toGql(d));
       }
 
       case 'getResultBatch':
       case 'GET:/api/admin/results/:id':
         authorize(ctx, 'academics.results.read');
-        return PublishedResultBatch.findOne({ tenantId, _id: args.id as string }).lean();
+        return toGql(await PublishedResultBatch.findOne({ tenantId, _id: args.id as string }).lean());
 
       case 'createResultBatch':
       case 'POST:/api/admin/results': {
         authorize(ctx, 'academics.results.create');
         const input = args.input as Record<string, unknown> ?? args;
-        return PublishedResultBatch.create({
+        const doc = await PublishedResultBatch.create({
           ...input,
           tenantId,
           campusId:       input.campusId ?? ctx.membership!.campusIds[0],
           createdBy:      ctx.membership!.profileId,
           status:         'DRAFT',
         });
+        return toGql(doc.toObject());
       }
 
       case 'updateResultBatch':
@@ -87,11 +97,11 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const batch = await PublishedResultBatch.findOne({ tenantId, _id: id as string });
         if (!batch) throw new AppError('NOT_FOUND', 'Result batch not found');
         if (batch.status === 'PUBLISHED') throw new AppError('BAD_REQUEST', 'Cannot edit a published result batch. Archive it first.');
-        return PublishedResultBatch.findOneAndUpdate(
+        return toGql(await PublishedResultBatch.findOneAndUpdate(
           { tenantId, _id: id as string },
           { $set: update },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'publishResultBatch':
@@ -100,21 +110,21 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const batch = await PublishedResultBatch.findOne({ tenantId, _id: args.id as string });
         if (!batch) throw new AppError('NOT_FOUND', 'Result batch not found');
         if (batch.status === 'PUBLISHED') throw new AppError('BAD_REQUEST', 'Already published');
-        return PublishedResultBatch.findOneAndUpdate(
+        return toGql(await PublishedResultBatch.findOneAndUpdate(
           { tenantId, _id: args.id as string },
           { $set: { status: 'PUBLISHED', publishedAt: new Date(), publishedBy: ctx.membership!.profileId } },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'archiveResultBatch':
       case 'POST:/api/admin/results/:id/archive': {
         authorize(ctx, 'academics.results.publish');
-        return PublishedResultBatch.findOneAndUpdate(
+        return toGql(await PublishedResultBatch.findOneAndUpdate(
           { tenantId, _id: args.id as string },
           { $set: { status: 'ARCHIVED' } },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'deleteResultBatch':
@@ -123,7 +133,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const batch = await PublishedResultBatch.findOne({ tenantId, _id: args.id as string });
         if (!batch) throw new AppError('NOT_FOUND', 'Result batch not found');
         if (batch.status === 'PUBLISHED') throw new AppError('BAD_REQUEST', 'Cannot delete a published batch. Archive it first.');
-        return PublishedResultBatch.findOneAndDelete({ tenantId, _id: args.id as string }).lean();
+        return toGql(await PublishedResultBatch.findOneAndDelete({ tenantId, _id: args.id as string }).lean());
       }
 
       case 'getResultPublicToken':

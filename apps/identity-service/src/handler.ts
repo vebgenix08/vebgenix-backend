@@ -21,6 +21,13 @@ import { DeactivateUser } from './use-cases/DeactivateUser';
 import { InviteStaff } from './use-cases/InviteStaff';
 import { Types } from 'mongoose';
 
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 
 function parseEvent(event: Record<string, unknown>) {
   // AppSync: event.info.fieldName = 'listUsers', 'createUser', etc.
@@ -97,7 +104,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'getUser':
       case 'GET:/api/admin/users/:id': {
         const tenantId = getTenantId(ctx);
-        return IdentityRepo.findProfileById(tenantId, args.id as string);
+        return toGql(await IdentityRepo.findProfileById(tenantId, args.id as string));
       }
 
       case 'createUser':
@@ -121,7 +128,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const tenantId = getTenantId(ctx);
         const updated  = await IdentityRepo.updateProfile(tenantId, args.id as string, { isActive: true });
         if (!updated) throw new AppError('NOT_FOUND', 'User not found');
-        return updated;
+        return toGql(updated);
       }
 
       // ── Staff ─────────────────────────────────────────────────────────────
@@ -134,13 +141,14 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const tenantId = getTenantId(ctx);
         const filter: Record<string, unknown> = { personaRole: { $in: ['STAFF', 'TEACHER'] } };
         if (args.campusId) filter['campusAccess.campusId'] = args.campusId;
-        return IdentityRepo.listProfiles(tenantId, filter);
+        const profiles = await IdentityRepo.listProfiles(tenantId, filter);
+        return (profiles as unknown[]).map(p => toGql(p));
       }
 
       case 'getStaffMember':
       case 'GET:/api/admin/staff/:id': {
         const tenantId = getTenantId(ctx);
-        return IdentityRepo.findProfileById(tenantId, args.id as string);
+        return toGql(await IdentityRepo.findProfileById(tenantId, args.id as string));
       }
 
       // ── Employee Records ───────────────────────────────────────────────────
@@ -152,14 +160,15 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if (args.staffType)   filter.staffType   = args.staffType;
         if (args.campusId)    filter.campusId     = args.campusId;
         if (args.isActive !== undefined) filter.isActive = args.isActive === 'true' || args.isActive === true;
-        return Employee.find(filter).sort({ createdAt: -1 }).lean();
+        const docs = await Employee.find(filter).sort({ createdAt: -1 }).lean();
+        return docs.map(d => toGql(d));
       }
 
       case 'getEmployee':
       case 'GET:/api/admin/employees/:id': {
         authorize(ctx, 'identity.staff.read');
         const tenantId = getTenantId(ctx);
-        return Employee.findOne({ tenantId, _id: args.id as string }).lean();
+        return toGql(await Employee.findOne({ tenantId, _id: args.id as string }).lean());
       }
 
       case 'updateEmployee':
@@ -167,11 +176,11 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         authorize(ctx, 'identity.staff.update');
         const tenantId = getTenantId(ctx);
         const { id, ...update } = args as Record<string, unknown>;
-        return Employee.findOneAndUpdate(
+        return toGql(await Employee.findOneAndUpdate(
           { tenantId, _id: id as string },
           { $set: update },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       // ── Campus Access ──────────────────────────────────────────────────────
@@ -286,7 +295,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const profileId = ctx.membership!.profileId;
         const { isActive: _ia, personaRole: _pr, roleAssignments: _ra, campusAccess: _ca, ...safeUpdate } =
           args as Record<string, unknown>;
-        return IdentityRepo.updateProfile(tenantId, profileId, safeUpdate as never);
+        return toGql(await IdentityRepo.updateProfile(tenantId, profileId, safeUpdate as never));
       }
 
       case 'uploadAvatar':

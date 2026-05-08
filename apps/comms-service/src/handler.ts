@@ -12,6 +12,14 @@ import { resolveContext } from '@vebgenix/auth';
 import { AppError, isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 import { authorize } from '@vebgenix/permissions';
+
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 function parseEvent(event: Record<string, unknown>) {
   if (event.info) {
     const info = event.info as Record<string, string>;
@@ -43,25 +51,27 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const filter: Record<string, unknown> = { tenantId };
         if (args.status)      filter.status      = args.status;
         if (args.targetGroup) filter.targetGroups = args.targetGroup;
-        return Announcement.find(filter).sort({ createdAt: -1 }).lean();
+        const docs = await Announcement.find(filter).sort({ createdAt: -1 }).lean();
+        return docs.map(d => toGql(d));
       }
 
       case 'getAnnouncement':
       case 'GET:/api/admin/communication/announcements/:id':
         authorize(ctx, 'comms.announcements.read');
-        return Announcement.findOne({ tenantId, _id: args.id as string }).lean();
+        return toGql(await Announcement.findOne({ tenantId, _id: args.id as string }).lean());
 
       case 'createAnnouncement':
       case 'POST:/api/admin/communication/announcements': {
         authorize(ctx, 'comms.announcements.create');
         const input = args.input as Record<string, unknown> ?? args;
-        return Announcement.create({
+        const doc = await Announcement.create({
           ...input,
           tenantId,
           createdBy: ctx.membership!.profileId,
           status:    input.publishNow ? 'PUBLISHED' : 'DRAFT',
           publishedAt: input.publishNow ? new Date() : undefined,
         });
+        return toGql(doc.toObject());
       }
 
       case 'updateAnnouncement':
@@ -70,11 +80,11 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const { id, ...update } = args as Record<string, unknown>;
         const existing = await Announcement.findOne({ tenantId, _id: id as string });
         if (!existing) throw new AppError('NOT_FOUND', 'Announcement not found');
-        return Announcement.findOneAndUpdate(
+        return toGql(await Announcement.findOneAndUpdate(
           { tenantId, _id: id as string },
           { $set: update },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'publishAnnouncement':
@@ -82,27 +92,27 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         authorize(ctx, 'comms.announcements.update');
         const ann = await Announcement.findOne({ tenantId, _id: args.id as string });
         if (!ann) throw new AppError('NOT_FOUND', 'Announcement not found');
-        return Announcement.findOneAndUpdate(
+        return toGql(await Announcement.findOneAndUpdate(
           { tenantId, _id: args.id as string },
           { $set: { status: 'PUBLISHED', publishedAt: new Date(), publishedBy: ctx.membership!.profileId } },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'archiveAnnouncement':
       case 'POST:/api/admin/communication/announcements/:id/archive': {
         authorize(ctx, 'comms.announcements.update');
-        return Announcement.findOneAndUpdate(
+        return toGql(await Announcement.findOneAndUpdate(
           { tenantId, _id: args.id as string },
           { $set: { status: 'ARCHIVED' } },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'deleteAnnouncement':
       case 'DELETE:/api/admin/communication/announcements/:id':
         authorize(ctx, 'comms.announcements.delete');
-        return Announcement.findOneAndDelete({ tenantId, _id: args.id as string }).lean();
+        return toGql(await Announcement.findOneAndDelete({ tenantId, _id: args.id as string }).lean());
 
       // ── Events ─────────────────────────────────────────────────────────────────
 
@@ -114,23 +124,25 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
           filter.startDate = { $gte: new Date() };
         }
         if (args.campusId) filter.campusId = args.campusId;
-        return EventModel.find(filter).sort({ startDate: 1 }).lean();
+        const docs = await EventModel.find(filter).sort({ startDate: 1 }).lean();
+        return docs.map(d => toGql(d));
       }
 
       case 'getEvent':
       case 'GET:/api/admin/events/:id':
         authorize(ctx, 'comms.events.read');
-        return EventModel.findOne({ tenantId, _id: args.id as string }).lean();
+        return toGql(await EventModel.findOne({ tenantId, _id: args.id as string }).lean());
 
       case 'createEvent':
       case 'POST:/api/admin/events': {
         authorize(ctx, 'comms.events.create');
         const input = args.input as Record<string, unknown> ?? args;
-        return EventModel.create({
+        const doc = await EventModel.create({
           ...input,
           tenantId,
           createdBy: ctx.membership!.profileId,
         });
+        return toGql(doc.toObject());
       }
 
       case 'updateEvent':
@@ -139,17 +151,17 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const { id, ...update } = args as Record<string, unknown>;
         const existing = await EventModel.findOne({ tenantId, _id: id as string });
         if (!existing) throw new AppError('NOT_FOUND', 'Event not found');
-        return EventModel.findOneAndUpdate(
+        return toGql(await EventModel.findOneAndUpdate(
           { tenantId, _id: id as string },
           { $set: update },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'deleteEvent':
       case 'DELETE:/api/admin/events/:id':
         authorize(ctx, 'comms.events.delete');
-        return EventModel.findOneAndDelete({ tenantId, _id: args.id as string }).lean();
+        return toGql(await EventModel.findOneAndDelete({ tenantId, _id: args.id as string }).lean());
 
       // ── Leave Requests ──────────────────────────────────────────────────────────
 
@@ -164,7 +176,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if (!ctx.membership?.roles?.some(r => r.roleName === 'ADMIN') && !ctx.isPlatformAdmin) {
           filter.profileId = ctx.membership!.profileId;
         }
-        return LeaveRequest.find(filter).sort({ createdAt: -1 }).lean();
+        const docs = await LeaveRequest.find(filter).sort({ createdAt: -1 }).lean();
+        return docs.map(d => toGql(d));
       }
 
       case 'getLeaveRequest':
@@ -177,19 +190,20 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if (!isAdmin && (req as unknown as Record<string, unknown>).profileId?.toString() !== ctx.membership!.profileId) {
           throw new AppError('FORBIDDEN', 'Cannot view another staff member\'s leave request');
         }
-        return req;
+        return toGql(req);
       }
 
       case 'createLeaveRequest':
       case 'POST:/api/admin/leave': {
         const input = args.input as Record<string, unknown> ?? args;
-        return LeaveRequest.create({
+        const doc = await LeaveRequest.create({
           ...input,
           tenantId,
           profileId: input.profileId ?? ctx.membership!.profileId,
           status:    'PENDING',
           appliedAt: new Date(),
         });
+        return toGql(doc.toObject());
       }
 
       case 'updateLeaveRequest':
@@ -204,11 +218,11 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if ((req as unknown as Record<string, unknown>).status !== 'PENDING') {
           throw new AppError('BAD_REQUEST', 'Can only edit PENDING requests');
         }
-        return LeaveRequest.findOneAndUpdate(
+        return toGql(await LeaveRequest.findOneAndUpdate(
           { tenantId, _id: id as string },
           { $set: update },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'approveLeave':
@@ -219,7 +233,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if ((req as unknown as Record<string, unknown>).status !== 'PENDING') {
           throw new AppError('BAD_REQUEST', 'Can only approve PENDING requests');
         }
-        return LeaveRequest.findOneAndUpdate(
+        return toGql(await LeaveRequest.findOneAndUpdate(
           { tenantId, _id: args.id as string },
           { $set: {
             status:     'APPROVED',
@@ -228,7 +242,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
             remarks:    args.remarks as string | undefined,
           }},
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'rejectLeave':
@@ -239,7 +253,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if ((req as unknown as Record<string, unknown>).status !== 'PENDING') {
           throw new AppError('BAD_REQUEST', 'Can only reject PENDING requests');
         }
-        return LeaveRequest.findOneAndUpdate(
+        return toGql(await LeaveRequest.findOneAndUpdate(
           { tenantId, _id: args.id as string },
           { $set: {
             status:     'REJECTED',
@@ -248,7 +262,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
             remarks:    args.remarks as string | undefined,
           }},
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'cancelLeave':
@@ -261,17 +275,17 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if (!['PENDING', 'APPROVED'].includes((req as unknown as Record<string, unknown>).status as string)) {
           throw new AppError('BAD_REQUEST', 'Cannot cancel this leave request');
         }
-        return LeaveRequest.findOneAndUpdate(
+        return toGql(await LeaveRequest.findOneAndUpdate(
           { tenantId, _id: args.id as string },
           { $set: { status: 'CANCELLED' } },
           { new: true }
-        ).lean();
+        ).lean());
       }
 
       case 'deleteLeaveRequest':
       case 'DELETE:/api/admin/leave/:id': {
         authorize(ctx, 'comms.leave.approve');
-        return LeaveRequest.findOneAndDelete({ tenantId, _id: args.id as string }).lean();
+        return toGql(await LeaveRequest.findOneAndDelete({ tenantId, _id: args.id as string }).lean());
       }
 
       default:

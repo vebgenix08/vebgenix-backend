@@ -5,6 +5,13 @@ import type { AuthContext } from '@vebgenix/auth';
 import { PromoteStudents } from '../use-cases/PromoteStudents';
 import { getTenantId } from '@vebgenix/tenant';
 
+function toGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+}
+
 export async function resolvePromotions(
   operation: string,
   args: Record<string, unknown>,
@@ -16,7 +23,8 @@ export async function resolvePromotions(
     case 'promoteStudents':
     case 'POST:/api/admin/academics/promotions': {
       const input = ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof PromoteStudents.execute>[1];
-      return PromoteStudents.execute(ctx, input);
+      const result = await PromoteStudents.execute(ctx, input);
+      return toGql(result);
     }
 
     case 'listPromotionBatches':
@@ -28,7 +36,8 @@ export async function resolvePromotions(
       if (args.campusId)           filters.campusId           = args.campusId;
       if (args.fromGradeId)        filters.fromGradeId        = args.fromGradeId;
       if (args.status)             filters.status             = args.status;
-      return AcademicsRepo.listPromotionBatches(tenantId, filters);
+      const batches = await AcademicsRepo.listPromotionBatches(tenantId, filters);
+      return (batches as unknown[]).map(d => toGql(d));
     }
 
     case 'getPromotionBatch':
@@ -38,7 +47,7 @@ export async function resolvePromotions(
       if (!id) throw new AppError('BAD_REQUEST', 'id is required');
       const batch = await AcademicsRepo.findPromotionBatchById(tenantId, id);
       if (!batch) throw new AppError('NOT_FOUND', 'Promotion batch not found');
-      return batch;
+      return toGql(batch);
     }
 
     case 'listPromotionBatchItems':
@@ -46,7 +55,8 @@ export async function resolvePromotions(
       authorize(ctx, 'academics.promotion.read');
       const { id } = args as Record<string, string>;
       if (!id) throw new AppError('BAD_REQUEST', 'id is required');
-      return AcademicsRepo.listPromotionBatchItems(tenantId, id);
+      const items = await AcademicsRepo.listPromotionBatchItems(tenantId, id);
+      return (items as unknown[]).map(d => toGql(d));
     }
 
     case 'setStudentPromotionEligibility':
