@@ -6,6 +6,7 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { resolveContext } from '@vebgenix/auth';
+import { bootstrapDB, ensureDB } from '@vebgenix/db';
 import { AppError, isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 
@@ -23,8 +24,10 @@ function parseEvent(event: Record<string, unknown>) {
   return { operation: `${method}:${path}`, args: { ...body, ...params } };
 }
 
-export const handler = async (event: Record<string, unknown>) => {
+export const handler = async (event: Record<string, unknown>, context: Record<string, unknown>) => {
+  bootstrapDB(context);
   try {
+    await ensureDB();
     const ctx = await resolveContext(event);
     const { operation, args } = parseEvent(event);
     const tenantId = getTenantId(ctx);
@@ -37,11 +40,9 @@ export const handler = async (event: Record<string, unknown>) => {
       // ── Upload URL ────────────────────────────────────────────────────────
       case 'generateUploadUrl':
       case 'POST:/api/storage/upload-url': {
-        const { fileName, contentType, folder = 'uploads' } = args as {
-          fileName: string;
-          contentType: string;
-          folder?: string;
-        };
+        const argsTyped = args as { fileName?: string; filename?: string; contentType: string; folder?: string };
+        const fileName = argsTyped.filename ?? argsTyped.fileName;
+        const { contentType, folder = 'uploads' } = argsTyped;
         if (!fileName)    throw new AppError('BAD_REQUEST', 'fileName is required');
         if (!contentType) throw new AppError('BAD_REQUEST', 'contentType is required');
 
