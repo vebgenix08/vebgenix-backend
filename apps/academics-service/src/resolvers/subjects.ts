@@ -1,5 +1,6 @@
 import { Subject, SubjectAllocation } from '@vebgenix/db';
 import { authorize } from '@vebgenix/permissions';
+import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 
 function toGql(doc: unknown): Record<string, unknown> | null {
@@ -32,8 +33,14 @@ export async function resolveSubjects(
     case 'POST:/api/tenant/subjects': {
       authorize(ctx, 'academics.subjects.create');
       const input = (args.input as Record<string, unknown>) ?? args;
-      const doc = await Subject.create({ ...input, tenantId });
-      return toGql(doc.toObject());
+      try {
+        const doc = await Subject.create({ ...input, tenantId });
+        return toGql(doc.toObject());
+      } catch (e: unknown) {
+        const err = e as { code?: number; message?: string };
+        if (err.code === 11000) throw new AppError('CONFLICT', 'A subject with this code already exists for this tenant');
+        throw e;
+      }
     }
 
     case 'updateSubject':

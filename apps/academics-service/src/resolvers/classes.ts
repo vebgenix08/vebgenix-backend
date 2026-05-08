@@ -1,5 +1,6 @@
 import { Class } from '@vebgenix/db';
 import { authorize } from '@vebgenix/permissions';
+import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 
 /** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
@@ -34,8 +35,14 @@ export async function resolveClasses(
     case 'POST:/api/tenant/classes': {
       authorize(ctx, 'academics.classes.create');
       const input = (args.input as Record<string, unknown>) ?? args;
-      const doc = await Class.create({ ...input, tenantId });
-      return toGql(doc.toObject());
+      try {
+        const doc = await Class.create({ ...input, tenantId });
+        return toGql(doc.toObject());
+      } catch (e: unknown) {
+        const err = e as { code?: number; message?: string };
+        if (err.code === 11000) throw new AppError('CONFLICT', 'A class with this code already exists for this tenant');
+        throw e;
+      }
     }
 
     case 'updateClass':

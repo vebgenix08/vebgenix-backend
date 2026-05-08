@@ -1,5 +1,6 @@
 import { Campus } from '@vebgenix/db';
 import { authorize } from '@vebgenix/permissions';
+import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 
 function toGql(doc: Record<string, unknown> | null) {
@@ -30,8 +31,14 @@ export async function resolveCampuses(
     case 'POST:/api/admin/settings/campuses': {
       authorize(ctx, 'tenant.campuses.create');
       const input = (args.input as Record<string, unknown>) ?? args;
-      const doc = await Campus.create({ ...input, tenantId });
-      return toGql(doc.toObject() as unknown as Record<string, unknown>);
+      try {
+        const doc = await Campus.create({ ...input, tenantId });
+        return toGql(doc.toObject() as unknown as Record<string, unknown>);
+      } catch (e: unknown) {
+        const err = e as { code?: number; message?: string };
+        if (err.code === 11000) throw new AppError('CONFLICT', 'A campus with this code already exists for this tenant');
+        throw e;
+      }
     }
 
     case 'updateCampus':

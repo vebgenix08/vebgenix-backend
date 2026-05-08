@@ -2,6 +2,7 @@ import { AcademicYear } from '@vebgenix/db';
 import { authorize } from '@vebgenix/permissions';
 import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
+import { isValidObjectId } from 'mongoose';
 
 function toGql(doc: Record<string, unknown> | null) {
   if (!doc) return null;
@@ -54,12 +55,16 @@ export async function resolveAcademicYears(
     case 'setActiveAcademicYear':
     case 'POST:/api/admin/settings/academic-years/:id/activate': {
       authorize(ctx, 'settings.academic_year.update');
+      const activateId = args.id as string;
+      if (!activateId || !isValidObjectId(activateId)) throw new AppError('BAD_REQUEST', 'id is required');
       await AcademicYear.updateMany({ tenantId }, { $set: { isActive: false, isCurrent: false } });
-      return toGql(await AcademicYear.findOneAndUpdate(
-        { tenantId, _id: args.id as string },
+      const updated = await AcademicYear.findOneAndUpdate(
+        { tenantId, _id: activateId },
         { $set: { isActive: true, isCurrent: true } },
         { new: true },
-      ).lean() as Record<string, unknown> | null);
+      ).lean();
+      if (!updated) throw new AppError('NOT_FOUND', 'Academic year not found');
+      return toGql(updated as Record<string, unknown>);
     }
 
     default:
