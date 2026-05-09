@@ -90,7 +90,10 @@ export async function resolveFeatures(
     case 'getTenantFeatures':
     case 'GET:/api/admin/settings/features': {
       const doc = await TenantFeature.findOne({ tenantId }).lean();
-      return toGql(doc) ?? { tenantId, features: {} };
+      const raw = (toGql(doc) ?? { tenantId, features: {} }) as Record<string, unknown>;
+      const featuresObj = (raw.features ?? {}) as Record<string, boolean>;
+      const features = Object.entries(featuresObj).map(([key, enabled]) => ({ key, enabled: Boolean(enabled) }));
+      return { tenantId: (raw.tenantId as string) ?? tenantId, features };
     }
 
     case 'updateTenantFeatures':
@@ -98,12 +101,26 @@ export async function resolveFeatures(
     case 'PATCH:/api/platform/tenants/:id/features': {
       const tid = (args.id as string) ?? tenantId;
       if (!ctx.isPlatformAdmin) authorize(ctx, 'tenant.settings.update');
-      const features = (args.features as Record<string, boolean>) ?? args;
-      return toGql(await TenantFeature.findOneAndUpdate(
+      // Accept both new typed input { features: [{key, enabled}] } and legacy object { key: bool }
+      const inputArr = (args.input as { features?: Array<{ key: string; enabled: boolean }> } | undefined)?.features;
+      const featuresObj: Record<string, boolean> = {};
+      if (Array.isArray(inputArr)) {
+        for (const item of inputArr) {
+          featuresObj[item.key] = item.enabled;
+        }
+      } else {
+        // Fallback: REST or direct boolean map
+        const legacyMap = (args.features as Record<string, boolean>) ?? {};
+        Object.assign(featuresObj, legacyMap);
+      }
+      const saved = toGql(await TenantFeature.findOneAndUpdate(
         { tenantId: tid },
-        { $set: { features, updatedBy: ctx.membership?.profileId ?? ctx.userId } },
+        { $set: { features: featuresObj, updatedBy: ctx.membership?.profileId ?? ctx.userId } },
         { upsert: true, new: true },
       ).lean());
+      const savedFeaturesObj = ((saved?.features ?? {}) as Record<string, boolean>);
+      const features = Object.entries(savedFeaturesObj).map(([key, enabled]) => ({ key, enabled: Boolean(enabled) }));
+      return { tenantId: tid, features };
     }
 
     default:

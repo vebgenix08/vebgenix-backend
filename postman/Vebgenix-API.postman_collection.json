@@ -497,7 +497,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation CreateProgram($input: AWSJSON!) { createProgram(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"School Program\\\",\\\"code\\\":\\\"SCH\\\",\\\"type\\\":\\\"SCHOOL\\\",\\\"durationYears\\\":12,\\\"campusId\\\":\\\"{{campus_id}}\\\"}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation CreateProgram($input: CreateProgramInput!) { createProgram(input: $input) { id name code campusId isActive } }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"School Program\",\n      \"code\": \"SCH\",\n      \"type\": \"SCHOOL\",\n      \"durationYears\": 12,\n      \"campusId\": \"{{campus_id}}\"\n    }\n  }\n}"
             }
           },
           "event": [
@@ -508,23 +508,21 @@
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
-                  "const raw = r.data && r.data.createProgram;",
-                  "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
-                  "const pid = d && (d.id || d._id);",
+                  "const d = r.data && r.data.createProgram;",
+                  "const pid = d && d.id;",
                   "if (pid) { pm.environment.set('program_id', pid); console.log('program_id (created):', pid); }",
                   "else {",
                   "  if (r.errors) console.warn('createProgram error:', r.errors[0] && r.errors[0].message);",
                   "  pm.sendRequest({",
                   "    url: pm.environment.get('appsync_url'), method: 'POST',",
                   "    header: [{key:'Content-Type',value:'application/json'},{key:'Authorization',value:pm.environment.get('id_token')},{key:'x-tenant-id',value:pm.environment.get('tenant_id')}],",
-                  "    body: { mode:'raw', raw: JSON.stringify({ query: 'query { listPrograms }' }) }",
+                  "    body: { mode:'raw', raw: JSON.stringify({ query: 'query { listPrograms { id name code } }' }) }",
                   "  }, (err, res) => {",
                   "    if (err) return;",
-                  "    const jr = res.json(); const rv = jr.data && jr.data.listPrograms;",
-                  "    let items; try { items = typeof rv === 'string' ? JSON.parse(rv) : rv; } catch(e) { items = []; }",
+                  "    const jr = res.json(); const items = jr.data && jr.data.listPrograms;",
                   "    if (Array.isArray(items) && items.length > 0) {",
-                  "      pm.environment.set('program_id', items[0].id || items[0]._id);",
-                  "      console.log('program_id (from list):', items[0].id || items[0]._id);",
+                  "      pm.environment.set('program_id', items[0].id);",
+                  "      console.log('program_id (from list):', items[0].id);",
                   "    } else { console.warn('No programs found — program tests will be skipped'); }",
                   "  });",
                   "}",
@@ -555,7 +553,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query { listPrograms(campusId: \\\"{{campus_id}}\\\") }\"\n}"
+              "raw": "{\n  \"query\": \"query ListPrograms($campusId: ID) { listPrograms(campusId: $campusId) { id name code campusId isActive } }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\"\n  }\n}"
             }
           },
           "event": [
@@ -567,13 +565,13 @@
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
                   "pm.test('listPrograms exists', () => pm.expect(r.data).to.exist);",
-                  "const raw = r.data && r.data.listPrograms;",
-                  "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
-                  "pm.test('listPrograms is array', () => pm.expect(list).to.be.an('array'));",
+                  "const list = r.data && r.data.listPrograms;",
+                  "pm.test('listPrograms is array', () => pm.expect(Array.isArray(list)).to.be.true);",
                   "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('program_id')) {",
-                  "  pm.environment.set('program_id', list[0].id || list[0]._id);",
-                  "  console.log('program_id (from list):', list[0].id || list[0]._id);",
-                  "}"
+                  "  pm.environment.set('program_id', list[0].id);",
+                  "  console.log('program_id (from list):', list[0].id);",
+                  "}",
+                  "if (Array.isArray(list)) console.log('Programs:', list.map(p => p.name + ' (' + p.code + ')').join(', '));"
                 ]
               }
             }
@@ -600,7 +598,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query GetProgram($id: ID!) { getProgram(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{program_id}}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"query GetProgram($id: ID!) { getProgram(id: $id) { id name code campusId isActive } }\",\n  \"variables\": {\n    \"id\": \"{{program_id}}\"\n  }\n}"
             }
           },
           "event": [
@@ -612,8 +610,8 @@
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
                   "pm.test('getProgram (soft)', () => pm.expect(r.data || r.errors).to.exist);",
-                  "const raw = r.data && r.data.getProgram;",
-                  "if (raw) { let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; } if (d) console.log('Program:', d.name, '| code:', d.code); }",
+                  "const d = r.data && r.data.getProgram;",
+                  "if (d) console.log('Program:', d.name, '| code:', d.code);",
                   "else if (r.errors) console.warn('getProgram:', r.errors[0] && r.errors[0].message);"
                 ]
               }
@@ -641,7 +639,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation UpdateProgram($id: ID!, $input: AWSJSON!) { updateProgram(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{program_id}}\",\n    \"input\": \"{\\\"durationYears\\\":13}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation UpdateProgram($id: ID!, $input: UpdateProgramInput!) { updateProgram(id: $id, input: $input) { id name code isActive } }\",\n  \"variables\": {\n    \"id\": \"{{program_id}}\",\n    \"input\": {\n      \"durationYears\": 13\n    }\n  }\n}"
             }
           },
           "event": [
@@ -652,10 +650,9 @@
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "pm.test('updateProgram (soft)', () => pm.expect(pm.response.json()).to.exist);",
-                  "const raw = pm.response.json().data && pm.response.json().data.updateProgram;",
+                  "const d = pm.response.json().data && pm.response.json().data.updateProgram;",
                   "if (pm.response.json().errors) console.warn('updateProgram:', pm.response.json().errors[0] && pm.response.json().errors[0].message);",
-                  "let d; try { d = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { d = raw; }",
-                  "if (d) console.log('Updated program:', d.name, '| durationYears:', d.durationYears);"
+                  "if (d) console.log('Updated program:', d.name, '| id:', d.id);"
                 ]
               }
             }
@@ -759,7 +756,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query { getTenantFeatures }\"\n}"
+              "raw": "{\n  \"query\": \"query { getTenantFeatures { tenantId features { key enabled } } }\"\n}"
             }
           },
           "event": [
@@ -769,7 +766,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('getTenantFeatures exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getTenantFeatures).to.exist);"
+                  "const r = pm.response.json();",
+                  "const d = r.data && r.data.getTenantFeatures;",
+                  "pm.test('getTenantFeatures exists', () => pm.expect(d).to.exist);",
+                  "if (d && d.features) console.log('Features:', d.features.map(f => f.key + ':' + f.enabled).join(', '));"
                 ]
               }
             }
@@ -796,7 +796,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"mutation UpdateTenantFeatures($input: AWSJSON!) { updateTenantFeatures(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"admissions\\\":true,\\\"finance\\\":true,\\\"academics\\\":true,\\\"communications\\\":true}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"mutation UpdateTenantFeatures($input: UpdateTenantFeaturesInput!) { updateTenantFeatures(input: $input) { tenantId features { key enabled } } }\",\n  \"variables\": {\n    \"input\": {\n      \"features\": [\n        {\n          \"key\": \"admissions\",\n          \"enabled\": true\n        },\n        {\n          \"key\": \"finance\",\n          \"enabled\": true\n        },\n        {\n          \"key\": \"academics\",\n          \"enabled\": true\n        },\n        {\n          \"key\": \"comms\",\n          \"enabled\": true\n        }\n      ]\n    }\n  }\n}"
             }
           },
           "event": [
@@ -806,7 +806,10 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
-                  "pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"
+                  "const r = pm.response.json();",
+                  "pm.test('updateTenantFeatures no errors', () => pm.expect(r.errors).to.be.undefined);",
+                  "const d = r.data && r.data.updateTenantFeatures;",
+                  "if (d && d.features) console.log('Updated features:', d.features.map(f => f.key + ':' + f.enabled).join(', '));"
                 ]
               }
             }
@@ -1043,7 +1046,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query ListStaff($campusId: ID) { listStaff(campusId: $campusId) }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"query ListStaff($campusId: ID) { listStaff(campusId: $campusId) { id email fullName phone status personaRole isActive } }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\"\n  }\n}"
             }
           },
           "event": [
@@ -1054,9 +1057,12 @@
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
-                  "pm.test('listStaff exists', () => pm.expect(r.data && r.data.listStaff).to.exist);",
-                  "let list; try { list = typeof r.data.listStaff === 'string' ? JSON.parse(r.data.listStaff) : r.data.listStaff; } catch(e) { list = r.data.listStaff; }",
-                  "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('staff_profile_id')) { pm.environment.set('staff_profile_id', list[0].id || list[0]._id); }"
+                  "const list = r.data && r.data.listStaff;",
+                  "pm.test('listStaff is array', () => pm.expect(Array.isArray(list)).to.be.true);",
+                  "if (Array.isArray(list) && list.length > 0) {",
+                  "  if (!pm.environment.get('staff_profile_id')) pm.environment.set('staff_profile_id', list[0].id);",
+                  "  console.log('Staff count:', list.length, '| first:', list[0].fullName || list[0].email);",
+                  "}"
                 ]
               }
             }
@@ -1083,7 +1089,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query ListEmployees($campusId: ID) { listEmployees(campusId: $campusId) }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"query ListEmployees($campusId: ID) { listEmployees(campusId: $campusId) { id staffType campusId isActive department designation } }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\"\n  }\n}"
             }
           },
           "event": [
@@ -1094,9 +1100,12 @@
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
-                  "pm.test('listEmployees exists', () => pm.expect(r.data && r.data.listEmployees).to.exist);",
-                  "let list; try { list = typeof r.data.listEmployees === 'string' ? JSON.parse(r.data.listEmployees) : r.data.listEmployees; } catch(e) { list = r.data.listEmployees; }",
-                  "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('employee_id')) { pm.environment.set('employee_id', list[0].id || list[0]._id); }"
+                  "const list = r.data && r.data.listEmployees;",
+                  "pm.test('listEmployees is array', () => pm.expect(Array.isArray(list)).to.be.true);",
+                  "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('employee_id')) {",
+                  "  pm.environment.set('employee_id', list[0].id);",
+                  "  console.log('employee_id (from list):', list[0].id);",
+                  "}"
                 ]
               }
             }
@@ -1123,7 +1132,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query GetEmployee($id: ID!) { getEmployee(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{employee_id}}\"\n  }\n}"
+              "raw": "{\n  \"query\": \"query GetEmployee($id: ID!) { getEmployee(id: $id) { id staffType campusId isActive department designation } }\",\n  \"variables\": {\n    \"id\": \"{{employee_id}}\"\n  }\n}"
             }
           },
           "event": [
@@ -1135,8 +1144,9 @@
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
                   "if (r.errors) console.warn('getEmployee:', r.errors[0] && r.errors[0].message);",
-                  "// Soft-fail: employee_id may be empty if inviteStaff failed",
-                  "pm.test('getEmployee or no employee', () => pm.expect(r.data || r.errors).to.exist);"
+                  "pm.test('getEmployee or no employee', () => pm.expect(r.data || r.errors).to.exist);",
+                  "const d = r.data && r.data.getEmployee;",
+                  "if (d) console.log('Employee:', d.id, '| dept:', d.department);"
                 ]
               }
             }
@@ -1241,7 +1251,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"query\": \"query { listRoles }\"\n}"
+              "raw": "{\n  \"query\": \"query { listRoles { id roleName permissions description } }\"\n}"
             }
           },
           "event": [
@@ -1253,11 +1263,9 @@
                   "pm.test('Status 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
                   "if (r.errors) console.warn('listRoles errors:', JSON.stringify(r.errors).slice(0, 200));",
-                  "const raw = r.data && r.data.listRoles;",
-                  "pm.test('listRoles exists', () => pm.expect(r.data || r.errors).to.exist);",
-                  "let list; try { list = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { list = raw; }",
-                  "pm.test('listRoles is array', () => pm.expect(list || []).to.be.an('array'));",
-                  "if (Array.isArray(list)) console.log('Roles count:', list.length);"
+                  "const list = r.data && r.data.listRoles;",
+                  "pm.test('listRoles is array', () => pm.expect(Array.isArray(list || [])).to.be.true);",
+                  "if (Array.isArray(list)) console.log('Roles:', list.map(r => r.roleName).join(', '));"
                 ]
               }
             }
@@ -4857,7 +4865,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation MarkSectionAttendance($input: BulkAttendanceInput!) { markSectionAttendance(input: $input) { id studentId status date } }\",\n  \"variables\": {\n    \"input\": {\n      \"sectionId\": \"{{section_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"date\": \"2026-05-08\",\n      \"records\": [\n        {\n          \"studentId\": \"{{student_id}}\",\n          \"status\": \"PRESENT\"\n        }\n      ]\n    }\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation MarkSectionAttendance($input: BulkAttendanceInput!) { markSectionAttendance(input: $input) { id studentId status date } }\",\n  \"variables\": {\n    \"input\": {\n      \"sectionId\": \"{{section_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"date\": \"2026-05-09\",\n      \"records\": [\n        {\n          \"studentId\": \"{{student_id}}\",\n          \"status\": \"PRESENT\"\n        }\n      ]\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -4898,7 +4906,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query GetSectionAttendance($sectionId: ID!, $date: AWSDate!) { getSectionAttendance(sectionId: $sectionId, date: $date) { id studentId status date } }\",\n  \"variables\": {\n    \"sectionId\": \"{{section_id}}\",\n    \"date\": \"2026-05-08\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"query GetSectionAttendance($sectionId: ID!, $date: AWSDate!) { getSectionAttendance(sectionId: $sectionId, date: $date) { id studentId status date } }\",\n  \"variables\": {\n    \"sectionId\": \"{{section_id}}\",\n    \"date\": \"2026-05-09\"\n  }\n}"
                 }
               },
               "event": [

@@ -177,6 +177,87 @@ type AcceptInvitePayload {
   isExistingUser: Boolean
 }
 
+type StaffMember {
+  id: ID!
+  email: String!
+  fullName: String
+  firstName: String
+  lastName: String
+  phone: String
+  status: String
+  staffType: String
+  personaRole: String
+  isActive: Boolean
+  joinedAt: AWSDateTime
+  campusAccess: [CampusAccessItem!]
+  roles: [StaffRole!]
+}
+
+type EmployeeRecord {
+  id: ID!
+  tenantId: String
+  staffType: String
+  campusId: ID
+  isActive: Boolean
+  joiningDate: String
+  salary: Float
+  department: String
+  designation: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+type CampusAccessItem {
+  campusId: ID!
+  role: String
+  grantedAt: AWSDateTime
+}
+
+type StaffRole {
+  role: String!
+  campusId: ID
+  assignedAt: AWSDateTime
+}
+
+type Role {
+  id: ID!
+  roleName: String!
+  permissions: [String!]!
+  description: String
+}
+
+type BulkDeactivateResult {
+  modifiedCount: Int!
+}
+
+type ImpersonateResult {
+  note: String
+}
+
+type FileUploadResult {
+  key: String!
+  contentType: String!
+}
+
+input UpdateEmployeeInput {
+  staffType: String
+  campusId: ID
+  joiningDate: String
+  salary: Float
+  department: String
+  designation: String
+  isActive: Boolean
+}
+
+input UpdateMyProfileInput {
+  fullName: String
+  firstName: String
+  lastName: String
+  phone: String
+  avatarKey: String
+  address: String
+}
+
 # ─── Storage ──────────────────────────────────────────────────────────────────
 
 type UploadUrlPayload {
@@ -218,6 +299,54 @@ input CreateCampusInput {
   address: String
   phone: String
   email: String
+}
+
+type Program {
+  id: ID!
+  name: String!
+  code: String
+  campusId: ID
+  isActive: Boolean
+  description: String
+  tenantId: String
+}
+
+input CreateProgramInput {
+  name: String!
+  code: String!
+  campusId: ID
+  description: String
+  type: String
+  durationYears: Int
+}
+
+input UpdateProgramInput {
+  name: String
+  code: String
+  campusId: ID
+  description: String
+  isActive: Boolean
+  durationYears: Int
+}
+
+input UpdateAcademicYearInput {
+  name: String
+  startDate: String
+  endDate: String
+}
+
+type TenantFeaturesPayload {
+  tenantId: String!
+  features: [TenantFeatureItem!]!
+}
+
+input TenantFeatureUpdateItem {
+  key: String!
+  enabled: Boolean!
+}
+
+input UpdateTenantFeaturesInput {
+  features: [TenantFeatureUpdateItem!]!
 }
 
 # ─── Templates ────────────────────────────────────────────────────────────────
@@ -751,11 +880,12 @@ type Query {
   me: User!
   listUsers(limit: Int, nextToken: String, filter: UserFilter): UserConnection!
   getUser(id: ID!): User
-  listStaff(campusId: ID, limit: Int, nextToken: String): AWSJSON
-  getStaffMember(id: ID!): AWSJSON
-  listEmployees(campusId: ID, limit: Int, nextToken: String, filter: AWSJSON): AWSJSON
-  getEmployee(id: ID!): AWSJSON
-  listCampusAccess(userId: ID!): AWSJSON
+  listStaff(campusId: ID, limit: Int, nextToken: String): [StaffMember!]!
+  getStaffMember(id: ID!): StaffMember
+  listEmployees(campusId: ID, limit: Int, nextToken: String): [EmployeeRecord!]!
+  getEmployee(id: ID!): EmployeeRecord
+  listCampusAccess(userId: ID!): [CampusAccessItem!]!
+  listRoles: [Role!]!
 
   # Tenants (super-admin)
   listTenants(limit: Int, nextToken: String): TenantConnection!
@@ -864,11 +994,11 @@ type Query {
   getAcademicYear(id: ID!): AcademicYear
   listCampuses: [Campus!]!
   getCampus(id: ID!): Campus
-  listPrograms(campusId: ID): AWSJSON
-  getProgram(id: ID!): AWSJSON
+  listPrograms(campusId: ID): [Program!]!
+  getProgram(id: ID!): Program
   listTemplates(type: String): [Template!]!
   getTemplate(id: ID!): AWSJSON
-  getTenantFeatures: AWSJSON
+  getTenantFeatures: TenantFeaturesPayload!
 
   # Audit logs
   listAuditLogs(filter: AWSJSON, limit: Int, nextToken: String): AWSJSON
@@ -908,16 +1038,16 @@ type Mutation {
   deactivateUser(id: ID!): Boolean
   reactivateUser(id: ID!): Boolean
   inviteStaff(input: InviteStaffInput!): InviteStaffPayload!
-  updateEmployee(id: ID!, input: AWSJSON!): AWSJSON
-  addCampusAccess(userId: ID!, campusId: ID!): AWSJSON
+  updateEmployee(id: ID!, input: UpdateEmployeeInput!): EmployeeRecord
+  addCampusAccess(userId: ID!, campusId: ID!): User!
   removeCampusAccess(userId: ID!, campusId: ID!): Boolean
-  assignRole(userId: ID!, roleId: ID!): AWSJSON
+  assignRole(userId: ID!, role: String!, campusId: ID): User!
   removeRole(userId: ID!, roleId: ID!): Boolean
-  bulkDeactivateUsers(userIds: [ID!]!): AWSJSON
-  impersonateUser(userId: ID!): AWSJSON
-  updateMyProfile(input: AWSJSON!): AWSJSON
-  uploadAvatar(input: AWSJSON!): AWSJSON
-  uploadTenantLogo(input: AWSJSON!): AWSJSON
+  bulkDeactivateUsers(userIds: [ID!]!): BulkDeactivateResult!
+  impersonateUser(userId: ID!): ImpersonateResult!
+  updateMyProfile(input: UpdateMyProfileInput!): User!
+  uploadAvatar(contentType: String): FileUploadResult!
+  uploadTenantLogo(contentType: String): FileUploadResult!
   resendInvite(staffId: ID!): Boolean
 
   # Tenants
@@ -1057,19 +1187,19 @@ type Mutation {
 
   # Settings
   createAcademicYear(input: CreateAcademicYearInput!): AcademicYear!
-  updateAcademicYear(id: ID!, input: AWSJSON!): AcademicYear
+  updateAcademicYear(id: ID!, input: UpdateAcademicYearInput!): AcademicYear
   setActiveAcademicYear(id: ID!): AcademicYear
   createCampus(input: CreateCampusInput!): Campus!
   updateCampus(id: ID!, input: CreateCampusInput!): Campus!
   deactivateCampus(id: ID!): Boolean
-  createProgram(input: AWSJSON!): AWSJSON
-  updateProgram(id: ID!, input: AWSJSON!): AWSJSON
+  createProgram(input: CreateProgramInput!): Program!
+  updateProgram(id: ID!, input: UpdateProgramInput!): Program!
   deleteProgram(id: ID!): Boolean
   createTemplate(input: CreateTemplateInput!): Template!
   updateTemplate(id: ID!, input: AWSJSON!): AWSJSON
   publishTemplateVersion(input: PublishTemplateVersionInput!): TemplateVersion!
   deleteTemplate(id: ID!): Boolean
-  updateTenantFeatures(input: AWSJSON!): AWSJSON
+  updateTenantFeatures(input: UpdateTenantFeaturesInput!): TenantFeaturesPayload!
 
   # Storage
   generateUploadUrl(contentType: String!, filename: String!): UploadUrlPayload!

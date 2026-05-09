@@ -175,9 +175,13 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'PATCH:/api/admin/employees/:id': {
         authorize(ctx, 'identity.staff.update');
         const tenantId = getTenantId(ctx);
-        const { id, ...update } = args as Record<string, unknown>;
+        const id = args.id as string;
+        const update = (args.input as Record<string, unknown>) ?? (() => {
+          const { id: _id, ...rest } = args as Record<string, unknown>;
+          return rest;
+        })();
         return toGql(await Employee.findOneAndUpdate(
-          { tenantId, _id: id as string },
+          { tenantId, _id: id },
           { $set: update },
           { new: true }
         ).lean());
@@ -188,7 +192,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'POST:/api/admin/users/:id/campus-access': {
         authorize(ctx, 'identity.users.update');
         const tenantId  = getTenantId(ctx);
-        const profileId = args.id as string;
+        const profileId = (args.userId ?? args.id) as string;
         const campusId  = args.campusId as string;
         const roleAtCampus = args.role as string | undefined;
         const profile = await IdentityRepo.findProfileById(tenantId, profileId);
@@ -197,12 +201,12 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         if (existing.some((ca) => ca.campusId?.toString() === campusId)) {
           throw new AppError('CONFLICT', 'User already has access to this campus');
         }
-        return IdentityRepo.updateProfile(tenantId, profileId, {
+        return toGql(await IdentityRepo.updateProfile(tenantId, profileId, {
           campusAccess: [
             ...existing,
             { campusId, role: roleAtCampus, grantedAt: new Date() },
           ] as never,
-        });
+        }));
       }
 
       case 'removeCampusAccess':
@@ -245,18 +249,19 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'POST:/api/admin/users/:id/roles': {
         authorize(ctx, 'identity.roles.assign');
         const tenantId = getTenantId(ctx);
-        const profile  = await IdentityRepo.findProfileById(tenantId, args.id as string);
+        const targetId = (args.userId ?? args.id) as string;
+        const profile  = await IdentityRepo.findProfileById(tenantId, targetId);
         if (!profile) throw new AppError('NOT_FOUND', 'User not found');
         const roles        = (profile.roles ?? []) as unknown as Array<Record<string, unknown>>;
-        const roleName     = args.role as string;
+        const roleName     = (args.role ?? args.roleId) as string;
         const campusId     = args.campusId as string | undefined;
         if (roles.some((r) => r.role === roleName && r.campusId?.toString() === campusId)) {
           throw new AppError('CONFLICT', 'Role already assigned');
         }
         roles.push({ role: roleName, campusId, assignedAt: new Date(), assignedBy: ctx.membership!.profileId });
-        return IdentityRepo.updateProfile(tenantId, args.id as string, {
+        return toGql(await IdentityRepo.updateProfile(tenantId, targetId, {
           roles: roles as never,
-        });
+        }));
       }
 
       case 'removeRole':
@@ -293,8 +298,9 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const tenantId = ctx.membership?.tenantId;
         if (!tenantId) throw new AppError('BAD_REQUEST', 'No tenant context');
         const profileId = ctx.membership!.profileId;
+        const rawInput = (args.input as Record<string, unknown>) ?? args;
         const { isActive: _ia, personaRole: _pr, roleAssignments: _ra, campusAccess: _ca, ...safeUpdate } =
-          args as Record<string, unknown>;
+          rawInput as Record<string, unknown>;
         return toGql(await IdentityRepo.updateProfile(tenantId, profileId, safeUpdate as never));
       }
 
@@ -303,10 +309,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const tenantId = ctx.membership?.tenantId ?? 'platform';
         const key      = `${tenantId}/avatars/${ctx.userId}-${Date.now()}.jpg`;
         return {
-          storageOperation: 'getUploadUrl',
           key,
           contentType: (args.contentType as string) ?? 'image/jpeg',
-          instructions: 'PUT file to uploadUrl, then call updateMyProfile with { avatarKey }',
         };
       }
 
@@ -316,10 +320,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const tenantId = getTenantId(ctx);
         const key      = `${tenantId}/logos/tenant-logo-${Date.now()}.png`;
         return {
-          storageOperation: 'getUploadUrl',
           key,
           contentType: (args.contentType as string) ?? 'image/png',
-          instructions: 'PUT file to uploadUrl, then call updateTenant with { logoKey }',
         };
       }
 
