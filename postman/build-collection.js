@@ -478,13 +478,40 @@ const IDENTITY = {
   item: [
     mkReq(
       'Me (current user)',
-      'query { me { id email fullName firstName lastName permissions roles tenantId } }',
+      `query {
+  me {
+    id
+    email
+    fullName
+    phone
+    photoUrl
+    personaRole
+    isActive
+    isAllCampuses
+    isPrimaryOwner
+    isPlatformAdmin
+    tenantId
+    employeeId
+    studentId
+    createdAt
+    updatedAt
+    permissions
+    roles
+    roleAssignments { roleId roleName permissions }
+    campusAccess { campusId campusName }
+  }
+}`,
       null,
       okTest([
         "const r = pm.response.json();",
         "const d = r.data && r.data.me;",
         "pm.test('me exists', () => pm.expect(d).to.exist);",
-        "if (d) { console.log('me id:', d.id, 'email:', d.email, 'tenantId:', d.tenantId); }",
+        "if (d) {",
+        "  console.log('me id:', d.id, '| email:', d.email, '| tenantId:', d.tenantId);",
+        "  console.log('  personaRole:', d.personaRole, '| isActive:', d.isActive, '| isAllCampuses:', d.isAllCampuses);",
+        "  console.log('  roles:', (d.roles||[]).join(', '));",
+        "  console.log('  campusAccess:', JSON.stringify(d.campusAccess));",
+        "}",
         "if (d && d.tenantId && !pm.environment.get('tenant_id')) {",
         "  pm.environment.set('tenant_id', d.tenantId);",
         "  console.log('tenant_id (from me):', d.tenantId);",

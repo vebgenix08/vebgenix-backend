@@ -7,22 +7,37 @@ type PageInfo {
 
 # ─── Identity ─────────────────────────────────────────────────────────────────
 
+type UserCampusAccess {
+  campusId: ID!
+  campusName: String
+}
+
+type UserRoleAssignment {
+  roleId: ID
+  roleName: String!
+  permissions: [String!]!
+}
+
 type User {
   id: ID!
   email: String!
   fullName: String
-  firstName: String
-  lastName: String
-  permissions: [String!]!
-  roles: [String!]!
-  tenantId: String
-  campusScope: String
-  staffType: String
+  phone: String
+  photoUrl: String
+  personaRole: String
+  isActive: Boolean
+  isAllCampuses: Boolean
   isPrimaryOwner: Boolean
   isPlatformAdmin: Boolean
-  phone: String
-  status: String
-  joinedAt: AWSDateTime
+  tenantId: String
+  campusAccess: [UserCampusAccess!]
+  roleAssignments: [UserRoleAssignment!]
+  employeeId: ID
+  studentId: ID
+  permissions: [String!]!
+  roles: [String!]!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
 }
 
 type UserEdge {

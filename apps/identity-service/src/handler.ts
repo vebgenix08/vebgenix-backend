@@ -73,14 +73,21 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'GET:/api/me': {
         const tenantId = ctx.membership?.tenantId;
         if (!tenantId) {
-          return { id: ctx.userId, email: ctx.email, isPlatformAdmin: ctx.isPlatformAdmin, permissions: [], roles: [] };
+          return { id: ctx.userId, email: ctx.email, isPlatformAdmin: ctx.isPlatformAdmin, permissions: [], roles: [], roleAssignments: [] };
         }
         const profile = await IdentityRepo.findProfileByAuthUserId(tenantId, ctx.userId);
-        if (!profile) return { id: ctx.userId, email: ctx.email, permissions: [], roles: [] };
+        if (!profile) return { id: ctx.userId, email: ctx.email, permissions: [], roles: [], roleAssignments: [] };
+        const profileGql = toGqlProfile(profile, { id: ctx.userId, email: ctx.email }) as Record<string, unknown>;
         return {
-          ...toGqlProfile(profile, { id: ctx.userId, email: ctx.email }),
+          ...profileGql,
+          isPlatformAdmin: ctx.isPlatformAdmin ?? false,
           permissions: Array.from(ctx.permissions),
           roles: (ctx.membership?.roles ?? []).map(r => r.roleName),
+          roleAssignments: (ctx.membership?.roles ?? []).map(r => ({
+            roleId:      r.roleId?.toString() ?? null,
+            roleName:    r.roleName,
+            permissions: r.permissions ?? [],
+          })),
         };
       }
 
