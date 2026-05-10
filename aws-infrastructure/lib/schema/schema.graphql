@@ -421,7 +421,7 @@ type Template {
 type TemplateVersion {
   id: ID!
   version: Int!
-  content: AWSJSON!
+  content: String!
   isPublished: Boolean!
 }
 
@@ -437,7 +437,7 @@ input UpdateTemplateInput {
 
 input PublishTemplateVersionInput {
   templateId: ID!
-  content: AWSJSON!
+  content: String!
 }
 
 # ─── Finance — Fee Categories ─────────────────────────────────────────────────
@@ -1822,7 +1822,7 @@ type PlatformAuditLogDetail {
   action: String!
   targetType: PlatformAuditTargetType!
   targetId: ID
-  meta: AWSJSON
+  meta: String
 }
 
 type PlatformAuditLogEdge {
@@ -1861,7 +1861,7 @@ type AuditLogEntry {
   targetType: String!
   targetId:   String
   targetName: String
-  meta:       AWSJSON
+  meta:       String
   ipAddress:  String
 }
 
