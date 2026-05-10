@@ -227,7 +227,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const filtered = (profile.campusAccess ?? []).filter(
           (ca) => ca.campusId?.toString() !== campusId
         );
-        return IdentityRepo.updateProfile(tenantId, profileId, { campusAccess: filtered as never });
+        await IdentityRepo.updateProfile(tenantId, profileId, { campusAccess: filtered as never });
+        return true;
       }
 
       case 'listCampusAccess':
@@ -280,9 +281,10 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const filtered = (profile.roles ?? []).filter(
           (r) => (r as unknown as Record<string, unknown>).role !== args.role
         );
-        return IdentityRepo.updateProfile(tenantId, args.id as string, {
+        await IdentityRepo.updateProfile(tenantId, args.id as string, {
           roles: filtered as never,
         });
+        return true;
       }
 
       // ── Impersonation (platform admin only) ────────────────────────────────

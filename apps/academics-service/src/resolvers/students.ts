@@ -89,17 +89,17 @@ export async function resolveStudents(
         const lastName  = (update.lastName  ?? existing?.lastName)  as string | undefined;
         if (firstName) update.fullName = [firstName, lastName].filter(Boolean).join(' ');
       }
-      return AcademicsRepo.updateStudent(tenantId, (args.studentId ?? args.id) as string, update);
+      return toGqlStudent(await AcademicsRepo.updateStudent(tenantId, (args.studentId ?? args.id) as string, update));
     }
 
     case 'updateStudentStatus':
     case 'PATCH:/api/admin/students/:studentId/status':
       authorize(ctx, 'students.status.update');
-      return AcademicsRepo.updateStudent(
+      return toGqlStudent(await AcademicsRepo.updateStudent(
         tenantId,
         (args.studentId ?? args.id) as string,
         { status: args.status as never },
-      );
+      ));
 
     case 'assignStudentClass':
     case 'PATCH:/api/tenant/students/:studentId/assign-class':

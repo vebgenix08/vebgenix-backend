@@ -93,7 +93,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'updateResultBatch':
       case 'PATCH:/api/admin/results/:id': {
         authorize(ctx, 'academics.results.update');
-        const { id, ...update } = args as Record<string, unknown>;
+        const { id, input: batchInput, ...restBatch } = args as Record<string, unknown>;
+        const update = (batchInput as Record<string, unknown>) ?? restBatch;
         const batch = await PublishedResultBatch.findOne({ tenantId, _id: id as string });
         if (!batch) throw new AppError('NOT_FOUND', 'Result batch not found');
         if (batch.status === 'PUBLISHED') throw new AppError('BAD_REQUEST', 'Cannot edit a published result batch. Archive it first.');

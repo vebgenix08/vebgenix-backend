@@ -31,10 +31,12 @@ export async function resolveAuditLogs(
     case 'listPlatformAuditLogs':
     case 'GET:/api/platform/audit-logs': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
-      const limit  = Math.min((args.limit as number) ?? 50, 200);
-      const offset = (args.offset as number) ?? 0;
+      // AppSync: args.input = { filter, limit, cursor }  |  REST: args.limit / args.offset
+      const inp    = (args.input as Record<string, unknown>) ?? args;
+      const limit  = Math.min((inp.limit as number) ?? (args.limit as number) ?? 50, 200);
+      const offset = (inp.offset as number) ?? (args.offset as number) ?? 0;
       const docs = await PlatformAuditLog.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
-      return docs.map(d => toGql(d));
+      return { edges: docs.map(d => ({ cursor: String((d as Record<string,unknown>)._id), node: toGql(d) })), pageInfo: { hasNextPage: docs.length === limit } };
     }
 
     case 'getPlatformAuditLog':

@@ -20,8 +20,12 @@ export async function resolvePrograms(
     }
 
     case 'getProgram':
-    case 'GET:/api/admin/settings/programs/:id':
-      return Program.findOne({ tenantId, _id: args.id as string }).lean();
+    case 'GET:/api/admin/settings/programs/:id': {
+      const doc = await Program.findOne({ tenantId, _id: args.id as string }).lean();
+      if (!doc) return null;
+      const { _id, ...rest } = doc as unknown as Record<string, unknown>;
+      return { ...rest, id: String(_id) };
+    }
 
     case 'createProgram':
     case 'POST:/api/admin/settings/programs': {

@@ -95,7 +95,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'updateEnquiry':
       case 'PATCH:/api/admissions/enquiries/:id': {
         authorize(ctx, 'admissions.enquiry.update');
-        const { id, ...update } = args as Record<string, unknown>;
+        const { id, input: enquiryInput, ...restArgs } = args as Record<string, unknown>;
+        const update = (enquiryInput as Record<string, unknown>) ?? restArgs;
         return toGql(await AdmissionsRepo.updateEnquiry(tenantId, id as string, update));
       }
 

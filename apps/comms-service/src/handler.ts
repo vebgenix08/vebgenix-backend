@@ -77,7 +77,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'updateAnnouncement':
       case 'PATCH:/api/admin/communication/announcements/:id': {
         authorize(ctx, 'comms.announcements.update');
-        const { id, ...update } = args as Record<string, unknown>;
+        const { id, input: annInput, ...restAnn } = args as Record<string, unknown>;
+        const update = (annInput as Record<string, unknown>) ?? restAnn;
         const existing = await Announcement.findOne({ tenantId, _id: id as string });
         if (!existing) throw new AppError('NOT_FOUND', 'Announcement not found');
         return toGql(await Announcement.findOneAndUpdate(
@@ -148,7 +149,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'updateEvent':
       case 'PATCH:/api/admin/events/:id': {
         authorize(ctx, 'comms.events.update');
-        const { id, ...update } = args as Record<string, unknown>;
+        const { id, input: evtInput, ...restEvt } = args as Record<string, unknown>;
+        const update = (evtInput as Record<string, unknown>) ?? restEvt;
         const existing = await EventModel.findOne({ tenantId, _id: id as string });
         if (!existing) throw new AppError('NOT_FOUND', 'Event not found');
         return toGql(await EventModel.findOneAndUpdate(
@@ -208,7 +210,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'updateLeaveRequest':
       case 'PATCH:/api/admin/leave/:id': {
-        const { id, ...update } = args as Record<string, unknown>;
+        const { id, input: leaveInput, ...restLeave } = args as Record<string, unknown>;
+        const update = (leaveInput as Record<string, unknown>) ?? restLeave;
         const req = await LeaveRequest.findOne({ tenantId, _id: id as string });
         if (!req) throw new AppError('NOT_FOUND', 'Leave request not found');
         // Only the owner can update their own pending request

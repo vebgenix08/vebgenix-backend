@@ -52,10 +52,16 @@ export async function resolveExams(
       // New schema: input: EnterMarksInput! → { entries: [{ studentId, marksObtained, grade, remarks, isAbsent }] }
       // REST/legacy: flat args with single studentId/marksObtained
       const examId = (args.examId ?? args.id) as string;
+      if (!examId) throw new AppError('BAD_REQUEST', 'examId is required');
       const inp = (args.input ?? {}) as Record<string, unknown>;
-      const entries: object[] = Array.isArray(inp.entries)
+      const entries: object[] = Array.isArray(inp.entries) && inp.entries.length > 0
         ? (inp.entries as object[])
-        : [inp.studentId ? inp : args];   // legacy single-entry path
+        : inp.studentId
+          ? [inp]           // legacy single-entry from input
+          : args.studentId
+            ? [args]        // legacy flat args (REST)
+            : [];
+      if (entries.length === 0) throw new AppError('BAD_REQUEST', 'At least one marks entry is required');
       let result: unknown;
       for (const entry of entries) {
         result = await AcademicsRepo.addMarksEntry(tenantId, examId, entry);
