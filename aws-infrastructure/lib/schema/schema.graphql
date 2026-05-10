@@ -80,6 +80,107 @@ input UpdateUserInput {
   role: String
 }
 
+type StaffMember {
+  id: ID!
+  email: String!
+  fullName: String
+  phone: String
+  photoUrl: String
+  personaRole: String
+  isActive: Boolean
+  isAllCampuses: Boolean
+  isPrimaryOwner: Boolean
+  tenantId: String
+  campusAccess: [UserCampusAccess!]
+  roles: [UserRoleAssignment!]
+  employeeId: ID
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+type EmployeeRecord {
+  id: ID!
+  tenantId: String
+  campusId: ID
+  profileId: ID
+  authUserId: ID
+  employeeCode: String
+  fullName: String
+  email: String
+  phone: String
+  photoUrl: String
+  designation: String
+  department: String
+  staffType: String
+  staffCategory: String
+  employmentType: String
+  joiningDate: String
+  isActive: Boolean
+  reportingManagerId: ID
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+type CampusAccessItem {
+  campusId: ID!
+  role: String
+  grantedAt: AWSDateTime
+}
+
+type StaffRole {
+  role: String!
+  campusId: ID
+  assignedAt: AWSDateTime
+}
+
+type Role {
+  id: ID!
+  roleName: String!
+  permissions: [String!]!
+  description: String
+}
+
+type BulkDeactivateResult {
+  modifiedCount: Int!
+}
+
+type ImpersonateResult {
+  note: String
+}
+
+type FileUploadResult {
+  key: String!
+  contentType: String!
+}
+
+input UpdateEmployeeInput {
+  fullName: String
+  phone: String
+  designation: String
+  department: String
+  staffType: String
+  staffCategory: String
+  employmentType: String
+  joiningDate: String
+  isActive: Boolean
+  photoUrl: String
+  reportingManagerId: ID
+}
+
+input UpdateMyProfileInput {
+  fullName: String
+  phone: String
+  photoUrl: String
+  avatarKey: String
+  address: String
+}
+
+type AcceptInvitePayload {
+  success: Boolean!
+  email: String
+  isExistingUser: Boolean
+}
+
 # ─── Tenants ──────────────────────────────────────────────────────────────────
 
 type Tenant {
@@ -186,91 +287,12 @@ type TenantDeletionOtpResult {
   maskedEmail:  String!
 }
 
-type AcceptInvitePayload {
-  success: Boolean!
-  email: String
-  isExistingUser: Boolean
-}
-
-type StaffMember {
+type TenantUserRecord {
   id: ID!
   email: String!
   fullName: String
-  firstName: String
-  lastName: String
-  phone: String
-  status: String
-  staffType: String
   personaRole: String
   isActive: Boolean
-  joinedAt: AWSDateTime
-  campusAccess: [CampusAccessItem!]
-  roles: [StaffRole!]
-}
-
-type EmployeeRecord {
-  id: ID!
-  tenantId: String
-  staffType: String
-  campusId: ID
-  isActive: Boolean
-  joiningDate: String
-  salary: Float
-  department: String
-  designation: String
-  createdAt: AWSDateTime
-  updatedAt: AWSDateTime
-}
-
-type CampusAccessItem {
-  campusId: ID!
-  role: String
-  grantedAt: AWSDateTime
-}
-
-type StaffRole {
-  role: String!
-  campusId: ID
-  assignedAt: AWSDateTime
-}
-
-type Role {
-  id: ID!
-  roleName: String!
-  permissions: [String!]!
-  description: String
-}
-
-type BulkDeactivateResult {
-  modifiedCount: Int!
-}
-
-type ImpersonateResult {
-  note: String
-}
-
-type FileUploadResult {
-  key: String!
-  contentType: String!
-}
-
-input UpdateEmployeeInput {
-  staffType: String
-  campusId: ID
-  joiningDate: String
-  salary: Float
-  department: String
-  designation: String
-  isActive: Boolean
-}
-
-input UpdateMyProfileInput {
-  fullName: String
-  firstName: String
-  lastName: String
-  phone: String
-  avatarKey: String
-  address: String
 }
 
 # ─── Storage ──────────────────────────────────────────────────────────────────
@@ -280,14 +302,24 @@ type UploadUrlPayload {
   key: String!
 }
 
+type DownloadUrlPayload {
+  downloadUrl: String!
+  key: String!
+  expiresIn: Int
+}
+
 # ─── Settings ─────────────────────────────────────────────────────────────────
 
 type AcademicYear {
   id: ID!
+  tenantId: String
   name: String!
   startDate: String!
   endDate: String!
   isActive: Boolean!
+  isCurrent: Boolean
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
 }
 
 input CreateAcademicYearInput {
@@ -296,15 +328,27 @@ input CreateAcademicYearInput {
   endDate: String!
 }
 
+input UpdateAcademicYearInput {
+  name: String
+  startDate: String
+  endDate: String
+}
+
 type Campus {
   id: ID!
+  tenantId: String
   name: String!
   code: String!
   type: String!
   address: String
+  city: String
+  state: String
+  country: String
   phone: String
   email: String
   isActive: Boolean!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
 }
 
 input CreateCampusInput {
@@ -312,42 +356,44 @@ input CreateCampusInput {
   code: String!
   type: String!
   address: String
+  city: String
+  state: String
+  country: String
   phone: String
   email: String
 }
 
 type Program {
   id: ID!
-  name: String!
-  code: String
-  campusId: ID
-  isActive: Boolean
-  description: String
   tenantId: String
+  campusId: ID
+  name: String!
+  code: String!
+  type: String
+  durationYears: Int
+  totalSeats: Int
+  isActive: Boolean
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
 }
 
 input CreateProgramInput {
   name: String!
   code: String!
+  type: String!
+  durationYears: Int!
   campusId: ID
-  description: String
-  type: String
-  durationYears: Int
+  totalSeats: Int
 }
 
 input UpdateProgramInput {
   name: String
   code: String
-  campusId: ID
-  description: String
-  isActive: Boolean
+  type: String
   durationYears: Int
-}
-
-input UpdateAcademicYearInput {
-  name: String
-  startDate: String
-  endDate: String
+  campusId: ID
+  totalSeats: Int
+  isActive: Boolean
 }
 
 type TenantFeaturesPayload {
@@ -384,15 +430,21 @@ input CreateTemplateInput {
   name: String!
 }
 
+input UpdateTemplateInput {
+  name: String
+  type: String
+}
+
 input PublishTemplateVersionInput {
   templateId: ID!
   content: AWSJSON!
 }
 
-# ─── Finance ──────────────────────────────────────────────────────────────────
+# ─── Finance — Fee Categories ─────────────────────────────────────────────────
 
 type FeeCategory {
   id: ID!
+  tenantId: String
   name: String!
   moduleType: String!
   feeType: String!
@@ -400,24 +452,46 @@ type FeeCategory {
   receiptPrefix: String!
   defaultAllocationMethod: String!
   isActive: Boolean!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
 }
+
+input CreateFeeCategoryInput {
+  name: String!
+  feeType: String!
+  moduleType: String
+  invoicePrefix: String!
+  receiptPrefix: String!
+  defaultAllocationMethod: String
+}
+
+input UpdateFeeCategoryInput {
+  name: String
+  feeType: String
+  moduleType: String
+  invoicePrefix: String
+  receiptPrefix: String
+  defaultAllocationMethod: String
+  isActive: Boolean
+}
+
+# ─── Finance — Fee Heads ──────────────────────────────────────────────────────
 
 type FeeHead {
   id: ID!
+  tenantId: String
   name: String!
   type: String!
-  feeCategoryId: ID
+  prefix: String
   code: String
-  isRefundable: Boolean
-  isMandatory: Boolean
-  priorityOrder: Int
-}
-
-type FeeStructure {
-  id: ID!
-  name: String!
+  description: String
   feeCategoryId: ID
-  allocationMethod: String
+  isRefundable: Boolean!
+  isMandatory: Boolean!
+  priorityOrder: Int!
+  isActive: Boolean!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
 }
 
 input CreateFeeHeadInput {
@@ -425,25 +499,694 @@ input CreateFeeHeadInput {
   type: String!
   feeCategoryId: ID
   code: String
+  prefix: String
+  description: String
+  isRefundable: Boolean
+  isMandatory: Boolean
+  priorityOrder: Int
+}
+
+input UpdateFeeHeadInput {
+  name: String
+  type: String
+  feeCategoryId: ID
+  code: String
+  prefix: String
+  description: String
+  isRefundable: Boolean
+  isMandatory: Boolean
+  priorityOrder: Int
+  isActive: Boolean
+}
+
+# ─── Finance — Fee Structures ─────────────────────────────────────────────────
+
+type FeeComponent {
+  feeHeadId: ID!
+  feeHeadName: String!
+  amount: Float!
+  isOptional: Boolean!
+  priorityOrder: Int!
+}
+
+input FeeComponentInput {
+  feeHeadId: ID!
+  feeHeadName: String!
+  amount: Float!
+  isOptional: Boolean
+  priorityOrder: Int
+}
+
+type FeeStructure {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  academicYearId: ID!
+  programId: ID
+  classId: ID
+  name: String!
+  components: [FeeComponent!]!
+  totalAmount: Float!
+  isActive: Boolean!
+  feeCategoryId: ID
+  feeScheduleId: ID
+  allocationMethod: String!
+  studentCategoryId: ID
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
 }
 
 input CreateFeeStructureInput {
   name: String!
+  campusId: ID!
+  academicYearId: ID!
+  programId: ID
+  classId: ID
   feeCategoryId: ID
+  feeScheduleId: ID
+  allocationMethod: String
+  components: [FeeComponentInput!]
 }
+
+input UpdateFeeStructureInput {
+  name: String
+  campusId: ID
+  academicYearId: ID
+  programId: ID
+  classId: ID
+  feeCategoryId: ID
+  feeScheduleId: ID
+  allocationMethod: String
+  components: [FeeComponentInput!]
+  isActive: Boolean
+}
+
+input CopyFeePatternInput {
+  fromAcademicYearId: ID!
+  toAcademicYearId: ID!
+  campusId: ID
+  feeStructureIds: [ID!]
+}
+
+type CopyFeePatternResult {
+  copiedCount: Int!
+  skippedCount: Int!
+}
+
+# ─── Finance — Fee Schedules ──────────────────────────────────────────────────
+
+type FeeScheduleSlot {
+  name: String!
+  dueDate: String!
+  percentOfTotal: Float
+  fixedAmount: Float
+}
+
+input FeeScheduleSlotInput {
+  name: String!
+  dueDate: String!
+  percentOfTotal: Float
+  fixedAmount: Float
+}
+
+type FeeSchedule {
+  id: ID!
+  tenantId: String
+  name: String!
+  academicYearId: String!
+  feeCategoryId: ID
+  campusId: ID
+  slots: [FeeScheduleSlot!]!
+  isActive: Boolean!
+  allowPartialPayment: Boolean!
+  collectionType: String!
+  minimumAmount: Float!
+  minimumPercentage: Float!
+  graceDays: Int!
+  lateFeeEnabled: Boolean!
+  notificationEnabled: Boolean!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateFeeScheduleInput {
+  name: String!
+  academicYearId: ID!
+  feeCategoryId: ID
+  campusId: ID
+  collectionType: String
+  minimumAmount: Float
+  minimumPercentage: Float
+  allowPartialPayment: Boolean
+  graceDays: Int
+  lateFeeEnabled: Boolean
+  notificationEnabled: Boolean
+  slots: [FeeScheduleSlotInput!]
+}
+
+input UpdateFeeScheduleInput {
+  name: String
+  feeCategoryId: ID
+  campusId: ID
+  collectionType: String
+  minimumAmount: Float
+  minimumPercentage: Float
+  allowPartialPayment: Boolean
+  graceDays: Int
+  lateFeeEnabled: Boolean
+  notificationEnabled: Boolean
+  isActive: Boolean
+}
+
+# ─── Finance — Fee Assignments ────────────────────────────────────────────────
+
+type FeeAssignment {
+  id: ID!
+  tenantId: String
+  studentId: ID!
+  feeStructureId: ID!
+  academicYearId: ID!
+  classId: ID
+  totalAmount: Float!
+  discountAmount: Float!
+  netAmount: Float!
+  discountReason: String
+  status: String!
+  assignedBy: String!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateFeeAssignmentInput {
+  studentId: ID!
+  feeStructureId: ID!
+  academicYearId: ID!
+  classId: ID
+  discountAmount: Float
+  discountReason: String
+}
+
+input BulkFeeAssignInput {
+  studentIds: [ID!]!
+  feeStructureId: ID!
+  academicYearId: ID!
+  classId: ID
+  discountAmount: Float
+  discountReason: String
+}
+
+type BulkFeeAssignResult {
+  assignedCount: Int!
+  skippedCount: Int!
+  failedCount: Int!
+}
+
+type FeeAssignmentQueueItem {
+  studentId: ID!
+  studentName: String
+  admissionNo: String
+  registrationNumber: String
+  classId: ID
+  className: String
+  currentAssignment: FeeAssignment
+  availableStructures: [FeeStructure!]
+}
+
+# ─── Finance — Installment Plans ─────────────────────────────────────────────
+
+type InstallmentPlan {
+  id: ID!
+  tenantId: String
+  name: String!
+  numberOfInstallments: Int!
+  description: String
+  isActive: Boolean!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateInstallmentPlanInput {
+  name: String!
+  numberOfInstallments: Int!
+  description: String
+}
+
+input UpdateInstallmentPlanInput {
+  name: String
+  numberOfInstallments: Int
+  description: String
+  isActive: Boolean
+}
+
+# ─── Finance — Invoices ───────────────────────────────────────────────────────
+
+type InvoiceItem {
+  id: ID
+  feeHeadId: ID!
+  feeHeadName: String!
+  amount: Float!
+  concession: Float!
+  netAmount: Float!
+  paidAmount: Float!
+  balanceAmount: Float!
+  priorityOrder: Int!
+}
+
+type Invoice {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  studentId: ID!
+  academicYearId: ID!
+  classId: ID
+  feeOrderId: String!
+  invoiceNumber: String!
+  status: String!
+  items: [InvoiceItem!]!
+  totalAmount: Float!
+  concessionAmount: Float!
+  netAmount: Float!
+  paidAmount: Float!
+  dueAmount: Float!
+  dueDate: String
+  issuedAt: String
+  feeScheduleId: ID
+  installmentLabel: String
+  cancelledAt: String
+  cancelReason: String
+  feeCategoryId: ID
+  feeStructureId: ID
+  allocationMethod: String!
+  collectionType: String!
+  minimumAmount: Float!
+  minimumPercentage: Float!
+  allowPartialPayment: Boolean!
+  invoicePrefix: String
+  receiptPrefix: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input UpdateInvoiceInput {
+  dueDate: String
+  installmentLabel: String
+  status: String
+}
+
+input ReviseInvoiceInput {
+  reason: String!
+  items: [InvoiceItemRevisionInput!]
+}
+
+input InvoiceItemRevisionInput {
+  feeHeadId: ID!
+  concession: Float
+  amount: Float
+}
+
+input CreateOneOffChargeInput {
+  studentId: ID!
+  academicYearId: ID!
+  campusId: ID!
+  classId: ID
+  feeHeadId: ID!
+  amount: Float!
+  description: String
+}
+
+type FeeRevision {
+  id: ID!
+  tenantId: String
+  studentId: ID!
+  invoiceId: ID!
+  feeAssignmentId: ID
+  revisedBy: String!
+  previousAmount: Float!
+  newAmount: Float!
+  difference: Float!
+  reason: String!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+type StudentDues {
+  studentId: ID!
+  totalDue: Float!
+  invoices: [Invoice!]!
+}
+
+# ─── Finance — Payments & Receipts ───────────────────────────────────────────
+
+type Payment {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  studentId: ID!
+  invoiceId: ID!
+  academicYearId: ID!
+  classId: ID
+  receiptNumber: String
+  amount: Float!
+  method: String!
+  status: String!
+  referenceNumber: String
+  remarks: String
+  paidAt: String
+  collectedBy: ID!
+  razorpayOrderId: String
+  razorpayPaymentId: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+type PaymentAllocation {
+  id: ID
+  paymentId: ID!
+  invoiceId: ID!
+  feeHeadId: ID
+  allocatedAmount: Float!
+}
+
+type RecordPaymentResult {
+  payment: Payment!
+  receiptNumber: String
+  allocations: [PaymentAllocation!]!
+}
+
+input RecordPaymentInput {
+  invoiceId: ID!
+  studentId: ID!
+  campusId: ID!
+  amount: Float!
+  method: String!
+  referenceNumber: String
+  remarks: String
+  paidAt: String
+}
+
+type PaymentOrder {
+  orderId: String!
+  amount: Float!
+  currency: String!
+  paymentId: String!
+}
+
+input VerifyPaymentInput {
+  razorpayOrderId: String!
+  razorpayPaymentId: String!
+  razorpaySignature: String!
+}
+
+type PaymentVerifyResult {
+  success: Boolean!
+  paymentId: String!
+}
+
+type PaymentLink {
+  link: String!
+  expiresAt: String
+}
+
+input CollectByStudentInput {
+  amount: Float!
+  method: String!
+  remarks: String
+}
+
+type CollectByStudentResult {
+  payments: [Payment!]!
+  totalCollected: Float!
+  remainingAmount: Float!
+}
+
+# ─── Finance — Reports ────────────────────────────────────────────────────────
+
+type DayBookEntry {
+  paymentId: ID
+  receiptNumber: String
+  studentId: ID
+  studentName: String
+  amount: Float!
+  method: String!
+  collectedBy: String
+  paidAt: String
+}
+
+type DayBookReport {
+  date: String!
+  totalAmount: Float!
+  entries: [DayBookEntry!]!
+}
+
+type FeeCollectionAnalytics {
+  totalCollected: Float!
+  totalDue: Float!
+  collectionRate: Float
+  byMethod: [MethodBreakdown!]!
+  monthly: [MonthlyCollection!]!
+}
+
+type MethodBreakdown {
+  method: String!
+  amount: Float!
+  count: Int!
+}
+
+type MonthlyCollection {
+  month: String!
+  amount: Float!
+  count: Int!
+}
+
+type ClassFeeStats {
+  classId: ID
+  className: String
+  totalStudents: Int!
+  paidStudents: Int!
+  pendingStudents: Int!
+  totalAmount: Float!
+  collectedAmount: Float!
+  pendingAmount: Float!
+}
+
+type StudentFinancialSummary {
+  studentId: ID!
+  totalCharged: Float!
+  totalPaid: Float!
+  totalDue: Float!
+  totalConcession: Float!
+  invoiceCount: Int!
+  paymentCount: Int!
+}
+
+# ─── Admissions — Enquiries ───────────────────────────────────────────────────
+
+type Enquiry {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  academicYearId: ID
+  studentName: String!
+  email: String
+  phone: String!
+  programId: ID
+  programName: String
+  status: String!
+  source: String
+  notes: String
+  assignedTo: ID
+  followUpDate: String
+  createdBy: ID
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateEnquiryInput {
+  studentName: String!
+  phone: String!
+  email: String
+  campusId: ID!
+  academicYearId: ID
+  programId: ID
+  programName: String
+  source: String
+  notes: String
+  assignedTo: ID
+  followUpDate: String
+}
+
+input UpdateEnquiryInput {
+  studentName: String
+  phone: String
+  email: String
+  status: String
+  programId: ID
+  programName: String
+  source: String
+  notes: String
+  assignedTo: ID
+  followUpDate: String
+}
+
+input EnquiryFilterInput {
+  status: String
+  campusId: ID
+  search: String
+  source: String
+}
+
+type AdmissionsStats {
+  totalEnquiries: Int!
+  totalApplications: Int!
+  pendingApplications: Int!
+  approvedApplications: Int!
+  rejectedApplications: Int!
+  convertedEnquiries: Int!
+}
+
+# ─── Admissions — Applications ───────────────────────────────────────────────
+
+type ApplicationDocument {
+  type: String!
+  url: String!
+  key: String!
+  uploadedAt: String
+}
+
+type ApplicationReview {
+  reviewedBy: ID!
+  reviewedAt: String!
+  decision: String!
+  remarks: String
+}
+
+type Application {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  enquiryId: ID
+  academicYearId: ID!
+  programId: ID
+  applicationNumber: String!
+  status: String!
+  studentName: String!
+  dateOfBirth: String
+  gender: String
+  email: String
+  phone: String!
+  address: String
+  guardianName: String
+  guardianPhone: String
+  guardianRelation: String
+  documents: [ApplicationDocument!]!
+  reviews: [ApplicationReview!]!
+  submittedAt: String
+  approvedAt: String
+  rejectedAt: String
+  rejectionReason: String
+  createdBy: ID
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateApplicationInput {
+  campusId: ID!
+  academicYearId: ID!
+  enquiryId: ID
+  programId: ID
+  studentName: String!
+  phone: String!
+  email: String
+  dateOfBirth: String
+  gender: String
+  address: String
+  guardianName: String
+  guardianPhone: String
+  guardianRelation: String
+}
+
+input ApplicationReviewInput {
+  decision: String!
+  remarks: String
+}
+
+input VerifyDocumentInput {
+  verified: Boolean!
+  remarks: String
+}
+
+input CheckDuplicateInput {
+  studentName: String!
+  phone: String
+  email: String
+  campusId: ID
+}
+
+type DuplicateCheckResult {
+  isDuplicate: Boolean!
+  matches: [Enquiry!]!
+}
+
+type GetUploadUrlResult {
+  uploadUrl: String!
+  key: String!
+  contentType: String!
+}
+
+input GetUploadUrlInput {
+  fileName: String!
+  contentType: String!
+  folder: String
+}
+
+# ─── Finance — Fee Category ─────────────────────── (FeeCategory already above)
 
 # ─── Students ─────────────────────────────────────────────────────────────────
 
+type StudentGuardian {
+  name: String!
+  relation: String!
+  phone: String!
+  email: String
+  authUserId: ID
+}
+
+input StudentGuardianInput {
+  name: String!
+  relation: String!
+  phone: String!
+  email: String
+}
+
 type Student {
   id: ID!
-  applicationNo: String
+  tenantId: String
+  campusId: ID!
+  academicYearId: ID!
+  applicationId: ID
+  registrationNumber: String!
   admissionNo: String
-  firstName: String
+  applicationNo: String
+  admissionStatus: String!
+  admissionConfirmedAt: String
+  firstName: String!
   lastName: String
   fullName: String!
-  registrationNumber: String
+  dateOfBirth: String
+  gender: String
+  email: String
+  phone: String
+  photoUrl: String
+  address: String
+  classId: ID
+  sectionId: ID
+  programId: ID
   status: String!
-  currentGrade: String
+  authUserId: ID
+  transportRouteId: String
+  guardians: [StudentGuardian!]!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
 }
 
 type StudentConnection {
@@ -453,6 +1196,10 @@ type StudentConnection {
 
 input StudentFilter {
   search: String
+  campusId: ID
+  classId: ID
+  sectionId: ID
+  status: String
 }
 
 type PortalEnablementPayload {
@@ -466,6 +1213,49 @@ input EnableGuardianPortalInput {
   relationship: String!
   email: String!
   phone: String!
+}
+
+input EnrollStudentInput {
+  firstName: String!
+  lastName: String
+  dateOfBirth: String
+  gender: String
+  email: String
+  phone: String
+  campusId: ID!
+  academicYearId: ID!
+  programId: ID
+  classId: ID
+  sectionId: ID
+  admissionNo: String
+  applicationId: ID
+  guardians: [StudentGuardianInput!]
+  address: String
+  photoUrl: String
+  transportRouteId: String
+}
+
+input UpdateStudentInput {
+  firstName: String
+  lastName: String
+  dateOfBirth: String
+  gender: String
+  email: String
+  phone: String
+  address: String
+  photoUrl: String
+  admissionNo: String
+  classId: ID
+  sectionId: ID
+  programId: ID
+  transportRouteId: String
+  guardians: [StudentGuardianInput!]
+}
+
+input AssignStudentClassInput {
+  classId: ID!
+  sectionId: ID
+  academicYearId: ID!
 }
 
 # ─── Admissions (legacy) ──────────────────────────────────────────────────────
@@ -507,6 +1297,398 @@ input UpdateAdmissionInput {
 input ReviewAdmissionInput {
   decision: String!
   comments: String
+}
+
+# ─── Academics — Classes ──────────────────────────────────────────────────────
+
+type GradeClass {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  programId: ID
+  name: String!
+  code: String!
+  year: Int
+  isActive: Boolean!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateClassInput {
+  name: String!
+  code: String!
+  campusId: ID!
+  programId: ID
+  year: Int
+}
+
+input UpdateClassInput {
+  name: String
+  code: String
+  campusId: ID
+  programId: ID
+  year: Int
+  isActive: Boolean
+}
+
+# ─── Academics — Sections ─────────────────────────────────────────────────────
+
+type SectionRecord {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  classId: ID!
+  academicYearId: ID!
+  name: String!
+  displayName: String!
+  capacity: Int!
+  classTeacherId: ID
+  isActive: Boolean!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateSectionInput {
+  name: String!
+  classId: ID!
+  academicYearId: ID!
+  campusId: ID!
+  capacity: Int
+  classTeacherId: ID
+}
+
+input UpdateSectionInput {
+  name: String
+  capacity: Int
+  classTeacherId: ID
+  isActive: Boolean
+}
+
+input SetSectionInchargeInput {
+  classTeacherId: ID!
+}
+
+type SectionCourse {
+  id: ID!
+  sectionId: ID!
+  subjectId: ID!
+  teacherProfileId: ID
+  subjectName: String
+  subjectCode: String
+}
+
+input AssignSectionCourseInput {
+  subjectId: ID!
+  teacherProfileId: ID
+}
+
+# ─── Academics — Subjects ─────────────────────────────────────────────────────
+
+type SubjectRecord {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  code: String!
+  name: String!
+  type: String!
+  creditsOrPeriods: Int!
+  isActive: Boolean!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateSubjectInput {
+  name: String!
+  code: String!
+  type: String!
+  campusId: ID!
+  creditsOrPeriods: Int
+}
+
+input UpdateSubjectInput {
+  name: String
+  code: String
+  type: String
+  campusId: ID
+  creditsOrPeriods: Int
+  isActive: Boolean
+}
+
+# ─── Academic Enrollments ─────────────────────────────────────────────────────
+
+type Enrollment {
+  id: ID!
+  tenantId: String
+  studentId: ID!
+  academicYearId: ID!
+  campusId: ID!
+  gradeId: ID!
+  sectionId: ID
+  programId: ID
+  registrationNo: String
+  registrationNoStatus: String!
+  rollNo: String
+  rollNoStatus: String!
+  joiningDate: String!
+  joiningType: String!
+  status: String!
+  promotionEligibility: String
+  subjectGroupId: String
+  promotedFromEnrollmentId: ID
+  promotedToEnrollmentId: ID
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input AssignStudentToSectionInput {
+  studentId: ID!
+  sectionId: ID!
+  academicYearId: ID!
+  classId: ID!
+}
+
+input TransferStudentSectionInput {
+  studentId: ID!
+  fromSectionId: ID!
+  toSectionId: ID!
+  academicYearId: ID!
+  reason: String
+}
+
+input GenerateRegistrationNumbersInput {
+  academicYearId: ID!
+  campusId: ID!
+  gradeId: ID
+  prefix: String
+  startFrom: Int
+}
+
+input FreezeRegistrationNumbersInput {
+  academicYearId: ID!
+  campusId: ID!
+  gradeId: ID
+}
+
+type NumberingResult {
+  generated: Int!
+  skipped: Int!
+  batchId: ID
+}
+
+type RegistrationBatch {
+  id: ID!
+  tenantId: String
+  academicYearId: ID!
+  campusId: ID!
+  gradeId: ID
+  prefix: String
+  status: String!
+  generatedCount: Int!
+  createdAt: AWSDateTime
+}
+
+type RollNoBatch {
+  id: ID!
+  tenantId: String
+  academicYearId: ID!
+  campusId: ID!
+  gradeId: ID
+  sectionId: ID
+  status: String!
+  generatedCount: Int!
+  createdAt: AWSDateTime
+}
+
+input GenerateRollNumbersInput {
+  academicYearId: ID!
+  campusId: ID!
+  gradeId: ID
+  sectionId: ID
+  prefix: String
+  startFrom: Int
+}
+
+input FreezeRollNumbersInput {
+  academicYearId: ID!
+  campusId: ID!
+  gradeId: ID
+  sectionId: ID
+}
+
+# ─── Student Promotions ───────────────────────────────────────────────────────
+
+type PromotionBatch {
+  id: ID!
+  tenantId: String
+  fromAcademicYearId: ID!
+  toAcademicYearId: ID!
+  campusId: ID!
+  fromGradeId: ID!
+  toGradeId: ID!
+  sectionStrategy: String!
+  feeAction: String!
+  status: String!
+  totalStudents: Int!
+  promotedCount: Int!
+  detainedCount: Int!
+  skippedCount: Int!
+  failedCount: Int!
+  createdBy: ID!
+  completedAt: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+type PromotionBatchItem {
+  id: ID!
+  tenantId: String
+  promotionBatchId: ID!
+  studentId: ID!
+  fromGradeId: ID!
+  fromSectionId: ID
+  toGradeId: ID!
+  toSectionId: ID
+  action: String!
+  feeAssignmentStatus: String!
+  remarks: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input PromoteStudentsInput {
+  fromAcademicYearId: ID!
+  toAcademicYearId: ID!
+  campusId: ID!
+  fromGradeId: ID!
+  toGradeId: ID!
+  studentIds: [ID!]!
+  sectionStrategy: String
+  feeAction: String
+}
+
+input PromotionEligibilityUpdate {
+  studentId: ID!
+  eligibility: String!
+}
+
+input SetPromotionEligibilityInput {
+  academicYearId: ID!
+  updates: [PromotionEligibilityUpdate!]!
+}
+
+type SetEligibilityResult {
+  updatedCount: Int!
+}
+
+# ─── Academics — Exams & Marks ────────────────────────────────────────────────
+
+type MarksEntry {
+  studentId: ID!
+  marksObtained: Float!
+  maxMarks: Float!
+  grade: String
+  remarks: String
+  isAbsent: Boolean!
+}
+
+type ExamRecord {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  academicYearId: ID!
+  classId: ID!
+  sectionId: ID
+  subjectId: ID
+  name: String!
+  examDate: String
+  maxMarks: Float!
+  passingMarks: Float!
+  status: String!
+  publishedAt: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+type ExamWithMarks {
+  id: ID!
+  name: String!
+  status: String!
+  examDate: String
+  maxMarks: Float!
+  passingMarks: Float!
+  marksEntries: [MarksEntry!]!
+}
+
+input CreateExamInput {
+  name: String!
+  campusId: ID!
+  academicYearId: ID!
+  classId: ID!
+  sectionId: ID
+  subjectId: ID
+  examDate: String
+  maxMarks: Float!
+  passingMarks: Float!
+}
+
+input UpdateExamInput {
+  name: String
+  examDate: String
+  maxMarks: Float
+  passingMarks: Float
+  status: String
+  sectionId: ID
+  subjectId: ID
+}
+
+input MarksEntryInput {
+  studentId: ID!
+  marksObtained: Float!
+  grade: String
+  remarks: String
+  isAbsent: Boolean
+}
+
+input EnterMarksInput {
+  entries: [MarksEntryInput!]!
+}
+
+type ExamResultEntry {
+  studentId: ID!
+  studentName: String
+  marksObtained: Float
+  maxMarks: Float!
+  percentage: Float
+  grade: String
+  isPassed: Boolean
+  isAbsent: Boolean!
+}
+
+type ExamStats {
+  examId: ID!
+  totalStudents: Int!
+  appeared: Int!
+  passed: Int!
+  failed: Int!
+  absent: Int!
+  average: Float
+  highest: Float
+  lowest: Float
+  passPercentage: Float
+}
+
+type MarksStatus {
+  examId: ID!
+  totalStudents: Int!
+  enteredCount: Int!
+  pendingCount: Int!
+  isComplete: Boolean!
+}
+
+type PublishResultPayload {
+  success: Boolean!
+  examId: ID!
+  publishedAt: String
 }
 
 # ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -681,6 +1863,16 @@ type AuditLogEntry {
   targetName: String
   meta:       AWSJSON
   ipAddress:  String
+}
+
+input AuditLogFilterInput {
+  action: String
+  category: String
+  targetType: String
+  targetId: String
+  fromAt: String
+  toAt: String
+  actorId: String
 }
 
 # ─── Timetable & Academics ────────────────────────────────────────────────────
@@ -881,6 +2073,213 @@ input AttendanceRecordInput {
   remarks: String
 }
 
+type AttendanceDayRecord {
+  id: ID!
+  studentId: ID!
+  sectionId: ID!
+  date: String!
+  status: String!
+  remarks: String
+}
+
+# ─── Certificates ─────────────────────────────────────────────────────────────
+
+type Certificate {
+  id: ID!
+  tenantId: String
+  studentId: ID!
+  type: String!
+  status: String!
+  issuedAt: String
+  approvedBy: ID
+  fileKey: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input IssueCertificateInput {
+  type: String!
+  notes: String
+}
+
+# ─── Comms ────────────────────────────────────────────────────────────────────
+
+type Announcement {
+  id: ID!
+  tenantId: String
+  campusId: ID
+  title: String!
+  content: String!
+  targetGroups: [String!]!
+  status: String!
+  publishedAt: String
+  createdBy: String!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateAnnouncementInput {
+  title: String!
+  content: String!
+  campusId: ID
+  targetGroups: [String!]
+}
+
+input UpdateAnnouncementInput {
+  title: String
+  content: String
+  campusId: ID
+  targetGroups: [String!]
+  status: String
+}
+
+type CalendarEvent {
+  id: ID!
+  tenantId: String
+  campusId: ID
+  title: String!
+  description: String
+  startDate: String!
+  endDate: String!
+  venue: String
+  isPublic: Boolean!
+  createdBy: String!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateEventInput {
+  title: String!
+  startDate: String!
+  endDate: String!
+  campusId: ID
+  description: String
+  venue: String
+  isPublic: Boolean
+}
+
+input UpdateEventInput {
+  title: String
+  startDate: String
+  endDate: String
+  campusId: ID
+  description: String
+  venue: String
+  isPublic: Boolean
+}
+
+type LeaveRequest {
+  id: ID!
+  tenantId: String
+  profileId: String!
+  type: String!
+  fromDate: String!
+  toDate: String!
+  days: Int!
+  reason: String!
+  status: String!
+  approvedBy: String
+  remarks: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateLeaveRequestInput {
+  type: String!
+  fromDate: String!
+  toDate: String!
+  days: Int!
+  reason: String!
+}
+
+input UpdateLeaveRequestInput {
+  type: String
+  fromDate: String
+  toDate: String
+  days: Int
+  reason: String
+}
+
+# ─── Results Service ──────────────────────────────────────────────────────────
+
+type ResultBatch {
+  id: ID!
+  tenantId: String
+  campusId: String!
+  academicYearId: String!
+  examId: String
+  title: String!
+  description: String
+  fileKey: String
+  publicToken: String!
+  status: String!
+  publishedAt: String
+  publishedBy: String
+  createdBy: String!
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateResultBatchInput {
+  campusId: ID!
+  academicYearId: ID!
+  examId: ID
+  title: String!
+  description: String
+  fileKey: String
+}
+
+input UpdateResultBatchInput {
+  title: String
+  description: String
+  fileKey: String
+  status: String
+}
+
+type PublicResult {
+  id: ID!
+  title: String!
+  description: String
+  fileKey: String
+  status: String!
+  publishedAt: String
+  campusId: String
+  academicYearId: String
+}
+
+# ─── Admin Dedup ──────────────────────────────────────────────────────────────
+
+type DuplicateGroup {
+  key: String!
+  count: Int!
+  records: [String!]!
+}
+
+type DuplicateReport {
+  totalGroups: Int!
+  groups: [DuplicateGroup!]!
+}
+
+input MergeInput {
+  keepId: ID!
+  mergeIds: [ID!]!
+}
+
+type MergeResult {
+  success: Boolean!
+  mergedCount: Int!
+  keepId: ID!
+}
+
+input BulkDeleteInput {
+  ids: [ID!]
+  olderThanDays: Int
+}
+
+type BulkDeleteResult {
+  deletedCount: Int!
+}
+
 # ─── Query ────────────────────────────────────────────────────────────────────
 
 type Query {
@@ -907,81 +2306,81 @@ type Query {
   getTenant(id: ID!): Tenant
   validateSubdomain(subdomain: String!): SubdomainValidation!
   listAvailableFeatures: [AvailableFeature!]!
-  listTenantUsers(tenantId: ID!): AWSJSON
+  listTenantUsers(tenantId: ID!): [TenantUserRecord!]!
 
   # Admissions — legacy
   listAdmissions(filter: AdmissionFilter, limit: Int, cursor: String): AdmissionsConnection!
   getAdmission(id: ID!): Admission
 
   # Enquiries & Applications
-  listEnquiries(campusId: ID, filter: AWSJSON, limit: Int, nextToken: String): AWSJSON
-  getEnquiry(id: ID!): AWSJSON
-  listApplications(campusId: ID, filter: AWSJSON, limit: Int, nextToken: String): AWSJSON
-  getApplication(id: ID!): AWSJSON
-  getApprovalQueue(campusId: ID, limit: Int, nextToken: String): AWSJSON
-  getApplicationReviews(applicationId: ID!): AWSJSON
-  admissionsStats(campusId: ID, academicYearId: ID): AWSJSON
+  listEnquiries(campusId: ID, filter: EnquiryFilterInput, limit: Int, nextToken: String): [Enquiry!]!
+  getEnquiry(id: ID!): Enquiry
+  listApplications(campusId: ID, status: String, limit: Int, nextToken: String): [Application!]!
+  getApplication(id: ID!): Application
+  getApprovalQueue(campusId: ID, limit: Int, nextToken: String): [Application!]!
+  getApplicationReviews(applicationId: ID!): [ApplicationReview!]!
+  admissionsStats(campusId: ID, academicYearId: ID): AdmissionsStats!
 
   # Finance — Fee Categories
-  listFeeCategories(activeOnly: Boolean): AWSJSON
-  getFeeCategory(id: ID!): AWSJSON
+  listFeeCategories(activeOnly: Boolean): [FeeCategory!]!
+  getFeeCategory(id: ID!): FeeCategory
 
   # Finance — Fee Heads, Structures, Schedules
-  listFeeHeads(feeCategoryId: ID, isActive: Boolean): AWSJSON
-  getFeeHead(id: ID!): AWSJSON
-  listFeeStructures(campusId: ID, academicYearId: ID, feeCategoryId: ID): AWSJSON
-  getFeeStructure(id: ID!): AWSJSON
-  listFeeAssignments(studentId: ID, academicYearId: ID, limit: Int, nextToken: String): AWSJSON
-  getFeeAssignment(id: ID!): AWSJSON
-  getStudentFeeAssignment(studentId: ID!, academicYearId: ID): AWSJSON
-  listFeeSchedules(academicYearId: ID, feeCategoryId: ID): AWSJSON
-  listInstallmentPlans(isActive: Boolean): AWSJSON
+  listFeeHeads(feeCategoryId: ID, isActive: Boolean): [FeeHead!]!
+  getFeeHead(id: ID!): FeeHead
+  listFeeStructures(campusId: ID, academicYearId: ID, feeCategoryId: ID): [FeeStructure!]!
+  getFeeStructure(id: ID!): FeeStructure
+  listFeeAssignments(studentId: ID, academicYearId: ID, limit: Int, nextToken: String): [FeeAssignment!]!
+  getFeeAssignment(id: ID!): FeeAssignment
+  getStudentFeeAssignment(studentId: ID!, academicYearId: ID): FeeAssignment
+  listFeeSchedules(academicYearId: ID, feeCategoryId: ID): [FeeSchedule!]!
+  listInstallmentPlans(isActive: Boolean): [InstallmentPlan!]!
 
   # Finance — Invoices & Payments
-  listInvoices(studentId: ID, status: String, limit: Int, nextToken: String): AWSJSON
-  getInvoice(id: ID!): AWSJSON
-  getStudentInvoices(studentId: ID!): AWSJSON
-  listPayments(invoiceId: ID, studentId: ID, limit: Int, nextToken: String): AWSJSON
-  getPayment(id: ID!): AWSJSON
-  getFeeRevisions(invoiceId: ID!): AWSJSON
+  listInvoices(studentId: ID, status: String, limit: Int, nextToken: String): [Invoice!]!
+  getInvoice(id: ID!): Invoice
+  getStudentInvoices(studentId: ID!): [Invoice!]!
+  listPayments(invoiceId: ID, studentId: ID, limit: Int, nextToken: String): [Payment!]!
+  getPayment(id: ID!): Payment
+  getFeeRevisions(invoiceId: ID!): [FeeRevision!]!
 
   # Finance — Reports & Analytics
-  dayBookReport(date: String, campusId: ID): AWSJSON
-  feeCollectionAnalytics(campusId: ID, from: String, to: String): AWSJSON
-  classFeeStats(classId: ID!, academicYearId: ID): AWSJSON
-  studentFinancialSummary(studentId: ID!): AWSJSON
-  listReceipts(studentId: ID, from: String, to: String, limit: Int, nextToken: String): AWSJSON
-  getReceipt(id: ID!): AWSJSON
-  getFeeAssignmentQueue(campusId: ID, academicYearId: ID): AWSJSON
-  getAssignableFeeStructures(studentId: ID!, academicYearId: ID): AWSJSON
-  getStudentDues(studentId: ID!): AWSJSON
+  dayBookReport(date: String, campusId: ID): DayBookReport!
+  feeCollectionAnalytics(campusId: ID, from: String, to: String): FeeCollectionAnalytics!
+  classFeeStats(classId: ID!, academicYearId: ID): ClassFeeStats!
+  studentFinancialSummary(studentId: ID!): StudentFinancialSummary!
+  listReceipts(studentId: ID, from: String, to: String, limit: Int, nextToken: String): [Payment!]!
+  getReceipt(id: ID!): Payment
+  getFeeAssignmentQueue(campusId: ID, academicYearId: ID): [FeeAssignmentQueueItem!]!
+  getAssignableFeeStructures(studentId: ID!, academicYearId: ID): [FeeStructure!]!
+  getStudentDues(studentId: ID!): StudentDues!
 
   # Academics — Classes, Sections, Subjects
-  listClasses(campusId: ID, programId: ID): AWSJSON
-  getClass(id: ID!): AWSJSON
-  listAllSections(classId: ID, campusId: ID, academicYearId: ID): AWSJSON
-  getSection(id: ID!): AWSJSON
+  listClasses(campusId: ID, programId: ID): [GradeClass!]!
+  getClass(id: ID!): GradeClass
+  listAllSections(classId: ID, campusId: ID, academicYearId: ID): [SectionRecord!]!
+  getSection(id: ID!): SectionRecord
   listSectionStudents(sectionId: ID!): [AttendanceStudentInfo!]!
-  listSubjects(campusId: ID, isActive: Boolean): AWSJSON
-  getSubject(id: ID!): AWSJSON
-  listSectionCourses(sectionId: ID!): AWSJSON
+  listSubjects(campusId: ID, isActive: Boolean): [SubjectRecord!]!
+  getSubject(id: ID!): SubjectRecord
+  listSectionCourses(sectionId: ID!): [SectionCourse!]!
 
   # Students
   listStudents(filter: StudentFilter, limit: Int, nextToken: String): StudentConnection!
-  getStudent(id: ID!): AWSJSON
+  getStudent(id: ID!): Student
 
   # Academic Enrollments & Numbering
-  listEnrollments(academicYearId: ID, campusId: ID, gradeId: ID, sectionId: ID, status: String): AWSJSON
-  listRegistrationBatches(academicYearId: ID, campusId: ID, gradeId: ID): AWSJSON
-  listRollNoBatches(academicYearId: ID, campusId: ID, gradeId: ID, sectionId: ID): AWSJSON
+  listEnrollments(academicYearId: ID, campusId: ID, gradeId: ID, sectionId: ID, status: String): [Enrollment!]!
+  listRegistrationBatches(academicYearId: ID, campusId: ID, gradeId: ID): [RegistrationBatch!]!
+  listRollNoBatches(academicYearId: ID, campusId: ID, gradeId: ID, sectionId: ID): [RollNoBatch!]!
 
   # Student Promotions
-  listPromotionBatches(fromAcademicYearId: ID, toAcademicYearId: ID, campusId: ID, fromGradeId: ID, status: String): AWSJSON
-  getPromotionBatch(id: ID!): AWSJSON
-  listPromotionBatchItems(id: ID!): AWSJSON
+  listPromotionBatches(fromAcademicYearId: ID, toAcademicYearId: ID, campusId: ID, fromGradeId: ID, status: String): [PromotionBatch!]!
+  getPromotionBatch(id: ID!): PromotionBatch
+  listPromotionBatchItems(id: ID!): [PromotionBatchItem!]!
 
   # Attendance
-  listAttendance(studentId: ID, sectionId: ID, from: String, to: String): AWSJSON
+  listAttendance(studentId: ID, sectionId: ID, from: String, to: String): [AttendanceDayRecord!]!
   getSectionAttendance(sectionId: ID!, date: AWSDate!): [AttendanceRecord!]!
   getSectionAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!): AttendanceSummary!
   getClassAttendance(sectionId: ID!, date: AWSDate!): [AttendanceRecord!]!
@@ -989,12 +2388,12 @@ type Query {
   getAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!): AttendanceSummary!
 
   # Exams & Marks
-  listExams(campusId: ID, academicYearId: ID, classId: ID): AWSJSON
-  getExam(id: ID!): AWSJSON
-  listResults(examId: ID!): AWSJSON
-  getExamResults(examId: ID!): AWSJSON
-  getExamStats(id: ID!): AWSJSON
-  getMarksStatus(id: ID!): AWSJSON
+  listExams(campusId: ID, academicYearId: ID, classId: ID): [ExamRecord!]!
+  getExam(id: ID!): ExamWithMarks
+  listResults(examId: ID!): [ExamResultEntry!]!
+  getExamResults(examId: ID!): [ExamResultEntry!]!
+  getExamStats(id: ID!): ExamStats!
+  getMarksStatus(id: ID!): MarksStatus!
 
   # Timetable
   getSectionTimetable(sectionId: ID!): SectionTimetable!
@@ -1002,7 +2401,7 @@ type Query {
   getTeacherWorkload(profileId: ID!): TeacherWorkload!
 
   # Certificates
-  listCertificates(studentId: ID!): AWSJSON
+  listCertificates(studentId: ID!): [Certificate!]!
 
   # Settings
   listAcademicYears: [AcademicYear!]!
@@ -1012,36 +2411,35 @@ type Query {
   listPrograms(campusId: ID): [Program!]!
   getProgram(id: ID!): Program
   listTemplates(type: String): [Template!]!
-  getTemplate(id: ID!): AWSJSON
+  getTemplate(id: ID!): Template
   getTenantFeatures: TenantFeaturesPayload!
 
   # Audit logs
-  listAuditLogs(filter: AWSJSON, limit: Int, nextToken: String): AWSJSON
+  listAuditLogs(filter: AuditLogFilterInput, limit: Int, nextToken: String): [AuditLogEntry!]!
   listPlatformAuditLogs(input: ListPlatformAuditLogsInput!): PlatformAuditLogsConnection!
   getPlatformAuditLog(id: ID!): PlatformAuditLogDetail!
 
   # Comms
-  listAnnouncements(campusId: ID, status: String, limit: Int, nextToken: String): AWSJSON
-  getAnnouncement(id: ID!): AWSJSON
-  listEvents(campusId: ID, from: String, to: String, limit: Int, nextToken: String): AWSJSON
-  getEvent(id: ID!): AWSJSON
-  listLeaveRequests(profileId: ID, status: String, limit: Int, nextToken: String): AWSJSON
-  getLeaveRequest(id: ID!): AWSJSON
+  listAnnouncements(campusId: ID, status: String, limit: Int, nextToken: String): [Announcement!]!
+  getAnnouncement(id: ID!): Announcement
+  listEvents(campusId: ID, from: String, to: String, limit: Int, nextToken: String): [CalendarEvent!]!
+  getEvent(id: ID!): CalendarEvent
+  listLeaveRequests(profileId: ID, status: String, limit: Int, nextToken: String): [LeaveRequest!]!
+  getLeaveRequest(id: ID!): LeaveRequest
 
   # Results service
-  listResultBatches(campusId: ID, academicYearId: ID, status: String): AWSJSON
-  getResultBatch(id: ID!): AWSJSON
-  getPublicResult(token: String!): AWSJSON
-  getResultPublicToken(id: ID!): AWSJSON
+  listResultBatches(campusId: ID, academicYearId: ID, status: String): [ResultBatch!]!
+  getResultBatch(id: ID!): ResultBatch
+  getPublicResult(token: String!): PublicResult
+  getResultPublicToken(id: ID!): String
 
   # Admin cleanup / dedup
-  getDuplicateReport(campusId: ID): AWSJSON
-  getDuplicateEnquiryReport(campusId: ID): AWSJSON
-  getDuplicateStudentReport(campusId: ID): AWSJSON
+  getDuplicateReport(campusId: ID): DuplicateReport!
+  getDuplicateEnquiryReport(campusId: ID): DuplicateReport!
+  getDuplicateStudentReport(campusId: ID): DuplicateReport!
 
   # Storage
-  generateDownloadUrl(key: String!): AWSJSON
-
+  generateDownloadUrl(key: String!): DownloadUrlPayload!
 }
 
 # ─── Mutation ─────────────────────────────────────────────────────────────────
@@ -1072,11 +2470,11 @@ type Mutation {
   provisionTenant(input: ProvisionTenantInput!): ProvisionTenantResult!
   requestTenantDeletion(tenantId: ID!): TenantDeletionOtpResult!
   confirmTenantDeletion(tenantId: ID!, otp: String!): Boolean!
-  createFirstAdmin(tenantId: ID!, input: AWSJSON!): AWSJSON
-  finalizeOnboarding(tenantId: ID!, input: AWSJSON): AWSJSON
-  finalizeTenant(tenantId: ID!, input: AWSJSON): AWSJSON
+  createFirstAdmin(tenantId: ID!, fullName: String!, email: String!): TenantUserRecord
+  finalizeOnboarding(tenantId: ID!): Tenant
+  finalizeTenant(tenantId: ID!): Tenant
   resendTenantInvite(tenantId: ID!): Boolean
-  provisionTenantUser(tenantId: ID!, input: AWSJSON!): AWSJSON
+  provisionTenantUser(tenantId: ID!, email: String!, fullName: String!, role: String): TenantUserRecord
   deleteTenantUser(tenantId: ID!, userId: ID!): Boolean
 
   # Admissions — legacy
@@ -1088,117 +2486,117 @@ type Mutation {
   updateAdmissionStatus(id: ID!, status: String!): Admission!
 
   # Enquiries & Applications
-  createPublicEnquiry(input: AWSJSON!): AWSJSON
-  createEnquiry(input: AWSJSON!): AWSJSON
-  updateEnquiry(id: ID!, input: AWSJSON!): AWSJSON
+  createPublicEnquiry(input: CreateEnquiryInput!): Enquiry!
+  createEnquiry(input: CreateEnquiryInput!): Enquiry!
+  updateEnquiry(id: ID!, input: UpdateEnquiryInput!): Enquiry!
   deleteEnquiry(id: ID!): Boolean
-  checkDuplicate(input: AWSJSON!): AWSJSON
-  createApplication(input: AWSJSON!): AWSJSON
-  submitApplication(id: ID!): AWSJSON
-  reviewApplication(id: ID!, input: AWSJSON!): AWSJSON
-  withdrawApplication(id: ID!): AWSJSON
-  approveApplication(id: ID!, input: AWSJSON): AWSJSON
-  rejectApplication(id: ID!, input: AWSJSON): AWSJSON
-  verifyDocument(applicationId: ID!, documentId: ID!, input: AWSJSON!): AWSJSON
-  getUploadUrl(input: AWSJSON!): AWSJSON
+  checkDuplicate(input: CheckDuplicateInput!): DuplicateCheckResult!
+  createApplication(input: CreateApplicationInput!): Application!
+  submitApplication(id: ID!): Application!
+  reviewApplication(id: ID!, input: ApplicationReviewInput!): Application!
+  withdrawApplication(id: ID!): Application!
+  approveApplication(id: ID!, remarks: String): Application!
+  rejectApplication(id: ID!, reason: String): Application!
+  verifyDocument(applicationId: ID!, documentId: ID!, input: VerifyDocumentInput!): Application!
+  getUploadUrl(input: GetUploadUrlInput!): GetUploadUrlResult!
 
   # Finance — Fee Categories
-  createFeeCategory(input: AWSJSON!): AWSJSON
-  updateFeeCategory(id: ID!, input: AWSJSON!): AWSJSON
+  createFeeCategory(input: CreateFeeCategoryInput!): FeeCategory!
+  updateFeeCategory(id: ID!, input: UpdateFeeCategoryInput!): FeeCategory!
   deleteFeeCategory(id: ID!): Boolean
 
   # Finance — Fee Heads
-  createFeeHead(input: AWSJSON!): AWSJSON
-  updateFeeHead(id: ID!, input: AWSJSON!): AWSJSON
+  createFeeHead(input: CreateFeeHeadInput!): FeeHead!
+  updateFeeHead(id: ID!, input: UpdateFeeHeadInput!): FeeHead!
   deleteFeeHead(id: ID!): Boolean
 
   # Finance — Fee Structures & Schedules
-  createFeeStructure(input: AWSJSON!): AWSJSON
-  updateFeeStructure(id: ID!, input: AWSJSON!): AWSJSON
+  createFeeStructure(input: CreateFeeStructureInput!): FeeStructure!
+  updateFeeStructure(id: ID!, input: UpdateFeeStructureInput!): FeeStructure!
   deleteFeeStructure(id: ID!): Boolean
-  copyFeePatternToNextYear(input: AWSJSON!): AWSJSON
-  createFeeAssignment(input: AWSJSON!): AWSJSON
-  bulkAssignFeeStructure(input: AWSJSON!): AWSJSON
-  createFeeSchedule(input: AWSJSON!): AWSJSON
-  updateFeeSchedule(id: ID!, input: AWSJSON!): AWSJSON
+  copyFeePatternToNextYear(input: CopyFeePatternInput!): CopyFeePatternResult!
+  createFeeAssignment(input: CreateFeeAssignmentInput!): FeeAssignment!
+  bulkAssignFeeStructure(input: BulkFeeAssignInput!): BulkFeeAssignResult!
+  createFeeSchedule(input: CreateFeeScheduleInput!): FeeSchedule!
+  updateFeeSchedule(id: ID!, input: UpdateFeeScheduleInput!): FeeSchedule!
   deleteFeeSchedule(id: ID!): Boolean
-  addScheduleSlot(id: ID!, slot: AWSJSON!): AWSJSON
+  addScheduleSlot(id: ID!, slot: FeeScheduleSlotInput!): FeeSchedule!
   deleteScheduleSlot(id: ID!, slotIndex: Int!): Boolean
-  createInstallmentPlan(input: AWSJSON!): AWSJSON
-  updateInstallmentPlan(id: ID!, input: AWSJSON!): AWSJSON
+  createInstallmentPlan(input: CreateInstallmentPlanInput!): InstallmentPlan!
+  updateInstallmentPlan(id: ID!, input: UpdateInstallmentPlanInput!): InstallmentPlan!
   deleteInstallmentPlan(id: ID!): Boolean
 
   # Finance — Invoices
-  updateInvoice(id: ID!, input: AWSJSON!): AWSJSON
-  cancelInvoice(id: ID!, reason: String): AWSJSON
-  reviseInvoice(id: ID!, input: AWSJSON!): AWSJSON
-  createOneOffCharge(input: AWSJSON!): AWSJSON
-  bulkCreateCharge(input: AWSJSON!): AWSJSON
+  updateInvoice(id: ID!, input: UpdateInvoiceInput!): Invoice!
+  cancelInvoice(id: ID!, reason: String): Invoice!
+  reviseInvoice(id: ID!, input: ReviseInvoiceInput!): Invoice!
+  createOneOffCharge(input: CreateOneOffChargeInput!): Invoice!
+  bulkCreateCharge(studentIds: [ID!]!, input: CreateOneOffChargeInput!): [Invoice!]!
 
   # Finance — Payments & Receipts
-  recordPayment(input: AWSJSON!): AWSJSON
-  createPaymentOrder(invoiceId: ID!, amount: Float): AWSJSON
-  verifyPaymentSignature(input: AWSJSON!): AWSJSON
-  collectPaymentByStudent(studentId: ID!, input: AWSJSON!): AWSJSON
-  generatePaymentLink(invoiceId: ID!): AWSJSON
+  recordPayment(input: RecordPaymentInput!): RecordPaymentResult!
+  createPaymentOrder(invoiceId: ID!, amount: Float): PaymentOrder!
+  verifyPaymentSignature(input: VerifyPaymentInput!): PaymentVerifyResult!
+  collectPaymentByStudent(studentId: ID!, input: CollectByStudentInput!): CollectByStudentResult!
+  generatePaymentLink(invoiceId: ID!): PaymentLink!
 
   # Academics — Classes & Sections
-  createClass(input: AWSJSON!): AWSJSON
-  updateClass(id: ID!, input: AWSJSON!): AWSJSON
+  createClass(input: CreateClassInput!): GradeClass!
+  updateClass(id: ID!, input: UpdateClassInput!): GradeClass!
   deleteClass(id: ID!): Boolean
-  createSection(classId: ID!, input: AWSJSON!): AWSJSON
-  updateSection(id: ID!, input: AWSJSON!): AWSJSON
+  createSection(classId: ID!, input: CreateSectionInput!): SectionRecord!
+  updateSection(id: ID!, input: UpdateSectionInput!): SectionRecord!
   deleteSection(id: ID!): Boolean
-  setSectionIncharge(sectionId: ID!, input: AWSJSON!): AWSJSON
-  assignSectionCourse(sectionId: ID!, input: AWSJSON!): AWSJSON
+  setSectionIncharge(sectionId: ID!, input: SetSectionInchargeInput!): SectionRecord!
+  assignSectionCourse(sectionId: ID!, input: AssignSectionCourseInput!): SectionCourse!
   removeSectionCourse(sectionId: ID!, allocationId: ID!): Boolean
-  createSubject(input: AWSJSON!): AWSJSON
-  updateSubject(id: ID!, input: AWSJSON!): AWSJSON
+  createSubject(input: CreateSubjectInput!): SubjectRecord!
+  updateSubject(id: ID!, input: UpdateSubjectInput!): SubjectRecord!
   deleteSubject(id: ID!): Boolean
 
   # Students
-  enrollStudent(input: AWSJSON!): AWSJSON
-  updateStudent(id: ID!, input: AWSJSON!): AWSJSON
-  updateStudentStatus(id: ID!, status: String!): AWSJSON
-  assignStudentClass(studentId: ID!, input: AWSJSON!): AWSJSON
+  enrollStudent(input: EnrollStudentInput!): Student!
+  updateStudent(id: ID!, input: UpdateStudentInput!): Student!
+  updateStudentStatus(id: ID!, status: String!): Student!
+  assignStudentClass(studentId: ID!, input: AssignStudentClassInput!): Student!
   bulkAssignStudentsToClass(studentIds: [ID!]!, classId: ID!, sectionId: ID!): BulkAssignResult!
   randomAssignStudentsToClass(classId: ID!, studentIds: [ID!]): RandomAssignResult!
   convertApplicationToStudent(applicationId: ID!): Student!
   enablePortalAccess(studentId: ID!, email: String!): PortalEnablementPayload!
 
   # Academic Enrollments
-  assignStudentToSection(input: AWSJSON!): AWSJSON
-  transferStudentSection(input: AWSJSON!): AWSJSON
+  assignStudentToSection(input: AssignStudentToSectionInput!): Enrollment!
+  transferStudentSection(input: TransferStudentSectionInput!): Enrollment!
 
   # Registration Numbers
-  generateRegistrationNumbers(input: AWSJSON!): AWSJSON
-  freezeRegistrationNumbers(input: AWSJSON!): AWSJSON
+  generateRegistrationNumbers(input: GenerateRegistrationNumbersInput!): NumberingResult!
+  freezeRegistrationNumbers(input: FreezeRegistrationNumbersInput!): NumberingResult!
 
   # Roll Numbers
-  generateRollNumbers(input: AWSJSON!): AWSJSON
-  freezeRollNumbers(input: AWSJSON!): AWSJSON
+  generateRollNumbers(input: GenerateRollNumbersInput!): NumberingResult!
+  freezeRollNumbers(input: FreezeRollNumbersInput!): NumberingResult!
 
   # Student Promotions
-  promoteStudents(input: AWSJSON!): AWSJSON
-  setStudentPromotionEligibility(input: AWSJSON!): AWSJSON
+  promoteStudents(input: PromoteStudentsInput!): PromotionBatch!
+  setStudentPromotionEligibility(input: SetPromotionEligibilityInput!): SetEligibilityResult!
 
   # Attendance
   markSectionAttendance(input: BulkAttendanceInput!): [AttendanceRecord!]!
   markClassAttendance(input: BulkAttendanceInput!): [AttendanceRecord!]!
 
   # Exams & Marks
-  createExam(input: AWSJSON!): AWSJSON
-  updateExam(id: ID!, input: AWSJSON!): AWSJSON
+  createExam(input: CreateExamInput!): ExamRecord!
+  updateExam(id: ID!, input: UpdateExamInput!): ExamRecord!
   deleteExam(id: ID!): Boolean
-  enterMarks(examId: ID!, input: AWSJSON!): AWSJSON
-  publishResults(examId: ID!): AWSJSON
+  enterMarks(examId: ID!, input: EnterMarksInput!): ExamWithMarks!
+  publishResults(examId: ID!): PublishResultPayload!
 
   # Timetable
   replaceSectionTimetable(sectionId: ID!, slots: [TimetableSlotInput!]!): SectionTimetable!
 
   # Certificates
-  issueCertificate(studentId: ID!, input: AWSJSON!): AWSJSON
-  approveCertificate(studentId: ID!, certificateId: ID!): AWSJSON
+  issueCertificate(studentId: ID!, input: IssueCertificateInput!): Certificate!
+  approveCertificate(studentId: ID!, certificateId: ID!): Certificate!
 
   # Settings
   createAcademicYear(input: CreateAcademicYearInput!): AcademicYear!
@@ -1211,7 +2609,7 @@ type Mutation {
   updateProgram(id: ID!, input: UpdateProgramInput!): Program!
   deleteProgram(id: ID!): Boolean
   createTemplate(input: CreateTemplateInput!): Template!
-  updateTemplate(id: ID!, input: AWSJSON!): AWSJSON
+  updateTemplate(id: ID!, input: UpdateTemplateInput!): Template!
   publishTemplateVersion(input: PublishTemplateVersionInput!): TemplateVersion!
   deleteTemplate(id: ID!): Boolean
   updateTenantFeatures(input: UpdateTenantFeaturesInput!): TenantFeaturesPayload!
@@ -1220,33 +2618,33 @@ type Mutation {
   generateUploadUrl(contentType: String!, filename: String!): UploadUrlPayload!
 
   # Comms
-  createAnnouncement(input: AWSJSON!): AWSJSON
-  updateAnnouncement(id: ID!, input: AWSJSON!): AWSJSON
-  publishAnnouncement(id: ID!): AWSJSON
-  archiveAnnouncement(id: ID!): AWSJSON
+  createAnnouncement(input: CreateAnnouncementInput!): Announcement!
+  updateAnnouncement(id: ID!, input: UpdateAnnouncementInput!): Announcement!
+  publishAnnouncement(id: ID!): Announcement!
+  archiveAnnouncement(id: ID!): Announcement!
   deleteAnnouncement(id: ID!): Boolean
-  createEvent(input: AWSJSON!): AWSJSON
-  updateEvent(id: ID!, input: AWSJSON!): AWSJSON
+  createEvent(input: CreateEventInput!): CalendarEvent!
+  updateEvent(id: ID!, input: UpdateEventInput!): CalendarEvent!
   deleteEvent(id: ID!): Boolean
-  createLeaveRequest(input: AWSJSON!): AWSJSON
-  updateLeaveRequest(id: ID!, input: AWSJSON!): AWSJSON
-  approveLeave(id: ID!, remarks: String): AWSJSON
-  rejectLeave(id: ID!, remarks: String): AWSJSON
-  cancelLeave(id: ID!): AWSJSON
+  createLeaveRequest(input: CreateLeaveRequestInput!): LeaveRequest!
+  updateLeaveRequest(id: ID!, input: UpdateLeaveRequestInput!): LeaveRequest!
+  approveLeave(id: ID!, remarks: String): LeaveRequest!
+  rejectLeave(id: ID!, remarks: String): LeaveRequest!
+  cancelLeave(id: ID!): LeaveRequest!
   deleteLeaveRequest(id: ID!): Boolean
 
   # Results service
-  createResultBatch(input: AWSJSON!): AWSJSON
-  updateResultBatch(id: ID!, input: AWSJSON!): AWSJSON
-  publishResultBatch(id: ID!): AWSJSON
-  archiveResultBatch(id: ID!): AWSJSON
+  createResultBatch(input: CreateResultBatchInput!): ResultBatch!
+  updateResultBatch(id: ID!, input: UpdateResultBatchInput!): ResultBatch!
+  publishResultBatch(id: ID!): ResultBatch!
+  archiveResultBatch(id: ID!): ResultBatch!
   deleteResultBatch(id: ID!): Boolean
 
   # Admin cleanup / dedup
-  runDeduplication(input: AWSJSON): AWSJSON
-  mergeEnquiries(input: AWSJSON!): AWSJSON
-  mergeStudents(input: AWSJSON!): AWSJSON
-  bulkDeleteInactiveEnquiries(input: AWSJSON): AWSJSON
+  runDeduplication(campusId: ID): DuplicateReport!
+  mergeEnquiries(input: MergeInput!): MergeResult!
+  mergeStudents(input: MergeInput!): MergeResult!
+  bulkDeleteInactiveEnquiries(input: BulkDeleteInput): BulkDeleteResult!
 
   # Invites
   acceptInvite(token: String!, password: String): AcceptInvitePayload!

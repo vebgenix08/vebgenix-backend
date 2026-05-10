@@ -48,12 +48,20 @@ export async function resolveExams(
       return toGql(await Exam.findOneAndDelete({ tenantId, _id: args.id }).lean());
 
     case 'enterMarks':
-    case 'submitMarks':
-      return toGql(await AcademicsRepo.addMarksEntry(
-        tenantId,
-        (args.examId ?? args.id) as string,
-        args as object,
-      ));
+    case 'submitMarks': {
+      // New schema: input: EnterMarksInput! → { entries: [{ studentId, marksObtained, grade, remarks, isAbsent }] }
+      // REST/legacy: flat args with single studentId/marksObtained
+      const examId = (args.examId ?? args.id) as string;
+      const inp = (args.input ?? {}) as Record<string, unknown>;
+      const entries: object[] = Array.isArray(inp.entries)
+        ? (inp.entries as object[])
+        : [inp.studentId ? inp : args];   // legacy single-entry path
+      let result: unknown;
+      for (const entry of entries) {
+        result = await AcademicsRepo.addMarksEntry(tenantId, examId, entry);
+      }
+      return toGql(result ?? null);
+    }
 
     case 'publishResults':
       return toGql(await AcademicsRepo.publishExam(tenantId, args.id as string, ctx.membership!.profileId));

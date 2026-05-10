@@ -106,9 +106,13 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         return true;
 
       case 'checkDuplicate':
-      case 'POST:/api/admissions/duplicate-check':
+      case 'POST:/api/admissions/duplicate-check': {
         authorize(ctx, 'admissions.enquiry.read');
-        return toGql(await AdmissionsRepo.findDuplicateEnquiry(tenantId, args.phone as string, args.email as string | undefined));
+        // AppSync typed input: args.input = { studentName, phone, email, campusId }
+        // REST path: args.phone / args.email directly
+        const dupInput = (args.input ?? args) as Record<string, unknown>;
+        return toGql(await AdmissionsRepo.findDuplicateEnquiry(tenantId, dupInput.phone as string, dupInput.email as string | undefined));
+      }
 
       // ── Applications ─────────────────────────────────────────────────────────
       case 'listApplications':
@@ -153,9 +157,11 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'reviewApplication':
       case 'POST:/api/admissions/applications/:id/review':
+        // AppSync typed input: args.input = { decision, remarks }
+        // REST path: decision/remarks directly on args
         return toGql(await ReviewApplication.execute(ctx, {
           applicationId: args.id as string,
-          ...(args as object),
+          ...((args.input as object) ?? args),
         } as Parameters<typeof ReviewApplication.execute>[1]));
 
       case 'getApplicationReviews':
