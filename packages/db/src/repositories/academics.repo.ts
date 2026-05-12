@@ -15,7 +15,14 @@ export const AcademicsRepo: any = {
   // ── Students ──────────────────────────────────────────────────────
 
   async listStudents(tenantId: string, filters: Record<string, unknown> = {}) {
-    return Student.find({ tenantId, ...filters }).sort({ fullName: 1 });
+    const query: Record<string, unknown> = { tenantId, ...filters };
+    for (const key of ['campusId', 'academicYearId', 'classId', 'sectionId']) {
+      const value = query[key];
+      if (typeof value === 'string' && Types.ObjectId.isValid(value)) {
+        query[key] = new Types.ObjectId(value);
+      }
+    }
+    return Student.find(query).sort({ fullName: 1 });
   },
 
   async findStudentById(tenantId: string, id: string): Promise<IStudent | null> {

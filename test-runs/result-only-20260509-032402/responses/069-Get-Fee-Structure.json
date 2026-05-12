@@ -1,0 +1,23 @@
+{
+  "data": {
+    "getFeeStructure": null
+  },
+  "errors": [
+    {
+      "path": [
+        "getFeeStructure"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 35,
+          "sourceName": null
+        }
+      ],
+      "message": "Internal server error"
+    }
+  ]
+}

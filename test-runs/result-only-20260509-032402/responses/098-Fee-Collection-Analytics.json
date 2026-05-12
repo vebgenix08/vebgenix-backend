@@ -1,0 +1,32 @@
+{
+  "data": {
+    "feeCollectionAnalytics": {
+      "invoiceSummary": [
+        {
+          "_id": "PARTIALLY_PAID",
+          "totalAmount": 40000,
+          "paidAmount": 24000,
+          "dueAmount": 16000,
+          "count": 4
+        },
+        {
+          "_id": "CANCELLED",
+          "totalAmount": 48000,
+          "paidAmount": 6000,
+          "dueAmount": 42000,
+          "count": 1
+        }
+      ],
+      "collectionByMonth": [
+        {
+          "_id": {
+            "year": 2026,
+            "month": 5
+          },
+          "total": 30000,
+          "count": 10
+        }
+      ]
+    }
+  }
+}

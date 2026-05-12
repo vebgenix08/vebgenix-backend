@@ -22,7 +22,7 @@ type PlatformAuditLogDetail {
   action: String!
   targetType: PlatformAuditTargetType!
   targetId: ID
-  meta: AWSJSON
+  meta: String
 }
 
 type PlatformAuditLogEdge {

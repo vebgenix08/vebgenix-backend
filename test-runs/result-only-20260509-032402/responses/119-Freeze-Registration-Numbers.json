@@ -1,0 +1,23 @@
+{
+  "data": {
+    "freezeRegistrationNumbers": null
+  },
+  "errors": [
+    {
+      "path": [
+        "freezeRegistrationNumbers"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 56,
+          "sourceName": null
+        }
+      ],
+      "message": "Registration numbers must be generated before freezing"
+    }
+  ]
+}

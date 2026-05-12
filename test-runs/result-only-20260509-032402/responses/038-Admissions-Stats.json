@@ -1,0 +1,11 @@
+{
+  "data": {
+    "admissionsStats": {
+      "totalEnquiries": 7,
+      "newEnquiries": 7,
+      "totalApplications": 10,
+      "pendingApplications": 0,
+      "approvedApplications": 1
+    }
+  }
+}

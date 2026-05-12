@@ -1,0 +1,23 @@
+{
+  "data": {
+    "deleteFeeCategory": null
+  },
+  "errors": [
+    {
+      "path": [
+        "deleteFeeCategory"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 40,
+          "sourceName": null
+        }
+      ],
+      "message": "id is required"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "getMarksStatus": {
+      "examId": "69fe4f8d7f47eb4e7d1b66b7",
+      "totalEntries": 1,
+      "submitted": 0,
+      "entries": [
+        {
+          "isSubmitted": false
+        }
+      ]
+    }
+  }
+}

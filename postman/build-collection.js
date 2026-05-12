@@ -12,13 +12,7 @@ const STD_HEADERS = [
 ];
 
 function mkReq(name, gqlQuery, vars, testExec) {
-  // AppSync AWSJSON scalar requires the input value to be a JSON string, not an object.
-  // Auto-stringify any `input` property that is a plain object when query uses AWSJSON.
-  let processedVars = vars;
-  if (vars && gqlQuery.includes('AWSJSON') && vars.input && typeof vars.input === 'object' && !Array.isArray(vars.input)) {
-    processedVars = { ...vars, input: JSON.stringify(vars.input) };
-  }
-  const bodyObj = processedVars ? { query: gqlQuery, variables: processedVars } : { query: gqlQuery };
+  const bodyObj = vars ? { query: gqlQuery, variables: vars } : { query: gqlQuery };
   return {
     name,
     request: {
@@ -40,7 +34,7 @@ function okTest(extra) {
   ];
 }
 
-// ── Helper: parse AWSJSON-style response and optionally save an env var ────────
+// ── Helper: parse typed-input response and optionally save an env var ────────
 function parseAndSave(dataKey, envKey, logLabel) {
   const lines = [
     `const r = pm.response.json();`,
@@ -623,7 +617,7 @@ const ENQUIRIES_FOLDER = {
   name: 'Enquiries',
   item: [
     mkReq('Create Enquiry',
-      'mutation CreateEnquiry($input: AWSJSON!) { createEnquiry(input: $input) }',
+      'mutation CreateEnquiry($input: CreateEnquiryInput!) { createEnquiry(input: $input) }',
       { input: { studentName: 'Rahul Sharma', phone: '9876543210', email: 'rahul@example.com', campusId: '{{campus_id}}', academicYearId: '{{academic_year_id}}', source: 'WALK_IN' } },
       okTest([
         "const r = pm.response.json();",
@@ -651,12 +645,12 @@ const ENQUIRIES_FOLDER = {
       okTest(["pm.test('getEnquiry exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getEnquiry).to.exist);"])
     ),
     mkReq('Update Enquiry',
-      'mutation UpdateEnquiry($id: ID!, $input: AWSJSON!) { updateEnquiry(id: $id, input: $input) }',
+      'mutation UpdateEnquiry($id: ID!, $input: UpdateEnquiryInput!) { updateEnquiry(id: $id, input: $input) }',
       { id: '{{enquiry_id}}', input: { status: 'CONTACTED', notes: 'Called and confirmed interest' } },
       okTest(["pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"])
     ),
     mkReq('Duplicate Check',
-      'mutation CheckDuplicate($input: AWSJSON!) { checkDuplicate(input: $input) }',
+      'mutation CheckDuplicate($input: CheckDuplicateInput!) { checkDuplicate(input: $input) }',
       { input: { phone: '9876543210', email: 'rahul@example.com' } },
       okTest(["pm.test('checkDuplicate exists', () => pm.expect(pm.response.json().data).to.exist);"])
     ),
@@ -677,7 +671,7 @@ const APPLICATIONS_FOLDER = {
   name: 'Applications',
   item: [
     mkReq('Create Application',
-      'mutation CreateApplication($input: AWSJSON!) { createApplication(input: $input) }',
+      'mutation CreateApplication($input: CreateApplicationInput!) { createApplication(input: $input) }',
       { input: { studentName: 'Priya Patel', phone: '9876500002', email: 'priya2@example.com', campusId: '{{campus_id}}', academicYearId: '{{academic_year_id}}', enquiryId: '{{enquiry_id}}' } },
       okTest([
         "const r = pm.response.json();",
@@ -729,13 +723,13 @@ const APPLICATIONS_FOLDER = {
               "if (pm.response.json().errors) console.warn('submitApplication:', pm.response.json().errors[0].message);"])
     ),
     mkReq('Review Application (mark Under Review)',
-      'mutation ReviewApplication($id: ID!, $input: AWSJSON!) { reviewApplication(id: $id, input: $input) }',
+      'mutation ReviewApplication($id: ID!, $input: ApplicationReviewInput!) { reviewApplication(id: $id, input: $input) }',
       { id: '{{application_id}}', input: { decision: 'UNDER_REVIEW', remarks: 'Documents verified, proceeding to review' } },
       okTest(["pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
               "if (pm.response.json().errors) console.warn('reviewApplication:', pm.response.json().errors[0].message);"])
     ),
     mkReq('Get Application Reviews',
-      // Schema: getApplicationReviews(applicationId: ID!): AWSJSON
+      // Schema: getApplicationReviews(applicationId: ID!): typed input
       'query GetApplicationReviews($applicationId: ID!) { getApplicationReviews(applicationId: $applicationId) }',
       { applicationId: '{{application_id}}' },
       okTest(["pm.test('getApplicationReviews exists', () => pm.expect(pm.response.json().data).to.exist);"])
@@ -751,8 +745,8 @@ const APPLICATIONS_FOLDER = {
       okTest(["pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"])
     ),
     mkReq('Verify Document',
-      // Schema: verifyDocument(applicationId: ID!, documentId: ID!, input: AWSJSON!): AWSJSON
-      'mutation VerifyDocument($applicationId: ID!, $documentId: ID!, $input: AWSJSON!) { verifyDocument(applicationId: $applicationId, documentId: $documentId, input: $input) }',
+      // Schema: verifyDocument(applicationId: ID!, documentId: ID!, input: typed input!): typed input
+      'mutation VerifyDocument($applicationId: ID!, $documentId: ID!, $input: VerifyDocumentInput!) { verifyDocument(applicationId: $applicationId, documentId: $documentId, input: $input) }',
       { applicationId: '{{application_id}}', documentId: 'birth_certificate', input: { verified: true, remarks: 'Document looks valid' } },
       okTest(["pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"])
     ),
@@ -775,7 +769,7 @@ const FEE_CATEGORIES = {
   item: [
     mkReq(
       'Create Fee Category',
-      'mutation CreateFeeCategory($input: AWSJSON!) { createFeeCategory(input: $input) }',
+      'mutation CreateFeeCategory($input: CreateFeeCategoryInput!) { createFeeCategory(input: $input) }',
       { input: { name: 'General Fees', moduleType: 'FEE', feeType: 'GENERAL', invoicePrefix: 'GF/INV', receiptPrefix: 'GF/REC', defaultAllocationMethod: 'PRO_RATA' } },
       okTest([
         "const r = pm.response.json();",
@@ -832,7 +826,7 @@ const FEE_CATEGORIES = {
     ),
     mkReq(
       'Update Fee Category',
-      'mutation UpdateFeeCategory($id: ID!, $input: AWSJSON!) { updateFeeCategory(id: $id, input: $input) }',
+      'mutation UpdateFeeCategory($id: ID!, $input: UpdateFeeCategoryInput!) { updateFeeCategory(id: $id, input: $input) }',
       { id: '{{fee_category_id}}', input: { defaultAllocationMethod: 'PRO_RATA' } },
       okTest([
         "pm.test('updateFeeCategory (soft)', () => pm.expect(pm.response.json()).to.exist);",
@@ -855,7 +849,7 @@ const FEE_HEADS = {
   item: [
     mkReq(
       'Create Fee Head',
-      'mutation CreateFeeHead($input: AWSJSON!) { createFeeHead(input: $input) }',
+      'mutation CreateFeeHead($input: CreateFeeHeadInput!) { createFeeHead(input: $input) }',
       { input: { name: 'Tuition Fee', prefix: 'TF', type: 'RECURRING', feeCategoryId: '{{fee_category_id}}', isMandatory: true, isRefundable: false, priorityOrder: 1 } },
       okTest([
         "const r = pm.response.json();",
@@ -885,7 +879,7 @@ const FEE_HEADS = {
     ),
     mkReq(
       'Update Fee Head',
-      'mutation UpdateFeeHead($id: ID!, $input: AWSJSON!) { updateFeeHead(id: $id, input: $input) }',
+      'mutation UpdateFeeHead($id: ID!, $input: UpdateFeeHeadInput!) { updateFeeHead(id: $id, input: $input) }',
       { id: '{{fee_head_id}}', input: { priorityOrder: 1 } },
       okTest([
         "const r = pm.response.json();",
@@ -923,7 +917,7 @@ const FEE_SCHEDULES = {
   item: [
     mkReq(
       'Create Fee Schedule',
-      'mutation CreateFeeSchedule($input: AWSJSON!) { createFeeSchedule(input: $input) }',
+      'mutation CreateFeeSchedule($input: CreateFeeScheduleInput!) { createFeeSchedule(input: $input) }',
       { input: { name: 'Annual Plan 2025-26', academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}', feeCategoryId: '{{fee_category_id}}', collectionType: 'PARTIAL_ALLOWED', allowPartialPayment: true, graceDays: 5, slots: [{ name: 'Term 1', dueDate: '2025-07-31', percentOfTotal: 50 }, { name: 'Term 2', dueDate: '2025-12-31', percentOfTotal: 50 }] } },
       okTest([
         "const r = pm.response.json();",
@@ -952,7 +946,7 @@ const FEE_SCHEDULES = {
     ),
     mkReq(
       'Update Fee Schedule',
-      'mutation UpdateFeeSchedule($id: ID!, $input: AWSJSON!) { updateFeeSchedule(id: $id, input: $input) }',
+      'mutation UpdateFeeSchedule($id: ID!, $input: UpdateFeeScheduleInput!) { updateFeeSchedule(id: $id, input: $input) }',
       { id: '{{fee_schedule_id}}', input: { graceDays: 7 } },
       okTest([
         "const r = pm.response.json();",
@@ -984,7 +978,7 @@ const FEE_STRUCTURES = {
   item: [
     mkReq(
       'Create Fee Structure',
-      'mutation CreateFeeStructure($input: AWSJSON!) { createFeeStructure(input: $input) }',
+      'mutation CreateFeeStructure($input: CreateFeeStructureInput!) { createFeeStructure(input: $input) }',
       { input: { name: 'Grade 10 Annual Fee 2025-26', campusId: '{{campus_id}}', academicYearId: '{{academic_year_id}}', classId: '{{class_id}}', feeCategoryId: '{{fee_category_id}}', feeScheduleId: '{{fee_schedule_id}}', allocationMethod: 'PRO_RATA', components: [{ feeHeadId: '{{fee_head_id}}', feeHeadName: 'Tuition Fee', amount: 50000, isOptional: false, priorityOrder: 1 }] } },
       okTest([
         "const r = pm.response.json();",
@@ -1023,7 +1017,7 @@ const FEE_STRUCTURES = {
     ),
     mkReq(
       'Update Fee Structure',
-      'mutation UpdateFeeStructure($id: ID!, $input: AWSJSON!) { updateFeeStructure(id: $id, input: $input) }',
+      'mutation UpdateFeeStructure($id: ID!, $input: UpdateFeeStructureInput!) { updateFeeStructure(id: $id, input: $input) }',
       { id: '{{fee_structure_id}}', input: { name: 'Grade 10 Annual Fee 2025-26' } },
       okTest([
         "const r = pm.response.json();",
@@ -1041,8 +1035,8 @@ const FEE_STRUCTURES = {
     ),
     mkReq(
       'Copy Fee Pattern to Next Year',
-      // Schema: copyFeePatternToNextYear(input: AWSJSON!): AWSJSON
-      'mutation CopyFeePatternToNextYear($input: AWSJSON!) { copyFeePatternToNextYear(input: $input) }',
+      // Schema: copyFeePatternToNextYear(input: typed input!): typed input
+      'mutation CopyFeePatternToNextYear($input: CopyFeePatternInput!) { copyFeePatternToNextYear(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}' } },
       okTest([
         "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
@@ -1077,7 +1071,7 @@ const FEE_ASSIGNMENTS = {
     ),
     mkReq(
       'Assign Fee Structure',
-      'mutation CreateFeeAssignment($input: AWSJSON!) { createFeeAssignment(input: $input) }',
+      'mutation CreateFeeAssignment($input: CreateFeeAssignmentInput!) { createFeeAssignment(input: $input) }',
       { input: { studentId: '{{student_id}}', feeStructureId: '{{fee_structure_id}}', academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}' } },
       okTest([
         "const r = pm.response.json();",
@@ -1099,7 +1093,7 @@ const FEE_ASSIGNMENTS = {
     ),
     mkReq(
       'Bulk Assign Fee Structure',
-      'mutation BulkAssignFeeStructure($input: AWSJSON!) { bulkAssignFeeStructure(input: $input) }',
+      'mutation BulkAssignFeeStructure($input: BulkFeeAssignInput!) { bulkAssignFeeStructure(input: $input) }',
       { input: { studentIds: ['{{student_id}}'], feeStructureId: '{{fee_structure_id}}', academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}' } },
       okTest([
         "const r = pm.response.json();",
@@ -1189,7 +1183,7 @@ const INVOICES = {
     ),
     mkReq(
       'Create One-off Charge',
-      'mutation CreateOneOffCharge($input: AWSJSON!) { createOneOffCharge(input: $input) }',
+      'mutation CreateOneOffCharge($input: CreateOneOffChargeInput!) { createOneOffCharge(input: $input) }',
       { input: { studentId: '{{student_id}}', campusId: '{{campus_id}}', academicYearId: '{{academic_year_id}}', classId: '{{class_id}}', amount: 500, description: 'Library fine', feeHeadId: '{{fee_head_id}}', feeHeadName: 'Tuition Fee' } },
       okTest([
         "pm.test('createOneOffCharge exists', () => pm.expect(pm.response.json().data).to.exist);",
@@ -1197,7 +1191,7 @@ const INVOICES = {
     ),
     mkReq(
       'Revise Invoice',
-      'mutation ReviseInvoice($id: ID!, $input: AWSJSON!) { reviseInvoice(id: $id, input: $input) }',
+      'mutation ReviseInvoice($id: ID!, $input: ReviseInvoiceInput!) { reviseInvoice(id: $id, input: $input) }',
       { id: '{{invoice_id}}', input: { newAmount: 48000, reason: 'Scholarship discount applied' } },
       okTest([
         "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
@@ -1219,7 +1213,7 @@ const PAYMENTS = {
   item: [
     mkReq(
       'Record Payment (Cash / Cheque / UPI)',
-      'mutation RecordPayment($input: AWSJSON!) { recordPayment(input: $input) }',
+      'mutation RecordPayment($input: RecordPaymentInput!) { recordPayment(input: $input) }',
       { input: { invoiceId: '{{invoice_id}}', studentId: '{{student_id}}', campusId: '{{campus_id}}', amount: 10000, method: 'CASH', remarks: 'Partial payment — Term 1' } },
       okTest([
         "const r = pm.response.json();",
@@ -1235,7 +1229,7 @@ const PAYMENTS = {
     ),
     mkReq(
       'Record Payment — Manual Allocation',
-      'mutation RecordPayment($input: AWSJSON!) { recordPayment(input: $input) }',
+      'mutation RecordPayment($input: RecordPaymentInput!) { recordPayment(input: $input) }',
       { input: { invoiceId: '{{invoice_id}}', studentId: '{{student_id}}', campusId: '{{campus_id}}', amount: 5000, method: 'UPI', referenceNumber: 'UPI123456', allocationMode: 'MANUAL', remarks: 'UPI payment — manual allocation' } },
       okTest([
         "const r = pm.response.json();",
@@ -1245,7 +1239,7 @@ const PAYMENTS = {
     ),
     mkReq(
       'Collect Payment By Student',
-      'mutation CollectPaymentByStudent($studentId: ID!, $input: AWSJSON!) { collectPaymentByStudent(studentId: $studentId, input: $input) }',
+      'mutation CollectPaymentByStudent($studentId: ID!, $input: CollectByStudentInput!) { collectPaymentByStudent(studentId: $studentId, input: $input) }',
       { studentId: '{{student_id}}', input: { amount: 5000, method: 'CASH', remarks: 'Bulk collect across all outstanding invoices' } },
       okTest([
         "const r = pm.response.json();",
@@ -1298,7 +1292,7 @@ const PAYMENTS = {
     ),
     mkReq(
       'Create Razorpay Order',
-      // Schema: createPaymentOrder(invoiceId: ID!, amount: Float): AWSJSON
+      // Schema: createPaymentOrder(invoiceId: ID!, amount: Float): typed input
       'mutation CreatePaymentOrder($invoiceId: ID!, $amount: Float) { createPaymentOrder(invoiceId: $invoiceId, amount: $amount) }',
       { invoiceId: '{{invoice_id}}', amount: null },
       okTest([
@@ -1312,7 +1306,7 @@ const PAYMENTS = {
     ),
     mkReq(
       'Verify Razorpay Signature',
-      'mutation VerifyPaymentSignature($input: AWSJSON!) { verifyPaymentSignature(input: $input) }',
+      'mutation VerifyPaymentSignature($input: VerifyPaymentInput!) { verifyPaymentSignature(input: $input) }',
       { input: { razorpayOrderId: 'order_test_id', razorpayPaymentId: 'pay_test_id', razorpaySignature: 'test_signature' } },
       okTest([
         "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
@@ -1321,7 +1315,7 @@ const PAYMENTS = {
     ),
     mkReq(
       'List Fee Revisions (by invoice)',
-      // Schema: getFeeRevisions(invoiceId: ID!): AWSJSON
+      // Schema: getFeeRevisions(invoiceId: ID!): typed input
       'query GetFeeRevisions($invoiceId: ID!) { getFeeRevisions(invoiceId: $invoiceId) }',
       { invoiceId: '{{invoice_id}}' },
       okTest([
@@ -1336,7 +1330,7 @@ const REPORTS = {
   item: [
     mkReq(
       'Day Book Report',
-      // Schema: dayBookReport(date: String, campusId: ID): AWSJSON
+      // Schema: dayBookReport(date: String, campusId: ID): typed input
       'query { dayBookReport(date: "2025-12-01", campusId: "{{campus_id}}") }',
       null,
       okTest([
@@ -1346,7 +1340,7 @@ const REPORTS = {
     ),
     mkReq(
       'Fee Collection Analytics',
-      // Schema: feeCollectionAnalytics(campusId: ID, from: String, to: String): AWSJSON
+      // Schema: feeCollectionAnalytics(campusId: ID, from: String, to: String): typed input
       'query { feeCollectionAnalytics(campusId: "{{campus_id}}", from: "2025-06-01", to: "2025-12-31") }',
       null,
       okTest([
@@ -1368,7 +1362,7 @@ const CLASSES_FOLDER = {
   item: [
     mkReq(
       'Create Class',
-      'mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }',
+      'mutation CreateClass($input: CreateClassInput!) { createClass(input: $input) }',
       { input: { name: 'Grade 10', code: 'G10', campusId: '{{campus_id}}', academicYearId: '{{academic_year_id}}', programId: '{{program_id}}' } },
       okTest([
         "const r = pm.response.json();",
@@ -1417,7 +1411,7 @@ const CLASSES_FOLDER = {
     ),
     mkReq(
       'Create Section',
-      'mutation CreateSection($classId: ID!, $input: AWSJSON!) { createSection(classId: $classId, input: $input) }',
+      'mutation CreateSection($classId: ID!, $input: CreateSectionInput!) { createSection(classId: $classId, input: $input) }',
       { classId: '{{class_id}}', input: { name: 'A', academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}', capacity: 40 } },
       okTest([
         "const r = pm.response.json();",
@@ -1474,7 +1468,7 @@ const SUBJECTS_TIMETABLE_FOLDER = {
   item: [
     mkReq(
       'Create Subject',
-      'mutation CreateSubject($input: AWSJSON!) { createSubject(input: $input) }',
+      'mutation CreateSubject($input: CreateSubjectInput!) { createSubject(input: $input) }',
       { input: { name: 'Mathematics', code: 'MATH', campusId: '{{campus_id}}', type: 'CORE', creditsOrPeriods: 5 } },
       okTest([
         "const r = pm.response.json();",
@@ -1555,7 +1549,7 @@ const STUDENTS_FOLDER = {
   item: [
     mkReq(
       'Enroll Student',
-      'mutation EnrollStudent($input: AWSJSON!) { enrollStudent(input: $input) }',
+      'mutation EnrollStudent($input: EnrollStudentInput!) { enrollStudent(input: $input) }',
       { input: { firstName: 'Arjun', lastName: 'Kumar', dateOfBirth: '2010-03-15', gender: 'MALE', phone: '9876543210', campusId: '{{campus_id}}', academicYearId: '{{academic_year_id}}', classId: '{{class_id}}', sectionId: '{{section_id}}', guardians: [{ name: 'Ravi Kumar', relation: 'Father', phone: '9876543211' }] } },
       okTest([
         "const r = pm.response.json();",
@@ -1597,8 +1591,8 @@ const STUDENTS_FOLDER = {
     ),
     mkReq(
       'Update Student',
-      // Schema: updateStudent(id: ID!, input: AWSJSON!)
-      'mutation UpdateStudent($id: ID!, $input: AWSJSON!) { updateStudent(id: $id, input: $input) }',
+      // Schema: updateStudent(id: ID!, input: typed input!)
+      'mutation UpdateStudent($id: ID!, $input: UpdateStudentInput!) { updateStudent(id: $id, input: $input) }',
       { id: '{{student_id}}', input: { phone: '9876543212' } },
       okTest([
         "const r = pm.response.json();",
@@ -1608,7 +1602,7 @@ const STUDENTS_FOLDER = {
     ),
     mkReq(
       'Assign Student to Class',
-      'mutation AssignStudentClass($studentId: ID!, $input: AWSJSON!) { assignStudentClass(studentId: $studentId, input: $input) }',
+      'mutation AssignStudentClass($studentId: ID!, $input: AssignStudentClassInput!) { assignStudentClass(studentId: $studentId, input: $input) }',
       { studentId: '{{student_id}}', input: { classId: '{{class_id}}', sectionId: '{{section_id}}', academicYearId: '{{academic_year_id}}' } },
       okTest([
         "const r = pm.response.json();",
@@ -1645,7 +1639,7 @@ const REG_NUMBERS_FOLDER = {
   name: 'Registration Numbers',
   item: [
     mkReq('Generate Registration Numbers',
-      'mutation GenerateRegistrationNumbers($input: AWSJSON!) { generateRegistrationNumbers(input: $input) }',
+      'mutation GenerateRegistrationNumbers($input: GenerateRegistrationNumbersInput!) { generateRegistrationNumbers(input: $input) }',
       { input: { academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}', gradeId: '{{class_id}}' } },
       okTest([
         "const r = pm.response.json();",
@@ -1656,7 +1650,7 @@ const REG_NUMBERS_FOLDER = {
       ])
     ),
     mkReq('Freeze Registration Numbers',
-      'mutation FreezeRegistrationNumbers($input: AWSJSON!) { freezeRegistrationNumbers(input: $input) }',
+      'mutation FreezeRegistrationNumbers($input: FreezeRegistrationNumbersInput!) { freezeRegistrationNumbers(input: $input) }',
       { input: { academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}', gradeId: '{{class_id}}' } },
       okTest([
         "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
@@ -1683,7 +1677,7 @@ const ROLL_NUMBERS_FOLDER = {
   name: 'Roll Numbers',
   item: [
     mkReq('Generate Roll Numbers — Alphabetical',
-      'mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }',
+      'mutation GenerateRollNumbers($input: GenerateRollNumbersInput!) { generateRollNumbers(input: $input) }',
       { input: { academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}', gradeId: '{{class_id}}', sectionId: '{{section_id}}', generationMode: 'ALPHABETICAL' } },
       okTest([
         "const r = pm.response.json();",
@@ -1694,7 +1688,7 @@ const ROLL_NUMBERS_FOLDER = {
       ])
     ),
     mkReq('Generate Roll Numbers — Sequential',
-      'mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }',
+      'mutation GenerateRollNumbers($input: GenerateRollNumbersInput!) { generateRollNumbers(input: $input) }',
       { input: { academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}', gradeId: '{{class_id}}', sectionId: '{{section_id}}', generationMode: 'SEQUENTIAL' } },
       okTest([
         "const r = pm.response.json();",
@@ -1705,7 +1699,7 @@ const ROLL_NUMBERS_FOLDER = {
       ])
     ),
     mkReq('Freeze Roll Numbers',
-      'mutation FreezeRollNumbers($input: AWSJSON!) { freezeRollNumbers(input: $input) }',
+      'mutation FreezeRollNumbers($input: FreezeRollNumbersInput!) { freezeRollNumbers(input: $input) }',
       { input: { academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}', gradeId: '{{class_id}}', sectionId: '{{section_id}}' } },
       okTest([
         "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
@@ -1786,7 +1780,7 @@ const EXAMS_FOLDER = {
   name: 'Exams & Results',
   item: [
     mkReq('Create Exam',
-      'mutation CreateExam($input: AWSJSON!) { createExam(input: $input) }',
+      'mutation CreateExam($input: CreateExamInput!) { createExam(input: $input) }',
       { input: { name: 'Term 1 Exam 2025', classId: '{{class_id}}', sectionId: '{{section_id}}', academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}', startDate: '2025-10-15', endDate: '2025-10-20', maxMarks: 100, passingMarks: 35, type: 'UNIT_TEST' } },
       okTest([...parseAndSave('createExam', 'exam_id', 'exam_id')])
     ),
@@ -1807,8 +1801,8 @@ const EXAMS_FOLDER = {
       okTest(["pm.test('getExam exists', () => pm.expect(pm.response.json().data && pm.response.json().data.getExam).to.exist);"])
     ),
     mkReq('Enter Marks (single student)',
-      // Schema: enterMarks(examId: ID!, input: AWSJSON!): AWSJSON
-      'mutation EnterMarks($examId: ID!, $input: AWSJSON!) { enterMarks(examId: $examId, input: $input) }',
+      // Schema: enterMarks(examId: ID!, input: typed input!): typed input
+      'mutation EnterMarks($examId: ID!, $input: EnterMarksInput!) { enterMarks(examId: $examId, input: $input) }',
       { examId: '{{exam_id}}', input: { studentId: '{{student_id}}', marksObtained: 78, maxMarks: 100, grade: 'A', remarks: 'Good performance' } },
       okTest([
         "pm.test('enterMarks response exists', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);",
@@ -1843,19 +1837,19 @@ const EXAMS_FOLDER = {
       okTest(["pm.test('getExamResults exists', () => pm.expect(pm.response.json().data).to.exist);"])
     ),
     mkReq('Publish Results',
-      // Schema: publishResults(examId: ID!): AWSJSON
+      // Schema: publishResults(examId: ID!): typed input
       'mutation PublishResults($examId: ID!) { publishResults(examId: $examId) }',
       { examId: '{{exam_id}}' },
       okTest(["pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"])
     ),
     mkReq('List Results (published)',
-      // Schema: listResults(examId: ID!): AWSJSON — examId is required
+      // Schema: listResults(examId: ID!): typed input — examId is required
       'query { listResults(examId: "{{exam_id}}") }',
       null,
       okTest(["pm.test('listResults exists', () => pm.expect(pm.response.json().data).to.exist);"])
     ),
     mkReq('Update Exam',
-      'mutation UpdateExam($id: ID!, $input: AWSJSON!) { updateExam(id: $id, input: $input) }',
+      'mutation UpdateExam($id: ID!, $input: UpdateExamInput!) { updateExam(id: $id, input: $input) }',
       { id: '{{exam_id}}', input: { name: 'Term 1 Exam 2025 (Updated)' } },
       okTest(["pm.test('No errors', () => pm.expect(pm.response.json().errors).to.be.undefined);"])
     ),
@@ -1890,7 +1884,7 @@ const PROMOTIONS_FOLDER = {
   item: [
     mkReq(
       'Set Promotion Eligibility',
-      'mutation SetStudentPromotionEligibility($input: AWSJSON!) { setStudentPromotionEligibility(input: $input) }',
+      'mutation SetStudentPromotionEligibility($input: SetPromotionEligibilityInput!) { setStudentPromotionEligibility(input: $input) }',
       { input: { academicYearId: '{{academic_year_id}}', updates: [{ studentId: '{{student_id}}', eligibility: 'ELIGIBLE' }] } },
       okTest([
         "const r = pm.response.json();",
@@ -1902,7 +1896,7 @@ const PROMOTIONS_FOLDER = {
     ),
     mkReq(
       'Auto-Evaluate Promotion Eligibility',
-      'mutation AutoEvaluatePromotionEligibility($input: AWSJSON!) { autoEvaluatePromotionEligibility(input: $input) }',
+      'mutation AutoEvaluatePromotionEligibility($input: PromoteStudentsInput!) { autoEvaluatePromotionEligibility(input: $input) }',
       { input: { academicYearId: '{{academic_year_id}}', campusId: '{{campus_id}}', gradeId: '{{class_id}}', sectionId: '{{section_id}}', minAttendancePct: 75, minAvgMarks: 35 } },
       okTest([
         "const r = pm.response.json();",
@@ -1916,63 +1910,63 @@ const PROMOTIONS_FOLDER = {
     // ── Strategy 1: SAME_SECTION (keeps students in their current section) ──
     mkReq(
       'Promote Students — SAME_SECTION / Skip fee',
-      'mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }',
+      'mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}', fromGradeId: '{{class_id}}', toGradeId: '{{to_class_id}}', studentIds: ['{{student_id}}'], sectionStrategy: 'SAME_SECTION', eligibilityMode: 'USE_ENROLLMENT_ELIGIBILITY', feeAction: 'SKIP' } },
       promoteTest('SAME_SECTION')
     ),
     // ── Strategy 2: MANUAL (caller supplies explicit sectionId per student) ──
     mkReq(
       'Promote Students — MANUAL sections / Copy fee pattern',
-      'mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }',
+      'mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}', fromGradeId: '{{class_id}}', toGradeId: '{{to_class_id}}', studentIds: ['{{student_id}}'], sectionStrategy: 'MANUAL', manualAssignments: [{ studentId: '{{student_id}}', sectionId: '{{section_id}}' }], eligibilityMode: 'PROMOTE_ALL', feeAction: 'COPY_PATTERN' } },
       promoteTest('MANUAL')
     ),
     // ── Strategy 3: AUTO_SHUFFLE (round-robin across sections) ──
     mkReq(
       'Promote Students — AUTO_SHUFFLE / Assign existing fee',
-      'mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }',
+      'mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}', fromGradeId: '{{class_id}}', toGradeId: '{{to_class_id}}', studentIds: ['{{student_id}}'], targetSectionIds: ['{{section_id}}'], sectionStrategy: 'AUTO_SHUFFLE', eligibilityMode: 'PROMOTE_ALL', feeAction: 'ASSIGN_EXISTING', feeStructureId: '{{fee_structure_id}}' } },
       promoteTest('AUTO_SHUFFLE')
     ),
     // ── Strategy 4: GENDER_BALANCE (balances M/F ratio across sections) ──
     mkReq(
       'Promote Students — GENDER_BALANCE',
-      'mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }',
+      'mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}', fromGradeId: '{{class_id}}', toGradeId: '{{to_class_id}}', studentIds: ['{{student_id}}'], targetSectionIds: ['{{section_id}}'], sectionStrategy: 'GENDER_BALANCE', eligibilityMode: 'USE_ENROLLMENT_ELIGIBILITY', feeAction: 'SKIP' } },
       promoteTest('GENDER_BALANCE')
     ),
     // ── Strategy 5: CAPACITY_LIMIT (fills section up to maxStudents then overflows) ──
     mkReq(
       'Promote Students — CAPACITY_LIMIT',
-      'mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }',
+      'mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}', fromGradeId: '{{class_id}}', toGradeId: '{{to_class_id}}', studentIds: ['{{student_id}}'], targetSectionIds: ['{{section_id}}'], sectionStrategy: 'CAPACITY_LIMIT', sectionCapacity: 40, eligibilityMode: 'USE_ENROLLMENT_ELIGIBILITY', feeAction: 'SKIP' } },
       promoteTest('CAPACITY_LIMIT')
     ),
     // ── Strategy 6: PERFORMANCE_RANK (top N% go to Section A, next to B, etc.) ──
     mkReq(
       'Promote Students — PERFORMANCE_RANK (by exam scores)',
-      'mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }',
+      'mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}', fromGradeId: '{{class_id}}', toGradeId: '{{to_class_id}}', studentIds: ['{{student_id}}'], targetSectionIds: ['{{section_id}}'], sectionStrategy: 'PERFORMANCE_RANK', rankByExamId: '{{exam_id}}', eligibilityMode: 'USE_ENROLLMENT_ELIGIBILITY', feeAction: 'SKIP' } },
       promoteTest('PERFORMANCE_RANK')
     ),
     // ── Strategy 7: SUBJECT_GROUP (sections formed by optional subject choices) ──
     mkReq(
       'Promote Students — SUBJECT_GROUP',
-      'mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }',
+      'mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}', fromGradeId: '{{class_id}}', toGradeId: '{{to_class_id}}', studentIds: ['{{student_id}}'], targetSectionIds: ['{{section_id}}'], sectionStrategy: 'SUBJECT_GROUP', subjectGroupSectionMap: [{ subjectId: '{{subject_id}}', sectionId: '{{section_id}}' }], eligibilityMode: 'PROMOTE_ALL', feeAction: 'SKIP' } },
       promoteTest('SUBJECT_GROUP')
     ),
     // ── Strategy 8: TRANSPORT_ROUTE (group by bus route / area) ──
     mkReq(
       'Promote Students — TRANSPORT_ROUTE',
-      'mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }',
+      'mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}', fromGradeId: '{{class_id}}', toGradeId: '{{to_class_id}}', studentIds: ['{{student_id}}'], targetSectionIds: ['{{section_id}}'], transportRouteSectionMap: [{ routeId: 'route-1', sectionId: '{{section_id}}' }], sectionStrategy: 'TRANSPORT_ROUTE', eligibilityMode: 'USE_ENROLLMENT_ELIGIBILITY', feeAction: 'SKIP' } },
       promoteTest('TRANSPORT_ROUTE')
     ),
     // ── Strategy 9: EXCEL_IMPORT (upload CSV/Excel with student→section mapping) ──
     mkReq(
       'Promote Students — EXCEL_IMPORT (pre-uploaded file)',
-      'mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }',
+      'mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }',
       { input: { fromAcademicYearId: '{{academic_year_id}}', toAcademicYearId: '{{to_academic_year_id}}', campusId: '{{campus_id}}', fromGradeId: '{{class_id}}', toGradeId: '{{to_class_id}}', studentIds: ['{{student_id}}'], sectionAssignments: [{ studentId: '{{student_id}}', sectionId: '{{section_id}}' }], sectionStrategy: 'EXCEL_IMPORT', importFileKey: 'promotions/section-map.csv', eligibilityMode: 'USE_ENROLLMENT_ELIGIBILITY', feeAction: 'SKIP' } },
       promoteTest('EXCEL_IMPORT')
     ),
@@ -2029,7 +2023,7 @@ const COMMS = {
   item: [
     mkReq(
       'Create Announcement',
-      'mutation CreateAnnouncement($input: AWSJSON!) { createAnnouncement(input: $input) }',
+      'mutation CreateAnnouncement($input: CreateAnnouncementInput!) { createAnnouncement(input: $input) }',
       { input: { title: 'School Notice — Test', content: 'This is a test announcement.', campusId: '{{campus_id}}', targetAudience: 'ALL' } },
       okTest([
         "pm.test('createAnnouncement exists', () => pm.expect(pm.response.json().data).to.exist);",
@@ -2078,7 +2072,7 @@ const STORAGE = {
     ),
     mkReq(
       'Get Download URL',
-      // Query: generateDownloadUrl(key: String!): AWSJSON  ← it is a Query, not Mutation
+      // Query: generateDownloadUrl(key: String!): typed input  ← it is a Query, not Mutation
       'query GenerateDownloadUrl($key: String!) { generateDownloadUrl(key: $key) }',
       { key: 'documents/test-document.pdf' },
       okTest([
@@ -2094,7 +2088,7 @@ const RESULTS_FOLDER = {
   item: [
     mkReq(
       'Create Result Batch',
-      'mutation CreateResultBatch($input: AWSJSON!) { createResultBatch(input: $input) }',
+      'mutation CreateResultBatch($input: CreateResultBatchInput!) { createResultBatch(input: $input) }',
       { input: { examId: '{{exam_id}}', classId: '{{class_id}}', sectionId: '{{section_id}}', academicYearId: '{{academic_year_id}}' } },
       okTest([
         "pm.test('createResultBatch exists', () => pm.expect(pm.response.json().data).to.exist);",
@@ -2146,7 +2140,7 @@ const AUDIT = {
     ),
     mkReq(
       'Merge Students',
-      'mutation MergeStudents($input: AWSJSON!) { mergeStudents(input: $input) }',
+      'mutation MergeStudents($input: MergeInput!) { mergeStudents(input: $input) }',
       { input: { primaryStudentId: '{{student_id}}', duplicateStudentIds: [] } },
       okTest([
         "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);",
@@ -2243,7 +2237,7 @@ const PLATFORM_ADMIN = {
     ),
     platformReq(
       'Create Tenant',
-      'mutation CreateTenant($input: AWSJSON!) { createTenant(input: $input) }',
+      'mutation CreateTenant($input: CreateTenantInput!) { createTenant(input: $input) }',
       { input: { name: 'Test School', slug: 'test-school-demo', plan: 'BASIC', adminEmail: 'testadmin@example.com' } },
       okTest([
         "const r = pm.response.json();",
@@ -2255,7 +2249,7 @@ const PLATFORM_ADMIN = {
     ),
     platformReq(
       'Update Tenant',
-      'mutation UpdateTenant($id: ID!, $input: AWSJSON!) { updateTenant(id: $id, input: $input) }',
+      'mutation UpdateTenant($id: ID!, $input: UpdateTenantInput!) { updateTenant(id: $id, input: $input) }',
       { id: '{{target_tenant_id}}', input: { plan: 'STANDARD' } },
       okTest(["pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"])
     ),
@@ -2273,7 +2267,7 @@ const PLATFORM_ADMIN = {
     ),
     platformReq(
       'Provision Tenant + Campus + Admin',
-      'mutation ProvisionTenant($input: AWSJSON!) { provisionTenant(input: $input) }',
+      'mutation ProvisionTenant($input: ProvisionTenantInput!) { provisionTenant(input: $input) }',
       { input: { name: 'Demo School', slug: 'demo-school', plan: 'STANDARD', campusName: 'Main Campus', adminEmail: 'demoadmin@example.com', adminPassword: 'Qwerty@1234' } },
       okTest([
         "const r = pm.response.json();",
@@ -2337,7 +2331,7 @@ const PLATFORM_ADMIN = {
     ),
     platformReq(
       'Set Feature Flag',
-      'mutation SetFeatureFlag($input: AWSJSON!) { setFeatureFlag(input: $input) }',
+      'mutation SetFeatureFlag($input: UpdateTenantFeaturesInput!) { setFeatureFlag(input: $input) }',
       { input: { flag: 'ENABLE_PROMOTIONS', value: true, tenantId: '{{target_tenant_id}}' } },
       okTest(["pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"])
     ),
@@ -2458,3 +2452,4 @@ function countReqs(items, n = 0) {
 const total = countReqs(collection.item);
 console.log('✅ Collection written to', outPath);
 console.log('   Total requests:', total);
+

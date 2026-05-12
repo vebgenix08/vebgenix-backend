@@ -53,6 +53,7 @@ type UserConnection {
 input UserFilter {
   search: String
   campusId: ID
+  isActive: Boolean
 }
 
 input InviteStaffInput {
@@ -703,11 +704,21 @@ type BulkFeeAssignResult {
 
 type FeeAssignmentQueueItem {
   studentId: ID!
+  id: ID
   studentName: String
+  fullName: String
+  email: String
+  campusId: ID
+  applicationId: ID
   admissionNo: String
   registrationNumber: String
   classId: ID
   className: String
+  currentGrade: String
+  gradeApplyingFor: String
+  academicYear: String
+  hasFeeAssignment: Boolean!
+  feeAssignment: FeeAssignment
   currentAssignment: FeeAssignment
   availableStructures: [FeeStructure!]
 }
@@ -942,6 +953,12 @@ type FeeCollectionAnalytics {
   totalCollected: Float!
   totalDue: Float!
   collectionRate: Float
+  collectedToday: Float!
+  collectedThisMonth: Float!
+  outstandingDue: Float!
+  openInvoices: Int!
+  receiptsToday: Int!
+  pendingFeeAssignments: Int!
   byMethod: [MethodBreakdown!]!
   monthly: [MonthlyCollection!]!
 }
@@ -1031,6 +1048,8 @@ input UpdateEnquiryInput {
 input EnquiryFilterInput {
   status: String
   campusId: ID
+  academicYearId: ID
+  programId: ID
   search: String
   source: String
 }
@@ -1197,6 +1216,7 @@ type StudentConnection {
 input StudentFilter {
   search: String
   campusId: ID
+  academicYearId: ID
   classId: ID
   sectionId: ID
   status: String
@@ -1281,6 +1301,8 @@ type AdmissionsConnection {
 input AdmissionFilter {
   status: String
   search: String
+  campusId: ID
+  academicYearId: ID
 }
 
 input CreateAdmissionInput {
@@ -1708,6 +1730,7 @@ input DateRangeInput {
 
 input DashboardOverviewInput {
   campusId: ID!
+  academicYearId: ID
   range: DateRangeInput
   timezone: String = "Asia/Kolkata"
 }
@@ -2315,9 +2338,9 @@ type Query {
   # Enquiries & Applications
   listEnquiries(campusId: ID, filter: EnquiryFilterInput, limit: Int, nextToken: String): [Enquiry!]!
   getEnquiry(id: ID!): Enquiry
-  listApplications(campusId: ID, status: String, limit: Int, nextToken: String): [Application!]!
+  listApplications(campusId: ID, academicYearId: ID, status: String, limit: Int, nextToken: String): [Application!]!
   getApplication(id: ID!): Application
-  getApprovalQueue(campusId: ID, limit: Int, nextToken: String): [Application!]!
+  getApprovalQueue(campusId: ID, academicYearId: ID, limit: Int, nextToken: String): [Application!]!
   getApplicationReviews(applicationId: ID!): [ApplicationReview!]!
   admissionsStats(campusId: ID, academicYearId: ID): AdmissionsStats!
 
@@ -2337,19 +2360,19 @@ type Query {
   listInstallmentPlans(isActive: Boolean): [InstallmentPlan!]!
 
   # Finance — Invoices & Payments
-  listInvoices(studentId: ID, status: String, limit: Int, nextToken: String): [Invoice!]!
+  listInvoices(studentId: ID, status: String, campusId: ID, academicYearId: ID, limit: Int, nextToken: String): [Invoice!]!
   getInvoice(id: ID!): Invoice
   getStudentInvoices(studentId: ID!): [Invoice!]!
-  listPayments(invoiceId: ID, studentId: ID, limit: Int, nextToken: String): [Payment!]!
+  listPayments(invoiceId: ID, studentId: ID, campusId: ID, academicYearId: ID, from: String, to: String, limit: Int, nextToken: String): [Payment!]!
   getPayment(id: ID!): Payment
   getFeeRevisions(invoiceId: ID!): [FeeRevision!]!
 
   # Finance — Reports & Analytics
   dayBookReport(date: String, campusId: ID): DayBookReport!
-  feeCollectionAnalytics(campusId: ID, from: String, to: String): FeeCollectionAnalytics!
+  feeCollectionAnalytics(campusId: ID, academicYearId: ID, from: String, to: String): FeeCollectionAnalytics!
   classFeeStats(classId: ID!, academicYearId: ID): ClassFeeStats!
   studentFinancialSummary(studentId: ID!): StudentFinancialSummary!
-  listReceipts(studentId: ID, from: String, to: String, limit: Int, nextToken: String): [Payment!]!
+  listReceipts(studentId: ID, invoiceId: ID, campusId: ID, academicYearId: ID, from: String, to: String, limit: Int, nextToken: String): [Payment!]!
   getReceipt(id: ID!): Payment
   getFeeAssignmentQueue(campusId: ID, academicYearId: ID): [FeeAssignmentQueueItem!]!
   getAssignableFeeStructures(studentId: ID!, academicYearId: ID): [FeeStructure!]!

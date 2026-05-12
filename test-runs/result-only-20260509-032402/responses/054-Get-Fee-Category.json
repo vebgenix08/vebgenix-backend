@@ -1,0 +1,23 @@
+{
+  "data": {
+    "getFeeCategory": null
+  },
+  "errors": [
+    {
+      "path": [
+        "getFeeCategory"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 34,
+          "sourceName": null
+        }
+      ],
+      "message": "id is required"
+    }
+  ]
+}

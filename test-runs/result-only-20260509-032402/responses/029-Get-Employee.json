@@ -1,0 +1,23 @@
+{
+  "data": {
+    "getEmployee": null
+  },
+  "errors": [
+    {
+      "path": [
+        "getEmployee"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 31,
+          "sourceName": null
+        }
+      ],
+      "message": "Internal server error"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "data": {
+    "generateDownloadUrl": null
+  },
+  "errors": [
+    {
+      "path": [
+        "generateDownloadUrl"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 44,
+          "sourceName": null
+        }
+      ],
+      "message": "Access denied to this document"
+    }
+  ]
+}

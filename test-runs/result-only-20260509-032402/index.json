@@ -1,0 +1,2057 @@
+{
+  "sourceNewmanSummary": "E:\\APPLICATION\\vebgenix-backend-main\\postman\\reports\\2026-05-08T21-01-50\\summary.json",
+  "counts": {
+    "sourceExecutions": 187,
+    "pass": 110,
+    "fail": 77,
+    "emptyResultResponses": 72
+  },
+  "items": [
+    {
+      "index": 1,
+      "name": "Get Token — User+Password",
+      "httpStatus": 200,
+      "resultFile": "responses\\001-Get-Token-—-User+Password.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 2,
+      "name": "Forgot Password — Send Code",
+      "httpStatus": 200,
+      "resultFile": "responses\\002-Forgot-Password-—-Send-Code.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 3,
+      "name": "Confirm Forgot Password — Reset",
+      "httpStatus": 400,
+      "resultFile": "responses\\003-Confirm-Forgot-Password-—-Reset.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 400"
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 4,
+      "name": "Change Password — Logged In",
+      "httpStatus": 400,
+      "resultFile": "responses\\004-Change-Password-—-Logged-In.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 400"
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 5,
+      "name": "Refresh Token",
+      "httpStatus": 200,
+      "resultFile": "responses\\005-Refresh-Token.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 6,
+      "name": "Create Academic Year",
+      "httpStatus": 200,
+      "resultFile": "responses\\006-Create-Academic-Year.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 7,
+      "name": "Create Academic Year",
+      "httpStatus": 200,
+      "resultFile": "responses\\007-Create-Academic-Year.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 8,
+      "name": "Set Active Academic Year",
+      "httpStatus": 200,
+      "resultFile": "responses\\008-Set-Active-Academic-Year.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 9,
+      "name": "List Academic Years",
+      "httpStatus": 200,
+      "resultFile": "responses\\009-List-Academic-Years.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 10,
+      "name": "Create Campus",
+      "httpStatus": 200,
+      "resultFile": "responses\\010-Create-Campus.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 11,
+      "name": "Create Campus",
+      "httpStatus": 200,
+      "resultFile": "responses\\011-Create-Campus.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 12,
+      "name": "List Campuses",
+      "httpStatus": 200,
+      "resultFile": "responses\\012-List-Campuses.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 13,
+      "name": "Create Program",
+      "httpStatus": 200,
+      "resultFile": "responses\\013-Create-Program.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listPrograms"
+      ]
+    },
+    {
+      "index": 14,
+      "name": "Create Program",
+      "httpStatus": 200,
+      "resultFile": "responses\\014-Create-Program.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listPrograms"
+      ]
+    },
+    {
+      "index": 15,
+      "name": "List Programs",
+      "httpStatus": 200,
+      "resultFile": "responses\\015-List-Programs.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listPrograms"
+      ]
+    },
+    {
+      "index": 16,
+      "name": "Get Program",
+      "httpStatus": 200,
+      "resultFile": "responses\\016-Get-Program.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "getProgram returned null"
+      ],
+      "emptyFields": [
+        "getProgram"
+      ]
+    },
+    {
+      "index": 17,
+      "name": "Update Program",
+      "httpStatus": 200,
+      "resultFile": "responses\\017-Update-Program.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "updateProgram returned null"
+      ],
+      "emptyFields": [
+        "updateProgram"
+      ]
+    },
+    {
+      "index": 18,
+      "name": "Delete Program",
+      "httpStatus": 200,
+      "resultFile": "responses\\018-Delete-Program.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "deleteProgram returned null"
+      ],
+      "emptyFields": [
+        "deleteProgram"
+      ]
+    },
+    {
+      "index": 19,
+      "name": "Dashboard Overview",
+      "httpStatus": 200,
+      "resultFile": "responses\\019-Dashboard-Overview.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 20,
+      "name": "Get Tenant Features",
+      "httpStatus": 200,
+      "resultFile": "responses\\020-Get-Tenant-Features.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 21,
+      "name": "Update Tenant Features",
+      "httpStatus": 200,
+      "resultFile": "responses\\021-Update-Tenant-Features.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 22,
+      "name": "List Audit Logs",
+      "httpStatus": 200,
+      "resultFile": "responses\\022-List-Audit-Logs.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 23,
+      "name": "List Templates",
+      "httpStatus": 200,
+      "resultFile": "responses\\023-List-Templates.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listTemplates"
+      ]
+    },
+    {
+      "index": 24,
+      "name": "Me (current user)",
+      "httpStatus": 200,
+      "resultFile": "responses\\024-Me-(current-user).json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 25,
+      "name": "List Users",
+      "httpStatus": 200,
+      "resultFile": "responses\\025-List-Users.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 26,
+      "name": "Invite Staff / Onboard Staff",
+      "httpStatus": 200,
+      "resultFile": "responses\\026-Invite-Staff---Onboard-Staff.json",
+      "status": "FAIL",
+      "issues": [
+        "campusId or campusIds[0] is required"
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 27,
+      "name": "List Staff",
+      "httpStatus": 200,
+      "resultFile": "responses\\027-List-Staff.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listStaff"
+      ]
+    },
+    {
+      "index": 28,
+      "name": "List Employees",
+      "httpStatus": 200,
+      "resultFile": "responses\\028-List-Employees.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listEmployees"
+      ]
+    },
+    {
+      "index": 29,
+      "name": "Get Employee",
+      "httpStatus": 200,
+      "resultFile": "responses\\029-Get-Employee.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "getEmployee returned null"
+      ],
+      "emptyFields": [
+        "getEmployee"
+      ]
+    },
+    {
+      "index": 30,
+      "name": "Resend Staff Invite",
+      "httpStatus": 200,
+      "resultFile": "responses\\030-Resend-Staff-Invite.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "resendInvite returned null"
+      ],
+      "emptyFields": [
+        "resendInvite"
+      ]
+    },
+    {
+      "index": 31,
+      "name": "Accept Invite",
+      "httpStatus": 200,
+      "resultFile": "responses\\031-Accept-Invite.json",
+      "status": "FAIL",
+      "issues": [
+        "Validation error of type SubSelectionRequired: Sub selection required for type null of field acceptInvite @ 'acceptInvite'"
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 32,
+      "name": "List Roles",
+      "httpStatus": 200,
+      "resultFile": "responses\\032-List-Roles.json",
+      "status": "FAIL",
+      "issues": [
+        "Validation error of type FieldUndefined: Field 'listRoles' in type 'Query' is undefined @ 'listRoles'"
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 33,
+      "name": "Create Enquiry",
+      "httpStatus": 200,
+      "resultFile": "responses\\033-Create-Enquiry.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 34,
+      "name": "List Enquiries",
+      "httpStatus": 200,
+      "resultFile": "responses\\034-List-Enquiries.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 35,
+      "name": "Get Enquiry",
+      "httpStatus": 200,
+      "resultFile": "responses\\035-Get-Enquiry.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 36,
+      "name": "Update Enquiry",
+      "httpStatus": 200,
+      "resultFile": "responses\\036-Update-Enquiry.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 37,
+      "name": "Duplicate Check",
+      "httpStatus": 200,
+      "resultFile": "responses\\037-Duplicate-Check.json",
+      "status": "FAIL",
+      "issues": [
+        "checkDuplicate returned null"
+      ],
+      "emptyFields": [
+        "checkDuplicate"
+      ]
+    },
+    {
+      "index": 38,
+      "name": "Admissions Stats",
+      "httpStatus": 200,
+      "resultFile": "responses\\038-Admissions-Stats.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 39,
+      "name": "Delete Enquiry",
+      "httpStatus": 200,
+      "resultFile": "responses\\039-Delete-Enquiry.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 40,
+      "name": "Create Application",
+      "httpStatus": 200,
+      "resultFile": "responses\\040-Create-Application.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 41,
+      "name": "List Applications",
+      "httpStatus": 200,
+      "resultFile": "responses\\041-List-Applications.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 42,
+      "name": "Get Application",
+      "httpStatus": 200,
+      "resultFile": "responses\\042-Get-Application.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 43,
+      "name": "Get Approval Queue",
+      "httpStatus": 200,
+      "resultFile": "responses\\043-Get-Approval-Queue.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "getApprovalQueue"
+      ]
+    },
+    {
+      "index": 44,
+      "name": "Submit Application",
+      "httpStatus": 200,
+      "resultFile": "responses\\044-Submit-Application.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 45,
+      "name": "Review Application (mark Under Review)",
+      "httpStatus": 200,
+      "resultFile": "responses\\045-Review-Application-(mark-Under-Review).json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 46,
+      "name": "Get Application Reviews",
+      "httpStatus": 200,
+      "resultFile": "responses\\046-Get-Application-Reviews.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 47,
+      "name": "Approve Application",
+      "httpStatus": 200,
+      "resultFile": "responses\\047-Approve-Application.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 48,
+      "name": "Reject Application",
+      "httpStatus": 200,
+      "resultFile": "responses\\048-Reject-Application.json",
+      "status": "FAIL",
+      "issues": [
+        "Validation error of type UnknownArgument: Unknown field argument reason @ 'rejectApplication'"
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 49,
+      "name": "Verify Document",
+      "httpStatus": 200,
+      "resultFile": "responses\\049-Verify-Document.json",
+      "status": "FAIL",
+      "issues": [
+        "Document \"birth_certificate\" not found on this application",
+        "verifyDocument returned null"
+      ],
+      "emptyFields": [
+        "verifyDocument"
+      ]
+    },
+    {
+      "index": 50,
+      "name": "Withdraw Application",
+      "httpStatus": 200,
+      "resultFile": "responses\\050-Withdraw-Application.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 51,
+      "name": "Create Fee Category",
+      "httpStatus": 200,
+      "resultFile": "responses\\051-Create-Fee-Category.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeCategories"
+      ]
+    },
+    {
+      "index": 52,
+      "name": "Create Fee Category",
+      "httpStatus": 200,
+      "resultFile": "responses\\052-Create-Fee-Category.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeCategories"
+      ]
+    },
+    {
+      "index": 53,
+      "name": "List Fee Categories",
+      "httpStatus": 200,
+      "resultFile": "responses\\053-List-Fee-Categories.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeCategories"
+      ]
+    },
+    {
+      "index": 54,
+      "name": "Get Fee Category",
+      "httpStatus": 200,
+      "resultFile": "responses\\054-Get-Fee-Category.json",
+      "status": "FAIL",
+      "issues": [
+        "id is required",
+        "getFeeCategory returned null"
+      ],
+      "emptyFields": [
+        "getFeeCategory"
+      ]
+    },
+    {
+      "index": 55,
+      "name": "Update Fee Category",
+      "httpStatus": 200,
+      "resultFile": "responses\\055-Update-Fee-Category.json",
+      "status": "FAIL",
+      "issues": [
+        "id is required",
+        "updateFeeCategory returned null"
+      ],
+      "emptyFields": [
+        "updateFeeCategory"
+      ]
+    },
+    {
+      "index": 56,
+      "name": "Delete Fee Category",
+      "httpStatus": 200,
+      "resultFile": "responses\\056-Delete-Fee-Category.json",
+      "status": "FAIL",
+      "issues": [
+        "id is required",
+        "deleteFeeCategory returned null"
+      ],
+      "emptyFields": [
+        "deleteFeeCategory"
+      ]
+    },
+    {
+      "index": 57,
+      "name": "Create Fee Head",
+      "httpStatus": 200,
+      "resultFile": "responses\\057-Create-Fee-Head.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeHeads"
+      ]
+    },
+    {
+      "index": 58,
+      "name": "Create Fee Head",
+      "httpStatus": 200,
+      "resultFile": "responses\\058-Create-Fee-Head.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeHeads"
+      ]
+    },
+    {
+      "index": 59,
+      "name": "Update Fee Head",
+      "httpStatus": 200,
+      "resultFile": "responses\\059-Update-Fee-Head.json",
+      "status": "FAIL",
+      "issues": [
+        "id is required",
+        "updateFeeHead returned null"
+      ],
+      "emptyFields": [
+        "updateFeeHead"
+      ]
+    },
+    {
+      "index": 60,
+      "name": "List Fee Heads",
+      "httpStatus": 200,
+      "resultFile": "responses\\060-List-Fee-Heads.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeHeads"
+      ]
+    },
+    {
+      "index": 61,
+      "name": "Delete Fee Head",
+      "httpStatus": 200,
+      "resultFile": "responses\\061-Delete-Fee-Head.json",
+      "status": "FAIL",
+      "issues": [
+        "id is required",
+        "deleteFeeHead returned null"
+      ],
+      "emptyFields": [
+        "deleteFeeHead"
+      ]
+    },
+    {
+      "index": 62,
+      "name": "Create Fee Schedule",
+      "httpStatus": 200,
+      "resultFile": "responses\\062-Create-Fee-Schedule.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 63,
+      "name": "Create Fee Schedule",
+      "httpStatus": 200,
+      "resultFile": "responses\\063-Create-Fee-Schedule.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 64,
+      "name": "Update Fee Schedule",
+      "httpStatus": 200,
+      "resultFile": "responses\\064-Update-Fee-Schedule.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 65,
+      "name": "List Fee Schedules",
+      "httpStatus": 200,
+      "resultFile": "responses\\065-List-Fee-Schedules.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 66,
+      "name": "Delete Fee Schedule",
+      "httpStatus": 200,
+      "resultFile": "responses\\066-Delete-Fee-Schedule.json",
+      "status": "FAIL",
+      "issues": [
+        "Can't serialize value (/deleteFeeSchedule) : Expected type 'Boolean' but was 'LinkedHashMap'.",
+        "deleteFeeSchedule returned null"
+      ],
+      "emptyFields": [
+        "deleteFeeSchedule"
+      ]
+    },
+    {
+      "index": 67,
+      "name": "Create Fee Structure",
+      "httpStatus": 200,
+      "resultFile": "responses\\067-Create-Fee-Structure.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeStructures"
+      ]
+    },
+    {
+      "index": 68,
+      "name": "Create Fee Structure",
+      "httpStatus": 200,
+      "resultFile": "responses\\068-Create-Fee-Structure.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeStructures"
+      ]
+    },
+    {
+      "index": 69,
+      "name": "Get Fee Structure",
+      "httpStatus": 200,
+      "resultFile": "responses\\069-Get-Fee-Structure.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "getFeeStructure returned null"
+      ],
+      "emptyFields": [
+        "getFeeStructure"
+      ]
+    },
+    {
+      "index": 70,
+      "name": "Update Fee Structure",
+      "httpStatus": 200,
+      "resultFile": "responses\\070-Update-Fee-Structure.json",
+      "status": "FAIL",
+      "issues": [
+        "id is required",
+        "updateFeeStructure returned null"
+      ],
+      "emptyFields": [
+        "updateFeeStructure"
+      ]
+    },
+    {
+      "index": 71,
+      "name": "List Fee Structures",
+      "httpStatus": 200,
+      "resultFile": "responses\\071-List-Fee-Structures.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeStructures"
+      ]
+    },
+    {
+      "index": 72,
+      "name": "Copy Fee Pattern to Next Year",
+      "httpStatus": 200,
+      "resultFile": "responses\\072-Copy-Fee-Pattern-to-Next-Year.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 73,
+      "name": "Delete Fee Structure",
+      "httpStatus": 200,
+      "resultFile": "responses\\073-Delete-Fee-Structure.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "deleteFeeStructure returned null"
+      ],
+      "emptyFields": [
+        "deleteFeeStructure"
+      ]
+    },
+    {
+      "index": 74,
+      "name": "Get Fee Assignment Queue",
+      "httpStatus": 200,
+      "resultFile": "responses\\074-Get-Fee-Assignment-Queue.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 75,
+      "name": "Assign Fee Structure",
+      "httpStatus": 200,
+      "resultFile": "responses\\075-Assign-Fee-Structure.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "createFeeAssignment returned null"
+      ],
+      "emptyFields": [
+        "createFeeAssignment"
+      ]
+    },
+    {
+      "index": 76,
+      "name": "Get Student Fee Assignment",
+      "httpStatus": 200,
+      "resultFile": "responses\\076-Get-Student-Fee-Assignment.json",
+      "status": "FAIL",
+      "issues": [
+        "getStudentFeeAssignment returned null"
+      ],
+      "emptyFields": [
+        "getStudentFeeAssignment"
+      ]
+    },
+    {
+      "index": 77,
+      "name": "Bulk Assign Fee Structure",
+      "httpStatus": 200,
+      "resultFile": "responses\\077-Bulk-Assign-Fee-Structure.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 78,
+      "name": "List Fee Assignments",
+      "httpStatus": 200,
+      "resultFile": "responses\\078-List-Fee-Assignments.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listFeeAssignments"
+      ]
+    },
+    {
+      "index": 79,
+      "name": "Get Fee Assignment",
+      "httpStatus": 200,
+      "resultFile": "responses\\079-Get-Fee-Assignment.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "getFeeAssignment returned null"
+      ],
+      "emptyFields": [
+        "getFeeAssignment"
+      ]
+    },
+    {
+      "index": 80,
+      "name": "Get Student Invoices",
+      "httpStatus": 200,
+      "resultFile": "responses\\080-Get-Student-Invoices.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "getStudentInvoices returned null"
+      ],
+      "emptyFields": [
+        "getStudentInvoices"
+      ]
+    },
+    {
+      "index": 81,
+      "name": "List Invoices",
+      "httpStatus": 200,
+      "resultFile": "responses\\081-List-Invoices.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 82,
+      "name": "Get Invoice",
+      "httpStatus": 200,
+      "resultFile": "responses\\082-Get-Invoice.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 83,
+      "name": "Student Dues",
+      "httpStatus": 200,
+      "resultFile": "responses\\083-Student-Dues.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "getStudentDues returned null"
+      ],
+      "emptyFields": [
+        "getStudentDues"
+      ]
+    },
+    {
+      "index": 84,
+      "name": "Create One-off Charge",
+      "httpStatus": 200,
+      "resultFile": "responses\\084-Create-One-off-Charge.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "createOneOffCharge returned null"
+      ],
+      "emptyFields": [
+        "createOneOffCharge"
+      ]
+    },
+    {
+      "index": 85,
+      "name": "Revise Invoice",
+      "httpStatus": 200,
+      "resultFile": "responses\\085-Revise-Invoice.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 86,
+      "name": "Cancel Invoice",
+      "httpStatus": 200,
+      "resultFile": "responses\\086-Cancel-Invoice.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 87,
+      "name": "Record Payment (Cash / Cheque / UPI)",
+      "httpStatus": 200,
+      "resultFile": "responses\\087-Record-Payment-(Cash---Cheque---UPI).json",
+      "status": "FAIL",
+      "issues": [
+        "Invoice is cancelled",
+        "recordPayment returned null"
+      ],
+      "emptyFields": [
+        "recordPayment"
+      ]
+    },
+    {
+      "index": 88,
+      "name": "Record Payment — Manual Allocation",
+      "httpStatus": 200,
+      "resultFile": "responses\\088-Record-Payment-—-Manual-Allocation.json",
+      "status": "FAIL",
+      "issues": [
+        "Invoice is cancelled",
+        "recordPayment returned null"
+      ],
+      "emptyFields": [
+        "recordPayment"
+      ]
+    },
+    {
+      "index": 89,
+      "name": "Collect Payment By Student",
+      "httpStatus": 200,
+      "resultFile": "responses\\089-Collect-Payment-By-Student.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "collectPaymentByStudent returned null"
+      ],
+      "emptyFields": [
+        "collectPaymentByStudent"
+      ]
+    },
+    {
+      "index": 90,
+      "name": "List Payments",
+      "httpStatus": 200,
+      "resultFile": "responses\\090-List-Payments.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 91,
+      "name": "Get Payment",
+      "httpStatus": 200,
+      "resultFile": "responses\\091-Get-Payment.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "getPayment returned null"
+      ],
+      "emptyFields": [
+        "getPayment"
+      ]
+    },
+    {
+      "index": 92,
+      "name": "List Receipts",
+      "httpStatus": 200,
+      "resultFile": "responses\\092-List-Receipts.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 93,
+      "name": "Get Receipt",
+      "httpStatus": 200,
+      "resultFile": "responses\\093-Get-Receipt.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 94,
+      "name": "Create Razorpay Order",
+      "httpStatus": 200,
+      "resultFile": "responses\\094-Create-Razorpay-Order.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "createPaymentOrder returned null"
+      ],
+      "emptyFields": [
+        "createPaymentOrder"
+      ]
+    },
+    {
+      "index": 95,
+      "name": "Verify Razorpay Signature",
+      "httpStatus": 200,
+      "resultFile": "responses\\095-Verify-Razorpay-Signature.json",
+      "status": "FAIL",
+      "issues": [
+        "Invalid payment signature",
+        "verifyPaymentSignature returned null"
+      ],
+      "emptyFields": [
+        "verifyPaymentSignature"
+      ]
+    },
+    {
+      "index": 96,
+      "name": "List Fee Revisions (by invoice)",
+      "httpStatus": 200,
+      "resultFile": "responses\\096-List-Fee-Revisions-(by-invoice).json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "getFeeRevisions"
+      ]
+    },
+    {
+      "index": 97,
+      "name": "Day Book Report",
+      "httpStatus": 200,
+      "resultFile": "responses\\097-Day-Book-Report.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 98,
+      "name": "Fee Collection Analytics",
+      "httpStatus": 200,
+      "resultFile": "responses\\098-Fee-Collection-Analytics.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 99,
+      "name": "Create Class",
+      "httpStatus": 200,
+      "resultFile": "responses\\099-Create-Class.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 100,
+      "name": "Create Class",
+      "httpStatus": 200,
+      "resultFile": "responses\\100-Create-Class.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 101,
+      "name": "List Classes",
+      "httpStatus": 200,
+      "resultFile": "responses\\101-List-Classes.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 102,
+      "name": "Create Section",
+      "httpStatus": 200,
+      "resultFile": "responses\\102-Create-Section.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 103,
+      "name": "Create Section",
+      "httpStatus": 200,
+      "resultFile": "responses\\103-Create-Section.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 104,
+      "name": "List Sections",
+      "httpStatus": 200,
+      "resultFile": "responses\\104-List-Sections.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 105,
+      "name": "Create Subject",
+      "httpStatus": 200,
+      "resultFile": "responses\\105-Create-Subject.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 106,
+      "name": "Create Subject",
+      "httpStatus": 200,
+      "resultFile": "responses\\106-Create-Subject.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 107,
+      "name": "List Subjects",
+      "httpStatus": 200,
+      "resultFile": "responses\\107-List-Subjects.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 108,
+      "name": "Replace Section Timetable",
+      "httpStatus": 200,
+      "resultFile": "responses\\108-Replace-Section-Timetable.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 109,
+      "name": "Get Section Timetable",
+      "httpStatus": 200,
+      "resultFile": "responses\\109-Get-Section-Timetable.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 110,
+      "name": "Get Teacher Timetable",
+      "httpStatus": 200,
+      "resultFile": "responses\\110-Get-Teacher-Timetable.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 111,
+      "name": "Enroll Student",
+      "httpStatus": 200,
+      "resultFile": "responses\\111-Enroll-Student.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 112,
+      "name": "Enroll Student",
+      "httpStatus": 200,
+      "resultFile": "responses\\112-Enroll-Student.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 113,
+      "name": "Get Student",
+      "httpStatus": 200,
+      "resultFile": "responses\\113-Get-Student.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 114,
+      "name": "Update Student",
+      "httpStatus": 200,
+      "resultFile": "responses\\114-Update-Student.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 115,
+      "name": "Assign Student to Class",
+      "httpStatus": 200,
+      "resultFile": "responses\\115-Assign-Student-to-Class.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 116,
+      "name": "Update Student Status",
+      "httpStatus": 200,
+      "resultFile": "responses\\116-Update-Student-Status.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 117,
+      "name": "List Students",
+      "httpStatus": 200,
+      "resultFile": "responses\\117-List-Students.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 118,
+      "name": "Generate Registration Numbers",
+      "httpStatus": 200,
+      "resultFile": "responses\\118-Generate-Registration-Numbers.json",
+      "status": "FAIL",
+      "issues": [
+        "No active enrollments found for this grade",
+        "generateRegistrationNumbers returned null"
+      ],
+      "emptyFields": [
+        "generateRegistrationNumbers"
+      ]
+    },
+    {
+      "index": 119,
+      "name": "Freeze Registration Numbers",
+      "httpStatus": 200,
+      "resultFile": "responses\\119-Freeze-Registration-Numbers.json",
+      "status": "FAIL",
+      "issues": [
+        "Registration numbers must be generated before freezing",
+        "freezeRegistrationNumbers returned null"
+      ],
+      "emptyFields": [
+        "freezeRegistrationNumbers"
+      ]
+    },
+    {
+      "index": 120,
+      "name": "List Registration Batches",
+      "httpStatus": 200,
+      "resultFile": "responses\\120-List-Registration-Batches.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 121,
+      "name": "Generate Roll Numbers — Alphabetical",
+      "httpStatus": 200,
+      "resultFile": "responses\\121-Generate-Roll-Numbers-—-Alphabetical.json",
+      "status": "FAIL",
+      "issues": [
+        "No active enrollments found for this section",
+        "generateRollNumbers returned null"
+      ],
+      "emptyFields": [
+        "generateRollNumbers"
+      ]
+    },
+    {
+      "index": 122,
+      "name": "Generate Roll Numbers — Sequential",
+      "httpStatus": 200,
+      "resultFile": "responses\\122-Generate-Roll-Numbers-—-Sequential.json",
+      "status": "FAIL",
+      "issues": [
+        "No active enrollments found for this section",
+        "generateRollNumbers returned null"
+      ],
+      "emptyFields": [
+        "generateRollNumbers"
+      ]
+    },
+    {
+      "index": 123,
+      "name": "Freeze Roll Numbers",
+      "httpStatus": 200,
+      "resultFile": "responses\\123-Freeze-Roll-Numbers.json",
+      "status": "FAIL",
+      "issues": [
+        "Roll numbers must be generated before freezing",
+        "freezeRollNumbers returned null"
+      ],
+      "emptyFields": [
+        "freezeRollNumbers"
+      ]
+    },
+    {
+      "index": 124,
+      "name": "List Roll Number Batches",
+      "httpStatus": 200,
+      "resultFile": "responses\\124-List-Roll-Number-Batches.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 125,
+      "name": "Mark Section Attendance",
+      "httpStatus": 200,
+      "resultFile": "responses\\125-Mark-Section-Attendance.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 126,
+      "name": "Get Section Attendance (by date)",
+      "httpStatus": 200,
+      "resultFile": "responses\\126-Get-Section-Attendance-(by-date).json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 127,
+      "name": "Get Attendance Summary (date range)",
+      "httpStatus": 200,
+      "resultFile": "responses\\127-Get-Attendance-Summary-(date-range).json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 128,
+      "name": "Get Student Attendance (date range)",
+      "httpStatus": 200,
+      "resultFile": "responses\\128-Get-Student-Attendance-(date-range).json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "getStudentAttendance"
+      ]
+    },
+    {
+      "index": 129,
+      "name": "Create Exam",
+      "httpStatus": 200,
+      "resultFile": "responses\\129-Create-Exam.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 130,
+      "name": "List Exams",
+      "httpStatus": 200,
+      "resultFile": "responses\\130-List-Exams.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 131,
+      "name": "Get Exam",
+      "httpStatus": 200,
+      "resultFile": "responses\\131-Get-Exam.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 132,
+      "name": "Enter Marks (single student)",
+      "httpStatus": 200,
+      "resultFile": "responses\\132-Enter-Marks-(single-student).json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 133,
+      "name": "Get Exam Stats",
+      "httpStatus": 200,
+      "resultFile": "responses\\133-Get-Exam-Stats.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 134,
+      "name": "Get Marks Status",
+      "httpStatus": 200,
+      "resultFile": "responses\\134-Get-Marks-Status.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 135,
+      "name": "Get Exam Results",
+      "httpStatus": 200,
+      "resultFile": "responses\\135-Get-Exam-Results.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 136,
+      "name": "Publish Results",
+      "httpStatus": 200,
+      "resultFile": "responses\\136-Publish-Results.json",
+      "status": "FAIL",
+      "issues": [
+        "publishResults returned null"
+      ],
+      "emptyFields": [
+        "publishResults"
+      ]
+    },
+    {
+      "index": 137,
+      "name": "List Results (published)",
+      "httpStatus": 200,
+      "resultFile": "responses\\137-List-Results-(published).json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listResults"
+      ]
+    },
+    {
+      "index": 138,
+      "name": "Update Exam",
+      "httpStatus": 200,
+      "resultFile": "responses\\138-Update-Exam.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 139,
+      "name": "Delete Exam",
+      "httpStatus": 200,
+      "resultFile": "responses\\139-Delete-Exam.json",
+      "status": "FAIL",
+      "issues": [
+        "Can't serialize value (/deleteExam) : Expected type 'Boolean' but was 'LinkedHashMap'.",
+        "deleteExam returned null"
+      ],
+      "emptyFields": [
+        "deleteExam"
+      ]
+    },
+    {
+      "index": 140,
+      "name": "Set Promotion Eligibility",
+      "httpStatus": 200,
+      "resultFile": "responses\\140-Set-Promotion-Eligibility.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 141,
+      "name": "Auto-Evaluate Promotion Eligibility",
+      "httpStatus": 200,
+      "resultFile": "responses\\141-Auto-Evaluate-Promotion-Eligibility.json",
+      "status": "FAIL",
+      "issues": [
+        "Validation error of type FieldUndefined: Field 'autoEvaluatePromotionEligibility' in type 'Mutation' is undefined @ 'autoEvaluatePromotionEligibility'"
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 142,
+      "name": "Promote Students — SAME_SECTION / Skip fee",
+      "httpStatus": 200,
+      "resultFile": "responses\\142-Promote-Students-—-SAME_SECTION---Skip-fee.json",
+      "status": "FAIL",
+      "issues": [
+        "Unexpected error in academics-service",
+        "promoteStudents returned null"
+      ],
+      "emptyFields": [
+        "promoteStudents"
+      ]
+    },
+    {
+      "index": 143,
+      "name": "Promote Students — MANUAL sections / Copy fee pattern",
+      "httpStatus": 200,
+      "resultFile": "responses\\143-Promote-Students-—-MANUAL-sections---Copy-fee-pattern.json",
+      "status": "FAIL",
+      "issues": [
+        "sectionAssignments is required for MANUAL/EXCEL_IMPORT strategy",
+        "promoteStudents returned null"
+      ],
+      "emptyFields": [
+        "promoteStudents"
+      ]
+    },
+    {
+      "index": 144,
+      "name": "Promote Students — AUTO_SHUFFLE / Assign existing fee",
+      "httpStatus": 200,
+      "resultFile": "responses\\144-Promote-Students-—-AUTO_SHUFFLE---Assign-existing-fee.json",
+      "status": "FAIL",
+      "issues": [
+        "Unexpected error in academics-service",
+        "promoteStudents returned null"
+      ],
+      "emptyFields": [
+        "promoteStudents"
+      ]
+    },
+    {
+      "index": 145,
+      "name": "Promote Students — GENDER_BALANCE",
+      "httpStatus": 200,
+      "resultFile": "responses\\145-Promote-Students-—-GENDER_BALANCE.json",
+      "status": "FAIL",
+      "issues": [
+        "Unexpected error in academics-service",
+        "promoteStudents returned null"
+      ],
+      "emptyFields": [
+        "promoteStudents"
+      ]
+    },
+    {
+      "index": 146,
+      "name": "Promote Students — CAPACITY_LIMIT",
+      "httpStatus": 200,
+      "resultFile": "responses\\146-Promote-Students-—-CAPACITY_LIMIT.json",
+      "status": "FAIL",
+      "issues": [
+        "Unexpected error in academics-service",
+        "promoteStudents returned null"
+      ],
+      "emptyFields": [
+        "promoteStudents"
+      ]
+    },
+    {
+      "index": 147,
+      "name": "Promote Students — PERFORMANCE_RANK (by exam scores)",
+      "httpStatus": 200,
+      "resultFile": "responses\\147-Promote-Students-—-PERFORMANCE_RANK-(by-exam-scores).json",
+      "status": "FAIL",
+      "issues": [
+        "Unexpected error in academics-service",
+        "promoteStudents returned null"
+      ],
+      "emptyFields": [
+        "promoteStudents"
+      ]
+    },
+    {
+      "index": 148,
+      "name": "Promote Students — SUBJECT_GROUP",
+      "httpStatus": 200,
+      "resultFile": "responses\\148-Promote-Students-—-SUBJECT_GROUP.json",
+      "status": "FAIL",
+      "issues": [
+        "Unexpected error in academics-service",
+        "promoteStudents returned null"
+      ],
+      "emptyFields": [
+        "promoteStudents"
+      ]
+    },
+    {
+      "index": 149,
+      "name": "Promote Students — TRANSPORT_ROUTE",
+      "httpStatus": 200,
+      "resultFile": "responses\\149-Promote-Students-—-TRANSPORT_ROUTE.json",
+      "status": "FAIL",
+      "issues": [
+        "Unexpected error in academics-service",
+        "promoteStudents returned null"
+      ],
+      "emptyFields": [
+        "promoteStudents"
+      ]
+    },
+    {
+      "index": 150,
+      "name": "Promote Students — EXCEL_IMPORT (pre-uploaded file)",
+      "httpStatus": 200,
+      "resultFile": "responses\\150-Promote-Students-—-EXCEL_IMPORT-(pre-uploaded-file).json",
+      "status": "FAIL",
+      "issues": [
+        "Unexpected error in academics-service",
+        "promoteStudents returned null"
+      ],
+      "emptyFields": [
+        "promoteStudents"
+      ]
+    },
+    {
+      "index": 151,
+      "name": "List Promotion Batches",
+      "httpStatus": 200,
+      "resultFile": "responses\\151-List-Promotion-Batches.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listPromotionBatches"
+      ]
+    },
+    {
+      "index": 152,
+      "name": "Get Promotion Batch",
+      "httpStatus": 200,
+      "resultFile": "responses\\152-Get-Promotion-Batch.json",
+      "status": "FAIL",
+      "issues": [
+        "id is required",
+        "getPromotionBatch returned null"
+      ],
+      "emptyFields": [
+        "getPromotionBatch"
+      ]
+    },
+    {
+      "index": 153,
+      "name": "List Promotion Batch Items",
+      "httpStatus": 200,
+      "resultFile": "responses\\153-List-Promotion-Batch-Items.json",
+      "status": "FAIL",
+      "issues": [
+        "id is required",
+        "listPromotionBatchItems returned null"
+      ],
+      "emptyFields": [
+        "listPromotionBatchItems"
+      ]
+    },
+    {
+      "index": 154,
+      "name": "Rollback Promotion Batch",
+      "httpStatus": 200,
+      "resultFile": "responses\\154-Rollback-Promotion-Batch.json",
+      "status": "FAIL",
+      "issues": [
+        "Validation error of type FieldUndefined: Field 'rollbackPromotionBatch' in type 'Mutation' is undefined @ 'rollbackPromotionBatch'"
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 155,
+      "name": "Create Announcement",
+      "httpStatus": 200,
+      "resultFile": "responses\\155-Create-Announcement.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 156,
+      "name": "List Announcements",
+      "httpStatus": 200,
+      "resultFile": "responses\\156-List-Announcements.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 157,
+      "name": "List Events",
+      "httpStatus": 200,
+      "resultFile": "responses\\157-List-Events.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listEvents"
+      ]
+    },
+    {
+      "index": 158,
+      "name": "List Leave Requests",
+      "httpStatus": 200,
+      "resultFile": "responses\\158-List-Leave-Requests.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listLeaveRequests"
+      ]
+    },
+    {
+      "index": 159,
+      "name": "Get Upload URL",
+      "httpStatus": 200,
+      "resultFile": "responses\\159-Get-Upload-URL.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 160,
+      "name": "Get Download URL",
+      "httpStatus": 200,
+      "resultFile": "responses\\160-Get-Download-URL.json",
+      "status": "FAIL",
+      "issues": [
+        "Access denied to this document",
+        "generateDownloadUrl returned null"
+      ],
+      "emptyFields": [
+        "generateDownloadUrl"
+      ]
+    },
+    {
+      "index": 161,
+      "name": "Create Result Batch",
+      "httpStatus": 200,
+      "resultFile": "responses\\161-Create-Result-Batch.json",
+      "status": "FAIL",
+      "issues": [
+        "Internal server error",
+        "createResultBatch returned null"
+      ],
+      "emptyFields": [
+        "createResultBatch"
+      ]
+    },
+    {
+      "index": 162,
+      "name": "List Result Batches",
+      "httpStatus": 200,
+      "resultFile": "responses\\162-List-Result-Batches.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": [
+        "listResultBatches"
+      ]
+    },
+    {
+      "index": 163,
+      "name": "Get Public Result (no auth)",
+      "httpStatus": 401,
+      "resultFile": "responses\\163-Get-Public-Result-(no-auth).json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 164,
+      "name": "List Audit Logs",
+      "httpStatus": 200,
+      "resultFile": "responses\\164-List-Audit-Logs.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 165,
+      "name": "Duplicate Student Report",
+      "httpStatus": 200,
+      "resultFile": "responses\\165-Duplicate-Student-Report.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 166,
+      "name": "Merge Students",
+      "httpStatus": 200,
+      "resultFile": "responses\\166-Merge-Students.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 167,
+      "name": "Health Check",
+      "httpStatus": 200,
+      "resultFile": "responses\\167-Health-Check.json",
+      "status": "PASS",
+      "issues": [],
+      "emptyFields": []
+    },
+    {
+      "index": 168,
+      "name": "Get Platform Token",
+      "httpStatus": 400,
+      "resultFile": "responses\\168-Get-Platform-Token.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 400"
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 169,
+      "name": "List Tenants",
+      "httpStatus": 401,
+      "resultFile": "responses\\169-List-Tenants.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 170,
+      "name": "Get Tenant",
+      "httpStatus": 401,
+      "resultFile": "responses\\170-Get-Tenant.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 171,
+      "name": "Create Tenant",
+      "httpStatus": 401,
+      "resultFile": "responses\\171-Create-Tenant.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 172,
+      "name": "Update Tenant",
+      "httpStatus": 401,
+      "resultFile": "responses\\172-Update-Tenant.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 173,
+      "name": "Suspend Tenant",
+      "httpStatus": 401,
+      "resultFile": "responses\\173-Suspend-Tenant.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 174,
+      "name": "Reactivate Tenant",
+      "httpStatus": 401,
+      "resultFile": "responses\\174-Reactivate-Tenant.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 175,
+      "name": "Provision Tenant + Campus + Admin",
+      "httpStatus": 401,
+      "resultFile": "responses\\175-Provision-Tenant-+-Campus-+-Admin.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 176,
+      "name": "List All Users (Platform)",
+      "httpStatus": 401,
+      "resultFile": "responses\\176-List-All-Users-(Platform).json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 177,
+      "name": "Get User (Platform)",
+      "httpStatus": 401,
+      "resultFile": "responses\\177-Get-User-(Platform).json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 178,
+      "name": "Disable User (Platform)",
+      "httpStatus": 401,
+      "resultFile": "responses\\178-Disable-User-(Platform).json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 179,
+      "name": "Enable User (Platform)",
+      "httpStatus": 401,
+      "resultFile": "responses\\179-Enable-User-(Platform).json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 180,
+      "name": "Delete User (Platform)",
+      "httpStatus": 401,
+      "resultFile": "responses\\180-Delete-User-(Platform).json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 181,
+      "name": "List Feature Flags",
+      "httpStatus": 401,
+      "resultFile": "responses\\181-List-Feature-Flags.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 182,
+      "name": "Set Feature Flag",
+      "httpStatus": 401,
+      "resultFile": "responses\\182-Set-Feature-Flag.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 183,
+      "name": "Platform Overview (Super Admin Dashboard)",
+      "httpStatus": 401,
+      "resultFile": "responses\\183-Platform-Overview-(Super-Admin-Dashboard).json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 184,
+      "name": "Platform Audit Logs",
+      "httpStatus": 401,
+      "resultFile": "responses\\184-Platform-Audit-Logs.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 185,
+      "name": "Get Tenant Usage Stats",
+      "httpStatus": 401,
+      "resultFile": "responses\\185-Get-Tenant-Usage-Stats.json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 186,
+      "name": "Request Tenant Deletion (sends OTP)",
+      "httpStatus": 401,
+      "resultFile": "responses\\186-Request-Tenant-Deletion-(sends-OTP).json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    },
+    {
+      "index": 187,
+      "name": "Confirm Tenant Deletion (with OTP)",
+      "httpStatus": 401,
+      "resultFile": "responses\\187-Confirm-Tenant-Deletion-(with-OTP).json",
+      "status": "FAIL",
+      "issues": [
+        "HTTP 401",
+        "Valid authorization header not provided."
+      ],
+      "emptyFields": []
+    }
+  ]
+}

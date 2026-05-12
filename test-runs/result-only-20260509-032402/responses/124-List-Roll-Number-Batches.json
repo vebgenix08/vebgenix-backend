@@ -1,0 +1,20 @@
+{
+  "data": {
+    "listRollNoBatches": [
+      {
+        "_id": "69fe4636397957680cac7c94",
+        "tenantId": "org_vqr1dsp1",
+        "academicYearId": "69fb5e883633f68d4d31a50f",
+        "campusId": "69f9c29a690fae033907970c",
+        "gradeId": "69fa25e7fc42e073eb5607f0",
+        "sectionId": "69fe462f397957680cac7c27",
+        "generationMode": "ALPHABETICAL",
+        "status": "PENDING",
+        "lastRollNo": 0,
+        "createdAt": "2026-05-08T20:23:18.579Z",
+        "updatedAt": "2026-05-08T20:23:18.579Z",
+        "__v": 0
+      }
+    ]
+  }
+}

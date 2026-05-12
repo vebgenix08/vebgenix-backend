@@ -1,0 +1,23 @@
+{
+  "data": {
+    "promoteStudents": null
+  },
+  "errors": [
+    {
+      "path": [
+        "promoteStudents"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 46,
+          "sourceName": null
+        }
+      ],
+      "message": "sectionAssignments is required for MANUAL/EXCEL_IMPORT strategy"
+    }
+  ]
+}

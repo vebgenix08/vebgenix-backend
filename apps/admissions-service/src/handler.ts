@@ -75,10 +75,26 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'listEnquiries':
       case 'GET:/api/admissions/enquiries': {
         authorize(ctx, 'admissions.enquiry.read');
+        const inputFilter = (args.filter as Record<string, unknown> | undefined) ?? {};
         const filter: Record<string, unknown> = {};
-        if (args.status)   filter.status   = args.status;
-        if (args.campusId) filter.campusId  = args.campusId;
-        if (args.programId) filter.programId = args.programId;
+        const status = inputFilter.status ?? args.status;
+        const campusId = inputFilter.campusId ?? args.campusId;
+        const academicYearId = inputFilter.academicYearId ?? args.academicYearId;
+        const programId = inputFilter.programId ?? args.programId;
+        const source = inputFilter.source ?? args.source;
+        const search = String(inputFilter.search ?? args.search ?? '').trim();
+        if (status) filter.status = status;
+        if (campusId) filter.campusId = campusId;
+        if (academicYearId) filter.academicYearId = academicYearId;
+        if (programId) filter.programId = programId;
+        if (source) filter.source = source;
+        if (search) {
+          filter.$or = [
+            { studentName: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+            { phone: { $regex: search, $options: 'i' } },
+          ];
+        }
         const enquiryList = await AdmissionsRepo.listEnquiries(tenantId, filter);
         return (enquiryList as unknown[]).map(d => toGql(d));
       }
@@ -121,7 +137,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         authorize(ctx, 'admissions.application.read');
         const filter: Record<string, unknown> = {};
         if (args.status)   filter.status   = args.status;
-        if (args.campusId) filter.campusId  = args.campusId;
+        if (args.campusId) filter.campusId = args.campusId;
+        if (args.academicYearId) filter.academicYearId = args.academicYearId;
         const appList = await AdmissionsRepo.listApplications(tenantId, filter);
         return (appList as unknown[]).map(d => toGql(d));
       }
@@ -130,6 +147,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'GET:/api/admissions/applications/approval-queue': {
         authorize(ctx, 'admissions.application.review');
         const queueList = await AdmissionsRepo.listApplications(tenantId, {
+          ...(args.campusId ? { campusId: args.campusId } : {}),
+          ...(args.academicYearId ? { academicYearId: args.academicYearId } : {}),
           status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] },
         });
         return (queueList as unknown[]).map(d => toGql(d));
@@ -239,13 +258,16 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'GET:/api/admissions/stats': {
         authorize(ctx, 'admissions.enquiry.read');
         const { Enquiry: EnquiryModel, Application: AppModel } = await import('@vebgenix/db');
+        const scopedFilter: Record<string, unknown> = { tenantId };
+        if (args.campusId) scopedFilter.campusId = args.campusId;
+        if (args.academicYearId) scopedFilter.academicYearId = args.academicYearId;
         const [totalEnquiries, newEnquiries, totalApplications, pendingApplications, approvedApplications] =
           await Promise.all([
-            EnquiryModel.countDocuments({ tenantId }),
-            EnquiryModel.countDocuments({ tenantId, status: 'NEW' }),
-            AppModel.countDocuments({ tenantId }),
-            AppModel.countDocuments({ tenantId, status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } }),
-            AppModel.countDocuments({ tenantId, status: 'APPROVED' }),
+            EnquiryModel.countDocuments(scopedFilter),
+            EnquiryModel.countDocuments({ ...scopedFilter, status: 'NEW' }),
+            AppModel.countDocuments(scopedFilter),
+            AppModel.countDocuments({ ...scopedFilter, status: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } }),
+            AppModel.countDocuments({ ...scopedFilter, status: 'APPROVED' }),
           ]);
         return { totalEnquiries, newEnquiries, totalApplications, pendingApplications, approvedApplications };
       }

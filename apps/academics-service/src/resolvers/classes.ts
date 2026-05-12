@@ -59,7 +59,7 @@ export async function resolveClasses(
     case 'deleteClass':
     case 'DELETE:/api/tenant/classes/:classId':
       authorize(ctx, 'academics.classes.delete');
-      return toGql(await Class.findOneAndUpdate(
+      return Boolean(await Class.findOneAndUpdate(
         { tenantId, _id: args.classId ?? args.id },
         { $set: { isActive: false } },
         { new: true },

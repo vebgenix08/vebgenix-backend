@@ -137,12 +137,12 @@ All AppSync requests are `POST` to `https://<appsync_url>/graphql`:
 
 ```json
 {
-  "query": "mutation EnrollStudent($input: AWSJSON!) { enrollStudent(input: $input) }",
+  "query": "mutation EnrollStudent($input: EnrollStudentInput!) { enrollStudent(input: $input) }",
   "variables": { "input": "<stringified-JSON>" }
 }
 ```
 
-> **Note:** AppSync scalar `AWSJSON` means the `input` variable value must be a **JSON string**, not an object.
+> **Note:** AppSync scalar `typed input` means the `input` variable value must be a **JSON string**, not an object.
 
 ---
 
@@ -185,7 +185,7 @@ All AppSync requests are `POST` to `https://<appsync_url>/graphql`:
 | `setActiveAcademicYear` | `mutation SetActiveAcademicYear($id: ID!)` | Mark as active; deactivates all others |
 | `listAcademicYears` | `query { listAcademicYears { id name startDate endDate isActive } }` | List all years for tenant |
 | `getAcademicYear` | `query GetAcademicYear($id: ID!)` | Get single year |
-| `updateAcademicYear` | `mutation UpdateAcademicYear($id: ID!, $input: AWSJSON!)` | Update year fields |
+| `updateAcademicYear` | `mutation UpdateAcademicYear($id: ID!, $input: typed input!)` | Update year fields |
 
 **Create input:**
 ```json
@@ -213,10 +213,10 @@ All AppSync requests are `POST` to `https://<appsync_url>/graphql`:
 
 | Operation | Description |
 |-----------|-------------|
-| `createCampus(input: AWSJSON!)` | Create campus — returns `{ id, name, code, type, isActive }` |
+| `createCampus(input: typed input!)` | Create campus — returns `{ id, name, code, type, isActive }` |
 | `listCampuses` | List active campuses |
 | `getCampus(id: ID!)` | Get single campus |
-| `updateCampus(id: ID!, input: AWSJSON!)` | Update campus fields |
+| `updateCampus(id: ID!, input: typed input!)` | Update campus fields |
 | `deactivateCampus(id: ID!)` | Soft-delete campus |
 
 **Create input:**
@@ -236,10 +236,10 @@ All AppSync requests are `POST` to `https://<appsync_url>/graphql`:
 
 | Operation | Description |
 |-----------|-------------|
-| `createProgram(input: AWSJSON!)` | Create program — returns `{ id, name, code, type }` |
+| `createProgram(input: typed input!)` | Create program — returns `{ id, name, code, type }` |
 | `listPrograms` | List all programs |
 | `getProgram(id: ID!)` | Get single program |
-| `updateProgram(id: ID!, input: AWSJSON!)` | Update |
+| `updateProgram(id: ID!, input: typed input!)` | Update |
 | `deleteProgram(id: ID!)` | Soft-delete |
 
 **Create input:**
@@ -261,7 +261,7 @@ All AppSync requests are `POST` to `https://<appsync_url>/graphql`:
 | Operation | Description |
 |-----------|-------------|
 | `getTenantFeatures` | Get feature flags for tenant |
-| `updateTenantFeatures(input: AWSJSON!)` | Enable/disable modules |
+| `updateTenantFeatures(input: typed input!)` | Enable/disable modules |
 
 **Input:**
 ```json
@@ -321,8 +321,8 @@ query { me }
 |-----------|-------------|
 | `listUsers` | List all staff/admin users |
 | `getUser(id: ID!)` | Get user by ID |
-| `inviteStaff(input: AWSJSON!)` | Invite staff — sends Cognito invite email |
-| `updateUser(id: ID!, input: AWSJSON!)` | Update user fields |
+| `inviteStaff(input: typed input!)` | Invite staff — sends Cognito invite email |
+| `updateUser(id: ID!, input: typed input!)` | Update user fields |
 | `deactivateUser(id: ID!)` | Soft-deactivate |
 
 **Invite staff input:**
@@ -346,9 +346,9 @@ query { me }
 
 | Operation | Description |
 |-----------|-------------|
-| `createEnquiry(input: AWSJSON!)` | Log a new admission enquiry |
+| `createEnquiry(input: typed input!)` | Log a new admission enquiry |
 | `listEnquiries` | List enquiries (filter: `status`, `campusId`) |
-| `updateEnquiry(id: ID!, input: AWSJSON!)` | Update enquiry status |
+| `updateEnquiry(id: ID!, input: typed input!)` | Update enquiry status |
 
 **Create input:**
 ```json
@@ -373,8 +373,8 @@ query { me }
 |-----------|-------------|
 | `listApplications` | List applications (filter: `status`, `academicYearId`) |
 | `getApplication(id: ID!)` | Get single application |
-| `createApplication(input: AWSJSON!)` | Create application from enquiry |
-| `reviewApplication(id: ID!, input: AWSJSON!)` | Move to UNDER_REVIEW |
+| `createApplication(input: typed input!)` | Create application from enquiry |
+| `reviewApplication(id: ID!, input: typed input!)` | Move to UNDER_REVIEW |
 | `approveApplication(id: ID!)` | Approve — enables `convertApplicationToStudent` |
 | `rejectApplication(id: ID!, reason: String)` | Reject |
 | `admissionsStats` | Stats: total enquiries, applications, admissions by month |
@@ -393,9 +393,9 @@ Fee categories group fee heads and define invoice/receipt number prefixes.
 
 | Operation | Description |
 |-----------|-------------|
-| `createFeeCategory(input: AWSJSON!)` | Create category |
+| `createFeeCategory(input: typed input!)` | Create category |
 | `getFeeCategory(id: ID!)` | Get single |
-| `updateFeeCategory(id: ID!, input: AWSJSON!)` | Update |
+| `updateFeeCategory(id: ID!, input: typed input!)` | Update |
 | `listFeeCategories` | List all |
 | `deleteFeeCategory(id: ID!)` | Delete |
 
@@ -422,8 +422,8 @@ Fee heads are individual chargeable line items (Tuition Fee, Lab Fee, etc.).
 
 | Operation | Description |
 |-----------|-------------|
-| `createFeeHead(input: AWSJSON!)` | Create fee head |
-| `updateFeeHead(id: ID!, input: AWSJSON!)` | Update |
+| `createFeeHead(input: typed input!)` | Create fee head |
+| `updateFeeHead(id: ID!, input: typed input!)` | Update |
 | `listFeeHeads` | List all (filter: `feeCategoryId`, `isActive`) |
 | `deleteFeeHead(id: ID!)` | Delete |
 
@@ -450,8 +450,8 @@ Fee schedules define payment installment plans.
 
 | Operation | Description |
 |-----------|-------------|
-| `createFeeSchedule(input: AWSJSON!)` | Create schedule with slots |
-| `updateFeeSchedule(id: ID!, input: AWSJSON!)` | Update |
+| `createFeeSchedule(input: typed input!)` | Create schedule with slots |
+| `updateFeeSchedule(id: ID!, input: typed input!)` | Update |
 | `listFeeSchedules` | List all |
 | `deleteFeeSchedule(id: ID!)` | Delete |
 
@@ -482,11 +482,11 @@ A fee structure is the master template of fees for a class in an academic year.
 
 | Operation | Description |
 |-----------|-------------|
-| `createFeeStructure(input: AWSJSON!)` | Create structure |
+| `createFeeStructure(input: typed input!)` | Create structure |
 | `getFeeStructure(id: ID!)` | Get single |
-| `updateFeeStructure(id: ID!, input: AWSJSON!)` | Update |
+| `updateFeeStructure(id: ID!, input: typed input!)` | Update |
 | `listFeeStructures(academicYearId: ID)` | List all |
-| `copyFeePattern(input: AWSJSON!)` | Copy last year's structures to new year |
+| `copyFeePattern(input: typed input!)` | Copy last year's structures to new year |
 | `deleteFeeStructure(id: ID!)` | Delete |
 
 **Create input:**
@@ -536,8 +536,8 @@ Assigning a fee structure to a student generates invoices for that student.
 | Operation | Description |
 |-----------|-------------|
 | `getFeeAssignmentQueue(academicYearId: ID!, campusId: ID)` | Students without fee assignment yet |
-| `createFeeAssignment(input: AWSJSON!)` | Assign fee structure to one student — creates invoice |
-| `bulkAssignFeeStructure(input: AWSJSON!)` | Assign to all students in a class at once |
+| `createFeeAssignment(input: typed input!)` | Assign fee structure to one student — creates invoice |
+| `bulkAssignFeeStructure(input: typed input!)` | Assign to all students in a class at once |
 | `getStudentFeeAssignment(studentId: ID!, academicYearId: ID!)` | Student's current assignment |
 | `listFeeAssignments(academicYearId: ID)` | List all assignments |
 | `getFeeAssignment(id: ID!)` | Get single |
@@ -581,8 +581,8 @@ Assigning a fee structure to a student generates invoices for that student.
 | `listInvoices(academicYearId: ID)` | List (filter: `studentId`, `status`, `campusId`) |
 | `getInvoice(id: ID!)` | Get single invoice |
 | `getStudentDues(studentId: ID!)` | Outstanding unpaid invoices + total due |
-| `createOneOffCharge(input: AWSJSON!)` | Create a one-time ad-hoc charge |
-| `reviseInvoice(id: ID!, input: AWSJSON!)` | Revise invoice amount (creates audit trail) |
+| `createOneOffCharge(input: typed input!)` | Create a one-time ad-hoc charge |
+| `reviseInvoice(id: ID!, input: typed input!)` | Revise invoice amount (creates audit trail) |
 | `cancelInvoice(id: ID!, reason: String)` | Cancel invoice |
 | `getFeeRevisions(id: ID!)` | Revision history for an invoice |
 
@@ -639,10 +639,10 @@ Assigning a fee structure to a student generates invoices for that student.
 
 | Operation | Description |
 |-----------|-------------|
-| `recordPayment(input: AWSJSON!)` | Record offline payment (CASH / CHEQUE / UPI) |
-| `collectPaymentByStudent(studentId: ID!, input: AWSJSON!)` | Collect across all outstanding invoices (oldest-first) |
-| `createPaymentOrder(input: AWSJSON!)` | Create Razorpay order for online payment |
-| `verifyPaymentSignature(input: AWSJSON!)` | Verify Razorpay signature after client payment |
+| `recordPayment(input: typed input!)` | Record offline payment (CASH / CHEQUE / UPI) |
+| `collectPaymentByStudent(studentId: ID!, input: typed input!)` | Collect across all outstanding invoices (oldest-first) |
+| `createPaymentOrder(input: typed input!)` | Create Razorpay order for online payment |
+| `verifyPaymentSignature(input: typed input!)` | Verify Razorpay signature after client payment |
 | `listPayments(studentId: ID)` | List payments |
 | `getPayment(id: ID!)` | Get single payment |
 | `listReceipts(studentId: ID)` | List successful payments with receipts |
@@ -739,10 +739,10 @@ Assigning a fee structure to a student generates invoices for that student.
 
 | Operation | Description |
 |-----------|-------------|
-| `createClass(input: AWSJSON!)` | Create a class/grade |
+| `createClass(input: typed input!)` | Create a class/grade |
 | `listClasses(academicYearId: ID)` | List classes |
 | `getClass(id: ID!)` | Get single class |
-| `updateClass(id: ID!, input: AWSJSON!)` | Update class |
+| `updateClass(id: ID!, input: typed input!)` | Update class |
 | `deleteClass(id: ID!)` | Delete |
 
 **Create input:**
@@ -762,12 +762,12 @@ Assigning a fee structure to a student generates invoices for that student.
 
 | Operation | Description |
 |-----------|-------------|
-| `createSection(classId: ID!, input: AWSJSON!)` | Create a section under a class |
+| `createSection(classId: ID!, input: typed input!)` | Create a section under a class |
 | `listAllSections(classId: ID, academicYearId: ID)` | List sections (filter by class or year) |
 | `getSection(id: ID!)` | Get single section |
-| `updateSection(id: ID!, input: AWSJSON!)` | Update section |
+| `updateSection(id: ID!, input: typed input!)` | Update section |
 | `deleteSection(id: ID!)` | Soft-delete section |
-| `setSectionIncharge(sectionId: ID!, input: AWSJSON!)` | Assign class teacher |
+| `setSectionIncharge(sectionId: ID!, input: typed input!)` | Assign class teacher |
 | `listSectionStudents(sectionId: ID!)` | Students currently in section |
 
 **Create input:**
@@ -786,15 +786,15 @@ Assigning a fee structure to a student generates invoices for that student.
 
 | Operation | Description |
 |-----------|-------------|
-| `enrollStudent(input: AWSJSON!)` | Enroll new student (creates Student + Enrollment) |
-| `convertApplicationToStudent(input: AWSJSON!)` | Convert approved admission application |
+| `enrollStudent(input: typed input!)` | Enroll new student (creates Student + Enrollment) |
+| `convertApplicationToStudent(input: typed input!)` | Convert approved admission application |
 | `getStudent(id: ID!)` | Get student |
-| `updateStudent(studentId: ID!, input: AWSJSON!)` | Update student details |
+| `updateStudent(studentId: ID!, input: typed input!)` | Update student details |
 | `updateStudentStatus(studentId: ID!, status: String!)` | Change status |
-| `assignStudentClass(studentId: ID!, input: AWSJSON!)` | Assign to class and/or section |
+| `assignStudentClass(studentId: ID!, input: typed input!)` | Assign to class and/or section |
 | `listStudents` | List students (filter: `campusId`, `classId`, `sectionId`, `status`) |
 | `enableStudentPortal(studentId: ID!)` | Create Cognito account for student self-access |
-| `enableGuardianPortal(studentId: ID!, input: AWSJSON!)` | Create Cognito account for guardian |
+| `enableGuardianPortal(studentId: ID!, input: typed input!)` | Create Cognito account for guardian |
 
 **Enroll input:**
 ```json
@@ -880,7 +880,7 @@ Assigning a fee structure to a student generates invoices for that student.
 
 | Operation | Description |
 |-----------|-------------|
-| `createExam(input: AWSJSON!)` | Create exam definition |
+| `createExam(input: typed input!)` | Create exam definition |
 | `listExams(academicYearId: ID)` | List exams |
 | `getExam(id: ID!)` | Get exam |
 | `publishResults(examId: ID!)` | Publish results (makes them visible to students) |
@@ -929,7 +929,7 @@ Assigning a fee structure to a student generates invoices for that student.
 | Operation | Description |
 |-----------|-------------|
 | `listCertificates` | List certificate requests |
-| `issueCertificate(input: AWSJSON!)` | Request a certificate |
+| `issueCertificate(input: typed input!)` | Request a certificate |
 | `approveCertificate(id: ID!)` | Approve and issue |
 
 **Issue input:**
@@ -955,8 +955,8 @@ Promotions move students from one academic year + grade to the next, with config
 
 | Operation | Description |
 |-----------|-------------|
-| `setStudentPromotionEligibility(input: AWSJSON!)` | Mark students ELIGIBLE / DETAINED / ON_HOLD before promoting |
-| `promoteStudents(input: AWSJSON!)` | Run batch promotion (returns batch with per-student results) |
+| `setStudentPromotionEligibility(input: typed input!)` | Mark students ELIGIBLE / DETAINED / ON_HOLD before promoting |
+| `promoteStudents(input: typed input!)` | Run batch promotion (returns batch with per-student results) |
 | `listPromotionBatches(fromAcademicYearId: ID)` | List promotion batches |
 | `getPromotionBatch(id: ID!)` | Get batch details |
 | `listPromotionBatchItems(id: ID!)` | Individual student results within a batch |
@@ -1110,7 +1110,7 @@ The main promotion operation. Creates a `PromotionBatch` and per-student `Promot
 
 | Operation | Description |
 |-----------|-------------|
-| `createAnnouncement(input: AWSJSON!)` | Create and optionally publish immediately |
+| `createAnnouncement(input: typed input!)` | Create and optionally publish immediately |
 | `listAnnouncements` | List announcements |
 
 **Input:**
@@ -1132,7 +1132,7 @@ The main promotion operation. Creates a `PromotionBatch` and per-student `Promot
 | Operation | Description |
 |-----------|-------------|
 | `listEvents` | List events |
-| `createEvent(input: AWSJSON!)` | Create event |
+| `createEvent(input: typed input!)` | Create event |
 
 ---
 
@@ -1141,7 +1141,7 @@ The main promotion operation. Creates a `PromotionBatch` and per-student `Promot
 | Operation | Description |
 |-----------|-------------|
 | `listLeaveRequests` | List leave requests (admin sees all, staff see own) |
-| `submitLeaveRequest(input: AWSJSON!)` | Submit leave |
+| `submitLeaveRequest(input: typed input!)` | Submit leave |
 | `approveLeaveRequest(id: ID!)` | Approve |
 | `rejectLeaveRequest(id: ID!)` | Reject |
 
@@ -1152,7 +1152,7 @@ The main promotion operation. Creates a `PromotionBatch` and per-student `Promot
 ### Upload file
 
 ```graphql
-mutation GenerateUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }
+mutation GenerateUploadUrl($input: GetUploadUrlInput!) { getUploadUrl(input: $input) }
 ```
 
 **Input:**
@@ -1180,7 +1180,7 @@ mutation GenerateUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }
 ### Download file
 
 ```graphql
-mutation GenerateDownloadUrl($input: AWSJSON!) { getDownloadUrl(input: $input) }
+mutation GenerateDownloadUrl($input: ID!) { getDownloadUrl(input: $input) }
 ```
 
 **Input:** `{ "key": "tenantId/documents/uuid.pdf" }`
@@ -1204,7 +1204,7 @@ Returns the published result batch for the given token.
 
 | Operation | Description |
 |-----------|-------------|
-| `createResultBatch(input: AWSJSON!)` | Create draft result batch |
+| `createResultBatch(input: typed input!)` | Create draft result batch |
 | `listResultBatches(academicYearId: ID)` | List batches |
 | `publishResults(examId: ID!)` | Publish — activates public token |
 
@@ -1247,7 +1247,7 @@ Returns recent admin actions with `entityType`, `entityId`, `action`, `profileId
 
 | Operation | Description |
 |-----------|-------------|
-| `mergeStudents(input: AWSJSON!)` | Merge duplicates — keeps primary, deactivates others |
+| `mergeStudents(input: typed input!)` | Merge duplicates — keeps primary, deactivates others |
 
 **Input:**
 ```json
@@ -1448,3 +1448,4 @@ Step  Request                          Saves
 ```
 
 > **After step 33**, each promoted student has a new `StudentAcademicEnrollment` record for `to_academic_year_id` and their `Student.classId` / `Student.sectionId` are updated to the new grade/section.
+

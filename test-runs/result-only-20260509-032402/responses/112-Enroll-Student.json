@@ -1,0 +1,81 @@
+{
+  "data": {
+    "listStudents": {
+      "items": [
+        {
+          "id": "69fa25edfc42e073eb560873",
+          "firstName": "Application",
+          "lastName": "Student SW40KD",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69fa44c3515958e3fbb7f1bf",
+          "firstName": "Application",
+          "lastName": "Student T0SVSY",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69fa459f515958e3fbb7f355",
+          "firstName": "Application",
+          "lastName": "Student T0Y0LC",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69fae2b112627d3790c2e970",
+          "firstName": "Application",
+          "lastName": "Student TOV9OE",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69fe3874ea526ebb5edfba7e",
+          "firstName": "Arjun",
+          "lastName": "Kumar",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69f9f627ad313bb63dd12507",
+          "firstName": "John",
+          "lastName": "Doe",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69f9f9d92f4beacb8dff3791",
+          "firstName": "John",
+          "lastName": "Doe",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69fa44c2515958e3fbb7f195",
+          "firstName": "John",
+          "lastName": "T0SVSY",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69fa4566515958e3fbb7f263",
+          "firstName": "John",
+          "lastName": "T0WPZM",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69fa459e515958e3fbb7f328",
+          "firstName": "John",
+          "lastName": "T0Y0LC",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69fae2b012627d3790c2e941",
+          "firstName": "John",
+          "lastName": "TOV9OE",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "69fa25eefc42e073eb560883",
+          "firstName": "Numbering",
+          "lastName": "SW40KD",
+          "status": "ACTIVE"
+        }
+      ],
+      "nextToken": "[REDACTED]"
+    }
+  }
+}

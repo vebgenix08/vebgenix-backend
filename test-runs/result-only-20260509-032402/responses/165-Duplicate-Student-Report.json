@@ -1,0 +1,52 @@
+{
+  "data": {
+    "getDuplicateStudentReport": {
+      "byNameAndDob": [
+        {
+          "_id": {
+            "firstName": "John",
+            "lastName": "Doe",
+            "dateOfBirth": "2015-01-15T00:00:00.000Z"
+          },
+          "count": 2,
+          "ids": [
+            "69f9f627ad313bb63dd12507",
+            "69f9f9d92f4beacb8dff3791"
+          ],
+          "registrationNumbers": [
+            "ADM/26-27/0001",
+            "ADM/25-26/0002"
+          ]
+        }
+      ],
+      "byPhone": [
+        {
+          "_id": "9503333333",
+          "count": 2,
+          "ids": [
+            "69fa44c2515958e3fbb7f195",
+            "69fa4566515958e3fbb7f263"
+          ],
+          "names": [
+            "John T0SVSY",
+            "John T0WPZM"
+          ]
+        },
+        {
+          "_id": "9876543212",
+          "count": 2,
+          "ids": [
+            "69fa25edfc42e073eb560873",
+            "69fe3874ea526ebb5edfba7e"
+          ],
+          "names": [
+            "Application Student SW40KD",
+            "Arjun Kumar"
+          ]
+        }
+      ],
+      "totalNameDuplicates": 1,
+      "totalPhoneDuplicates": 2
+    }
+  }
+}

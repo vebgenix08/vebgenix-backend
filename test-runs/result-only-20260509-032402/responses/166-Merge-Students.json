@@ -1,0 +1,10 @@
+{
+  "data": {
+    "mergeStudents": {
+      "__error": true,
+      "code": "BAD_REQUEST",
+      "message": "keepId and mergeIds[] are required",
+      "statusCode": 400
+    }
+  }
+}

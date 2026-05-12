@@ -1,0 +1,13 @@
+{
+  "data": {
+    "listCampuses": [
+      {
+        "id": "69f9c29a690fae033907970c",
+        "name": "Main Campus",
+        "code": "MAIN",
+        "type": "SCHOOL",
+        "isActive": true
+      }
+    ]
+  }
+}

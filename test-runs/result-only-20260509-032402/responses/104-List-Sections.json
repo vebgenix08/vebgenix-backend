@@ -1,0 +1,19 @@
+{
+  "data": {
+    "listAllSections": [
+      {
+        "id": "69fe462f397957680cac7c27",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "classId": "69fa25e7fc42e073eb5607f0",
+        "academicYearId": "69fb5e883633f68d4d31a50f",
+        "name": "A",
+        "displayName": "API Numbering SW40KD — A",
+        "capacity": 40,
+        "isActive": true,
+        "createdAt": "2026-05-08T20:23:11.759Z",
+        "updatedAt": "2026-05-08T20:23:11.759Z"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "deleteExam": null
+  },
+  "errors": [
+    {
+      "path": [
+        "deleteExam"
+      ],
+      "locations": null,
+      "message": "Can't serialize value (/deleteExam) : Expected type 'Boolean' but was 'LinkedHashMap'."
+    }
+  ]
+}

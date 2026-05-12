@@ -1,0 +1,127 @@
+{
+  "data": {
+    "listClasses": [
+      {
+        "id": "69fa25e7fc42e073eb5607f0",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "API Numbering SW40KD",
+        "code": "APINSW40KD",
+        "isActive": true,
+        "createdAt": "2026-05-05T17:16:23.863Z",
+        "updatedAt": "2026-05-05T17:16:23.863Z"
+      },
+      {
+        "id": "69f9f61bad313bb63dd1247b",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 1",
+        "code": "G1",
+        "isActive": true,
+        "createdAt": "2026-05-05T13:52:27.119Z",
+        "updatedAt": "2026-05-05T13:52:27.119Z"
+      },
+      {
+        "id": "69fa44b4515958e3fbb7f109",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 1 T0SVSY",
+        "code": "G1T0SVSY",
+        "isActive": true,
+        "createdAt": "2026-05-05T19:27:48.788Z",
+        "updatedAt": "2026-05-05T19:27:48.788Z"
+      },
+      {
+        "id": "69fa455e515958e3fbb7f24a",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 1 T0WPZM",
+        "code": "G1T0WPZM",
+        "isActive": true,
+        "createdAt": "2026-05-05T19:30:38.872Z",
+        "updatedAt": "2026-05-05T19:30:38.872Z"
+      },
+      {
+        "id": "69fa459a515958e3fbb7f30f",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 1 T0Y0LC",
+        "code": "G1T0Y0LC",
+        "isActive": true,
+        "createdAt": "2026-05-05T19:31:38.728Z",
+        "updatedAt": "2026-05-05T19:31:38.728Z"
+      },
+      {
+        "id": "69fae2a012627d3790c2e8a1",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 1 TOV9OE",
+        "code": "G1TOV9OE",
+        "isActive": true,
+        "createdAt": "2026-05-06T06:41:36.440Z",
+        "updatedAt": "2026-05-06T06:41:36.440Z"
+      },
+      {
+        "id": "69fe386fea526ebb5edfb9d7",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "programId": "69f9f6171c36a0f5c8409f5d",
+        "name": "Grade 10",
+        "code": "G10",
+        "isActive": true,
+        "createdAt": "2026-05-08T19:24:31.819Z",
+        "updatedAt": "2026-05-08T19:24:31.819Z"
+      },
+      {
+        "id": "69f9f73aad313bb63dd12567",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 2",
+        "code": "G2",
+        "isActive": true,
+        "createdAt": "2026-05-05T13:57:14.060Z",
+        "updatedAt": "2026-05-05T13:57:14.060Z"
+      },
+      {
+        "id": "69fa44cb515958e3fbb7f21a",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 2 T0SVSY",
+        "code": "G2T0SVSY",
+        "isActive": true,
+        "createdAt": "2026-05-05T19:28:11.965Z",
+        "updatedAt": "2026-05-05T19:28:11.965Z"
+      },
+      {
+        "id": "69fa4578515958e3fbb7f2df",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 2 T0WPZM",
+        "code": "G2T0WPZM",
+        "isActive": true,
+        "createdAt": "2026-05-05T19:31:04.648Z",
+        "updatedAt": "2026-05-05T19:31:04.648Z"
+      },
+      {
+        "id": "69fa45a4515958e3fbb7f3b0",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 2 T0Y0LC",
+        "code": "G2T0Y0LC",
+        "isActive": true,
+        "createdAt": "2026-05-05T19:31:48.489Z",
+        "updatedAt": "2026-05-05T19:31:48.489Z"
+      },
+      {
+        "id": "69fae2bb12627d3790c2e9cb",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "name": "Grade 2 TOV9OE",
+        "code": "G2TOV9OE",
+        "isActive": true,
+        "createdAt": "2026-05-06T06:42:03.421Z",
+        "updatedAt": "2026-05-06T06:42:03.421Z"
+      }
+    ]
+  }
+}

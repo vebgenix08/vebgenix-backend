@@ -1,0 +1,23 @@
+{
+  "data": {
+    "createOneOffCharge": null
+  },
+  "errors": [
+    {
+      "path": [
+        "createOneOffCharge"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 49,
+          "sourceName": null
+        }
+      ],
+      "message": "Internal server error"
+    }
+  ]
+}

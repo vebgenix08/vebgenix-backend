@@ -1,0 +1,18 @@
+{
+  "data": {
+    "updateEnquiry": {
+      "id": "69fe4f5cf0257a23a69d42b9",
+      "tenantId": "org_vqr1dsp1",
+      "campusId": "69f9c29a690fae033907970c",
+      "academicYearId": "69fb5e883633f68d4d31a50f",
+      "studentName": "Rahul Sharma",
+      "email": "rahul@example.com",
+      "phone": "9876543210",
+      "status": "NEW",
+      "source": "WALK_IN",
+      "createdBy": "69f9c29a690fae0339079710",
+      "createdAt": "2026-05-08T21:02:20.931Z",
+      "updatedAt": "2026-05-08T21:02:23.271Z"
+    }
+  }
+}

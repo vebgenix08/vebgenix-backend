@@ -1,0 +1,23 @@
+{
+  "data": {
+    "getFeeAssignment": null
+  },
+  "errors": [
+    {
+      "path": [
+        "getFeeAssignment"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 36,
+          "sourceName": null
+        }
+      ],
+      "message": "Internal server error"
+    }
+  ]
+}

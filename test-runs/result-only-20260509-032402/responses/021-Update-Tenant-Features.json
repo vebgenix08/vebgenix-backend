@@ -1,0 +1,25 @@
+{
+  "data": {
+    "updateTenantFeatures": {
+      "id": "69f9c29a690fae033907970a",
+      "tenantId": "org_vqr1dsp1",
+      "features": {
+        "admissions": true,
+        "finance": true,
+        "academics": true,
+        "examResults": true,
+        "attendance": true,
+        "timetable": false,
+        "communication": true,
+        "events": false,
+        "leave": false,
+        "certificates": false,
+        "studentPortal": false,
+        "analytics": false
+      },
+      "updatedBy": "69f9c29a690fae0339079710",
+      "createdAt": "2026-05-05T10:12:42.316Z",
+      "updatedAt": "2026-05-08T21:02:09.848Z"
+    }
+  }
+}

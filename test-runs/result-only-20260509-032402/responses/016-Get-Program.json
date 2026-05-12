@@ -1,0 +1,23 @@
+{
+  "data": {
+    "getProgram": null
+  },
+  "errors": [
+    {
+      "path": [
+        "getProgram"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 30,
+          "sourceName": null
+        }
+      ],
+      "message": "Internal server error"
+    }
+  ]
+}

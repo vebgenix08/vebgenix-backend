@@ -1,0 +1,10 @@
+{
+  "data": {
+    "getSectionAttendanceSummary": {
+      "sectionId": "69fe462f397957680cac7c27",
+      "from": "2025-06-01",
+      "to": "2025-12-31",
+      "totalDays": 214
+    }
+  }
+}

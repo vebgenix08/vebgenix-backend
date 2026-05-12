@@ -1,0 +1,9 @@
+{
+  "data": {
+    "bulkAssignFeeStructure": {
+      "succeeded": 0,
+      "failed": 1,
+      "total": 1
+    }
+  }
+}

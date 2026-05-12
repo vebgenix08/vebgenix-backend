@@ -1,0 +1,23 @@
+{
+  "data": {
+    "listPromotionBatchItems": null
+  },
+  "errors": [
+    {
+      "path": [
+        "listPromotionBatchItems"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 9,
+          "sourceName": null
+        }
+      ],
+      "message": "id is required"
+    }
+  ]
+}

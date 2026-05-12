@@ -1,0 +1,30 @@
+{
+  "data": {
+    "listSubjects": [
+      {
+        "id": "69fe3872ea526ebb5edfba57",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "code": "MATH",
+        "name": "Mathematics",
+        "type": "CORE",
+        "creditsOrPeriods": 5,
+        "isActive": true,
+        "createdAt": "2026-05-08T19:24:34.498Z",
+        "updatedAt": "2026-05-08T19:24:34.498Z"
+      },
+      {
+        "id": "69fae2a312627d3790c2e927",
+        "tenantId": "org_vqr1dsp1",
+        "campusId": "69f9c29a690fae033907970c",
+        "code": "MATHTOV9OE",
+        "name": "Mathematics TOV9OE",
+        "type": "CORE",
+        "creditsOrPeriods": 5,
+        "isActive": true,
+        "createdAt": "2026-05-06T06:41:39.137Z",
+        "updatedAt": "2026-05-06T06:41:39.137Z"
+      }
+    ]
+  }
+}

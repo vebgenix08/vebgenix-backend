@@ -1,0 +1,14 @@
+{
+  "data": {
+    "getExamStats": {
+      "totalStudents": 1,
+      "submitted": 0,
+      "pending": 1,
+      "average": 0,
+      "highest": 0,
+      "lowest": 0,
+      "passCount": 0,
+      "failCount": 0
+    }
+  }
+}

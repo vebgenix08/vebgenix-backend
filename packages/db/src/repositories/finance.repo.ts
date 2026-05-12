@@ -243,31 +243,148 @@ export const FinanceRepo: any = {
     return { from, to, byMethod: payments, grandTotal };
   },
 
-  async feeCollectionAnalytics(tenantId: string, academicYearId?: string) {
-    const matchStage: Record<string, unknown> = { tenantId };
-    if (academicYearId) matchStage.academicYearId = toObjectId(academicYearId);
-    const [invoiceSummary, collectionByMonth] = await Promise.all([
+  async feeCollectionAnalytics(
+    tenantId: string,
+    options: { campusId?: string; academicYearId?: string; from?: string; to?: string } = {},
+  ) {
+    const invoiceMatch: Record<string, unknown> = { tenantId };
+    const paymentMatch: Record<string, unknown> = { tenantId, status: 'SUCCESS' };
+    const feeAssignmentMatch: Record<string, unknown> = { tenantId };
+
+    if (options.campusId) {
+      const campusId = toObjectId(options.campusId);
+      invoiceMatch.campusId = campusId;
+      paymentMatch.campusId = campusId;
+    }
+    if (options.academicYearId) {
+      const academicYearId = toObjectId(options.academicYearId);
+      invoiceMatch.academicYearId = academicYearId;
+      paymentMatch.academicYearId = academicYearId;
+      feeAssignmentMatch.academicYearId = academicYearId;
+    }
+
+    const from = options.from ? new Date(options.from) : undefined;
+    const to = options.to ? new Date(options.to) : undefined;
+    if (from || to) {
+      const createdAt: Record<string, Date> = {};
+      if (from) createdAt.$gte = from;
+      if (to) createdAt.$lte = to;
+      paymentMatch.createdAt = createdAt;
+    }
+
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [invoiceTotals, paymentMethodRows, monthlyRows, todayRows, monthRows, receiptsToday, pendingFeeAssignments] = await Promise.all([
       Invoice.aggregate([
-        { $match: matchStage },
-        { $group: {
-          _id:         '$status',
-          totalAmount: { $sum: '$netAmount' },
-          paidAmount:  { $sum: '$paidAmount' },
-          dueAmount:   { $sum: '$dueAmount' },
-          count:       { $sum: 1 },
-        }},
+        { $match: invoiceMatch },
+        {
+          $group: {
+            _id: null,
+            totalBilled: { $sum: '$netAmount' },
+            totalCollected: { $sum: '$paidAmount' },
+            totalDue: { $sum: '$dueAmount' },
+            openInvoices: {
+              $sum: {
+                $cond: [{ $gt: ['$dueAmount', 0] }, 1, 0],
+              },
+            },
+          },
+        },
       ]),
       Payment.aggregate([
-        { $match: { tenantId, status: 'SUCCESS', ...(academicYearId ? { academicYearId: toObjectId(academicYearId) } : {}) } },
-        { $group: {
-          _id:   { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-          total: { $sum: '$amount' },
-          count: { $sum: 1 },
-        }},
+        { $match: paymentMatch },
+        {
+          $group: {
+            _id: '$method',
+            amount: { $sum: '$amount' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { amount: -1 } },
+      ]),
+      Payment.aggregate([
+        { $match: paymentMatch },
+        {
+          $group: {
+            _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+            amount: { $sum: '$amount' },
+          },
+        },
         { $sort: { '_id.year': 1, '_id.month': 1 } },
       ]),
+      Payment.aggregate([
+        {
+          $match: {
+            ...paymentMatch,
+            createdAt: { $gte: todayStart, $lte: now },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            amount: { $sum: '$amount' },
+          },
+        },
+      ]),
+      Payment.aggregate([
+        {
+          $match: {
+            ...paymentMatch,
+            createdAt: { $gte: monthStart, $lte: now },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            amount: { $sum: '$amount' },
+          },
+        },
+      ]),
+      Payment.countDocuments({
+        ...paymentMatch,
+        receiptNumber: { $exists: true, $ne: null },
+        createdAt: { $gte: todayStart, $lte: now },
+      }),
+      FeeAssignment.countDocuments(feeAssignmentMatch),
     ]);
-    return { invoiceSummary, collectionByMonth };
+
+    const invoiceSummary = invoiceTotals[0] ?? {
+      totalBilled: 0,
+      totalCollected: 0,
+      totalDue: 0,
+      openInvoices: 0,
+    };
+    const totalCollected = Number(invoiceSummary.totalCollected ?? 0);
+    const totalDue = Number(invoiceSummary.totalDue ?? 0);
+    const totalExpected = Number(invoiceSummary.totalBilled ?? 0);
+
+    return {
+      totalCollected,
+      totalDue,
+      collectionRate: totalExpected > 0 ? Number(((totalCollected / totalExpected) * 100).toFixed(2)) : 0,
+      collectedToday: Number(todayRows[0]?.amount ?? 0),
+      collectedThisMonth: Number(monthRows[0]?.amount ?? 0),
+      outstandingDue: totalDue,
+      openInvoices: Number(invoiceSummary.openInvoices ?? 0),
+      receiptsToday,
+      pendingFeeAssignments,
+      byMethod: paymentMethodRows.map((row: Record<string, unknown>) => ({
+        method: String(row._id ?? 'OTHER'),
+        amount: Number(row.amount ?? 0),
+        count: Number(row.count ?? 0),
+      })),
+      monthly: monthlyRows.map((row: Record<string, unknown>) => {
+        const bucket = (row._id ?? {}) as { year?: number; month?: number };
+        return {
+          month: `${bucket.year ?? 0}-${String(bucket.month ?? 0).padStart(2, '0')}`,
+          amount: Number(row.amount ?? 0),
+          count: Number(row.count ?? 0),
+        };
+      }),
+    };
   },
 
   async classFeeStats(tenantId: string, classId?: string, academicYearId?: string) {

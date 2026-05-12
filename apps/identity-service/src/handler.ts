@@ -51,10 +51,19 @@ function toGqlProfile(profile: unknown, fallback: { id?: string; email?: string 
   const doc = (profile as { toObject?: () => Record<string, unknown> }).toObject?.()
     ?? (profile as Record<string, unknown>);
   const { _id, ...rest } = doc;
+  const roleAssignments = Array.isArray(doc.roles)
+    ? (doc.roles as Array<Record<string, unknown>>).map((role) => ({
+        roleId:      role.roleId?.toString?.() ?? role.roleId ?? null,
+        roleName:    String(role.roleName ?? role.role ?? ''),
+        permissions: Array.isArray(role.permissions) ? role.permissions : [],
+      })).filter((role) => role.roleName)
+    : [];
   return {
     ...rest,
     id:    String(doc.id ?? _id ?? fallback.id ?? ''),
     email: String(doc.email ?? fallback.email ?? ''),
+    roles: roleAssignments.map((role) => role.roleName),
+    roleAssignments,
   };
 }
 
@@ -95,9 +104,20 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'listUsers':
       case 'GET:/api/admin/users': {
         const tenantId = getTenantId(ctx);
+        const inputFilter = (args.filter as Record<string, unknown> | undefined) ?? {};
         const filter: Record<string, unknown> = { personaRole: { $ne: 'STUDENT' } };
-        if (args.isActive !== undefined) filter.isActive = args.isActive === 'true' || args.isActive === true;
-        if (args.campusId) filter['campusAccess.campusId'] = args.campusId;
+        const isActive = inputFilter.isActive ?? args.isActive;
+        const campusId = inputFilter.campusId ?? args.campusId;
+        const search = String(inputFilter.search ?? args.search ?? '').trim();
+        if (isActive !== undefined) filter.isActive = isActive === 'true' || isActive === true;
+        if (campusId) filter['campusAccess.campusId'] = campusId;
+        if (search) {
+          filter.$or = [
+            { fullName: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+            { phone: { $regex: search, $options: 'i' } },
+          ];
+        }
         const profiles = await IdentityRepo.listProfiles(tenantId, filter);
         return {
           edges: profiles.map(p => {

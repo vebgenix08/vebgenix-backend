@@ -1,0 +1,20 @@
+{
+  "data": {
+    "getExam": {
+      "id": "69fe4f8d7f47eb4e7d1b66b7",
+      "tenantId": "org_vqr1dsp1",
+      "campusId": "69f9c29a690fae033907970c",
+      "academicYearId": "69fb5e883633f68d4d31a50f",
+      "classId": "69fa25e7fc42e073eb5607f0",
+      "sectionId": "69fe462f397957680cac7c27",
+      "name": "Term 1 Exam 2025",
+      "maxMarks": 100,
+      "passingMarks": 35,
+      "status": "DRAFT",
+      "createdBy": "69f9c29a690fae0339079710",
+      "marksEntries": [],
+      "createdAt": "2026-05-08T21:03:09.063Z",
+      "updatedAt": "2026-05-08T21:03:09.063Z"
+    }
+  }
+}

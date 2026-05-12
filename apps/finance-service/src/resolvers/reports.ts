@@ -25,8 +25,12 @@ export async function resolveReports(
     case 'feeCollectionAnalytics':
     case 'GET:/api/admin/finance/reports/collection-analytics': {
       authorize(ctx, 'finance.reports.read');
-      const academicYearId = args.academicYearId as string | undefined;
-      return FinanceRepo.feeCollectionAnalytics(tenantId, academicYearId);
+      return FinanceRepo.feeCollectionAnalytics(tenantId, {
+        campusId: args.campusId as string | undefined,
+        academicYearId: args.academicYearId as string | undefined,
+        from: args.from as string | undefined,
+        to: args.to as string | undefined,
+      });
     }
 
     case 'classFeeStats':

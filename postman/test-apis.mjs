@@ -174,7 +174,7 @@ async function run() {
   await test('Create Program', async () => {
     if (!env.campus_id) throw new Error('No campus_id');
     const input = JSON.stringify({ name: suffixName('Science'), code: suffixCode('SCI'), type: 'SCHOOL', campusId: env.campus_id, durationYears: 1 });
-    const res = await gql('mutation CreateProgram($input: AWSJSON!) { createProgram(input: $input) }', { input });
+    const res = await gql('mutation CreateProgram($input: typed input!) { createProgram(input: $input) }', { input });
     const d = parse(ok(res, 'createProgram'));
     if (id(d)) env.program_id = id(d);
     return d;
@@ -191,7 +191,7 @@ async function run() {
   });
 
   await test('Dashboard Overview', async () => {
-    // Try AWSJSON (new schema), fall back to typed with input (old schema)
+    // Try typed input (new schema), fall back to typed with input (old schema)
     let res = await gql('query { dashboardOverview }');
     if (res.errors?.some(e => e.message?.includes('MissingFieldArgument') || e.message?.includes('SubSelectionRequired'))) {
       if (!env.campus_id) return { skipped: 'no campus_id for DashboardOverviewInput' };
@@ -212,7 +212,7 @@ async function run() {
   await test('Update Tenant Features', async () => {
     const input = JSON.stringify({ admissions: true, finance: true });
     const res = await gql(
-      'mutation UpdateTenantFeatures($input: AWSJSON!) { updateTenantFeatures(input: $input) }',
+      'mutation UpdateTenantFeatures($input: UpdateTenantFeaturesInput!) { updateTenantFeatures(input: $input) }',
       { input },
     );
     return parse(ok(res, 'updateTenantFeatures'));
@@ -222,7 +222,7 @@ async function run() {
   console.log('\n👤 IDENTITY');
 
   await test('Me (current user)', async () => {
-    // Try AWSJSON first (new schema), fall back to typed User (old schema)
+    // Try typed input first (new schema), fall back to typed User (old schema)
     let res = await gql('query { me }');
     if (res.errors?.some(e => e.message?.includes('SubSelectionRequired'))) {
       res = await gql('query { me { id email fullName } }');
@@ -232,7 +232,7 @@ async function run() {
   });
 
   await test('List Users', async () => {
-    // Try AWSJSON first (new schema), fall back to typed UserConnection (old schema)
+    // Try typed input first (new schema), fall back to typed UserConnection (old schema)
     let res = await gql('query { listUsers }');
     if (res.errors?.some(e => e.message?.includes('SubSelectionRequired'))) {
       res = await gql('query { listUsers { edges { node { id email fullName } } pageInfo { hasNextPage } } }');
@@ -286,7 +286,7 @@ async function run() {
   await test('Create Class', async () => {
     if (!env.campus_id || !env.academic_year_id) throw new Error('Need campus_id and academic_year_id');
     const input = JSON.stringify({ name: suffixName('Grade 1'), code: suffixCode('G1'), grade: '1', campusId: env.campus_id, academicYearId: env.academic_year_id });
-    const res = await gql('mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }', { input });
+    const res = await gql('mutation CreateClass($input: CreateClassInput!) { createClass(input: $input) }', { input });
     const d = parse(ok(res, 'createClass'));
     if (id(d)) env.class_id = id(d);
     return d;
@@ -306,7 +306,7 @@ async function run() {
     if (!env.class_id) throw new Error('No class_id');
     const input = JSON.stringify({ name: `A-${SHORT_ID}`, academicYearId: env.academic_year_id, campusId: env.campus_id });
     const res = await gql(
-      'mutation CreateSection($classId: ID!, $input: AWSJSON!) { createSection(classId: $classId, input: $input) }',
+      'mutation CreateSection($classId: ID!, $input: CreateSectionInput!) { createSection(classId: $classId, input: $input) }',
       { classId: env.class_id, input },
     );
     const d = parse(ok(res, 'createSection'));
@@ -337,7 +337,7 @@ async function run() {
       type: 'CORE',
       creditsOrPeriods: 5,
     });
-    const res = await gql('mutation CreateSubject($input: AWSJSON!) { createSubject(input: $input) }', { input });
+    const res = await gql('mutation CreateSubject($input: CreateSubjectInput!) { createSubject(input: $input) }', { input });
     const d = parse(ok(res, 'createSubject'));
     if (id(d)) env.subject_id = id(d);
     return d;
@@ -422,7 +422,7 @@ async function run() {
       invoicePrefix: `TF${SHORT_ID.slice(-3)}`, receiptPrefix: `TR${SHORT_ID.slice(-3)}`,
       moduleType: 'FEE',
     });
-    const res = await gql('mutation CreateFeeCat($input: AWSJSON!) { createFeeCategory(input: $input) }', { input });
+    const res = await gql('mutation CreateFeeCat($input: typed input!) { createFeeCategory(input: $input) }', { input });
     const d = parse(ok(res, 'createFeeCategory'));
     if (id(d)) env.fee_category_id = id(d);
     return d;
@@ -453,7 +453,7 @@ async function run() {
       code: suffixCode('T1F'),
       prefix: suffixCode('T1F').slice(0, 8),
     });
-    const res = await gql('mutation CreateFeeHead($input: AWSJSON!) { createFeeHead(input: $input) }', { input });
+    const res = await gql('mutation CreateFeeHead($input: CreateFeeHeadInput!) { createFeeHead(input: $input) }', { input });
     const d = parse(ok(res, 'createFeeHead'));
     if (id(d)) env.fee_head_id = id(d);
     return d;
@@ -478,7 +478,7 @@ async function run() {
       name: suffixName('Annual'), academicYearId: env.academic_year_id,
       feeCategoryId: env.fee_category_id, dueDate: '2025-07-31',
     });
-    const res = await gql('mutation CreateFeeSchedule($input: AWSJSON!) { createFeeSchedule(input: $input) }', { input });
+    const res = await gql('mutation CreateFeeSchedule($input: CreateFeeScheduleInput!) { createFeeSchedule(input: $input) }', { input });
     const d = parse(ok(res, 'createFeeSchedule'));
     if (id(d)) env.fee_schedule_id = id(d);
     return d;
@@ -499,7 +499,7 @@ async function run() {
       classId: env.class_id,
       components: [{ feeHeadId: env.fee_head_id, feeHeadName: suffixName('Term 1 Fee'), amount: 10000 }],
     });
-    const res = await gql('mutation CreateFeeStructure($input: AWSJSON!) { createFeeStructure(input: $input) }', { input });
+    const res = await gql('mutation CreateFeeStructure($input: CreateFeeStructureInput!) { createFeeStructure(input: $input) }', { input });
     const d = parse(ok(res, 'createFeeStructure'));
     if (id(d)) env.fee_structure_id = id(d);
     return d;
@@ -530,7 +530,7 @@ async function run() {
       gradeApplied: 'Grade 1', academicYearId: env.academic_year_id,
       campusId: env.campus_id,
     });
-    const res = await gql('mutation CreateEnquiry($input: AWSJSON!) { createEnquiry(input: $input) }', { input });
+    const res = await gql('mutation CreateEnquiry($input: CreateEnquiryInput!) { createEnquiry(input: $input) }', { input });
     return parse(ok(res, 'createEnquiry'));
   });
 
@@ -554,7 +554,7 @@ async function run() {
       guardianPhone: `96${NUM_ID}`,
       guardianRelation: 'Father',
     });
-    const res = await gql('mutation CreateApplication($input: AWSJSON!) { createApplication(input: $input) }', { input });
+    const res = await gql('mutation CreateApplication($input: CreateApplicationInput!) { createApplication(input: $input) }', { input });
     const d = parse(ok(res, 'createApplication'));
     if (id(d)) env.application_id = id(d);
     if (!d?.applicationNumber && !d?.applicationNo) throw new Error('No application number generated');
@@ -570,7 +570,7 @@ async function run() {
   await test('Approve Application', async () => {
     if (!env.application_id) throw new Error('No application_id');
     const res = await gql(
-      'mutation ApproveApplication($id: ID!, $input: AWSJSON) { approveApplication(id: $id, input: $input) }',
+      'mutation ApproveApplication($id: ID!, $input: typed input) { approveApplication(id: $id, input: $input) }',
       { id: env.application_id, input: JSON.stringify({ remarks: 'API test approval' }) },
     );
     return parse(ok(res, 'approveApplication'));
@@ -598,7 +598,7 @@ async function run() {
       force: true,
       guardians: [{ name: 'Jane Doe', relation: 'Mother', phone: `94${NUM_ID}`, email: `jane.${SHORT_ID.toLowerCase()}@test.com` }],
     });
-    const res = await gql('mutation EnrollStudent($input: AWSJSON!) { enrollStudent(input: $input) }', { input });
+    const res = await gql('mutation EnrollStudent($input: EnrollStudentInput!) { enrollStudent(input: $input) }', { input });
     const d = parse(ok(res, 'enrollStudent'));
     const sid = id(d) || id(d?.student);
     if (sid) env.student_id = sid;
@@ -647,7 +647,7 @@ async function run() {
       academicYearId: env.academic_year_id,
     });
     const res = await gql(
-      'mutation AssignStudentClass($studentId: ID!, $input: AWSJSON!) { assignStudentClass(studentId: $studentId, input: $input) }',
+      'mutation AssignStudentClass($studentId: ID!, $input: AssignStudentClassInput!) { assignStudentClass(studentId: $studentId, input: $input) }',
       { studentId: env.student_id, input },
     );
     return parse(ok(res, 'assignStudentClass'));
@@ -686,7 +686,7 @@ async function run() {
   await test('Generate Registration Numbers', async () => {
     if (!env.academic_year_id || !env.campus_id || !env.class_id) throw new Error('Need academic_year_id, campus_id, class_id');
     const input = JSON.stringify({ academicYearId: env.academic_year_id, campusId: env.campus_id, gradeId: env.class_id });
-    const res = await gql('mutation GenerateRegistrationNumbers($input: AWSJSON!) { generateRegistrationNumbers(input: $input) }', { input });
+    const res = await gql('mutation GenerateRegistrationNumbers($input: GenerateRegistrationNumbersInput!) { generateRegistrationNumbers(input: $input) }', { input });
     const d = parse(ok(res, 'generateRegistrationNumbers'));
     if (!Number(d?.generated)) throw new Error('No registration numbers generated');
     return d;
@@ -702,7 +702,7 @@ async function run() {
 
   await test('Freeze Registration Numbers', async () => {
     const input = JSON.stringify({ academicYearId: env.academic_year_id, campusId: env.campus_id, gradeId: env.class_id });
-    const res = await gql('mutation FreezeRegistrationNumbers($input: AWSJSON!) { freezeRegistrationNumbers(input: $input) }', { input });
+    const res = await gql('mutation FreezeRegistrationNumbers($input: FreezeRegistrationNumbersInput!) { freezeRegistrationNumbers(input: $input) }', { input });
     return parse(ok(res, 'freezeRegistrationNumbers'));
   });
 
@@ -717,7 +717,7 @@ async function run() {
       sectionId: env.section_id,
       generationMode: 'ALPHABETICAL',
     });
-    const res = await gql('mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }', { input });
+    const res = await gql('mutation GenerateRollNumbers($input: GenerateRollNumbersInput!) { generateRollNumbers(input: $input) }', { input });
     const d = parse(ok(res, 'generateRollNumbers'));
     if (!Number(d?.generated)) throw new Error('No roll numbers generated');
     return d;
@@ -733,7 +733,7 @@ async function run() {
 
   await test('Freeze Roll Numbers', async () => {
     const input = JSON.stringify({ academicYearId: env.academic_year_id, campusId: env.campus_id, gradeId: env.class_id, sectionId: env.section_id });
-    const res = await gql('mutation FreezeRollNumbers($input: AWSJSON!) { freezeRollNumbers(input: $input) }', { input });
+    const res = await gql('mutation FreezeRollNumbers($input: FreezeRollNumbersInput!) { freezeRollNumbers(input: $input) }', { input });
     return parse(ok(res, 'freezeRollNumbers'));
   });
 
@@ -774,7 +774,7 @@ async function run() {
       studentId: env.student_id, feeStructureId: env.fee_structure_id,
       academicYearId: env.academic_year_id, campusId: env.campus_id,
     });
-    const res = await gql('mutation AssignFeeStructure($input: AWSJSON!) { createFeeAssignment(input: $input) }', { input });
+    const res = await gql('mutation AssignFeeStructure($input: typed input!) { createFeeAssignment(input: $input) }', { input });
     const d = parse(ok(res, 'createFeeAssignment'));
     if (id(d)) env.fee_assignment_id = id(d);
     return d;
@@ -844,7 +844,7 @@ async function run() {
       campusId: env.campus_id, amount: 5000,
       method: 'CASH', remarks: 'API test payment',
     });
-    const res = await gql('mutation RecordPayment($input: AWSJSON!) { recordPayment(input: $input) }', { input });
+    const res = await gql('mutation RecordPayment($input: RecordPaymentInput!) { recordPayment(input: $input) }', { input });
     const d = parse(ok(res, 'recordPayment'));
     const pid = id(d?.payment) || id(d);
     if (pid) env.payment_id = pid;
@@ -881,7 +881,7 @@ async function run() {
     if (!env.student_id) throw new Error('No student_id');
     const input = JSON.stringify({ amount: 1000, method: 'CASH', remarks: 'Collect test' });
     const res = await gql(
-      'mutation CollectPayment($studentId: ID!, $input: AWSJSON!) { collectPaymentByStudent(studentId: $studentId, input: $input) }',
+      'mutation CollectPayment($studentId: ID!, $input: typed input!) { collectPaymentByStudent(studentId: $studentId, input: $input) }',
       { studentId: env.student_id, input },
     );
     return parse(ok(res, 'collectPaymentByStudent'));
@@ -919,7 +919,7 @@ async function run() {
       startDate: '2025-08-01', endDate: '2025-08-05',
       maxMarks: 100, passingMarks: 35, type: 'UNIT_TEST',
     });
-    const res = await gql('mutation CreateExam($input: AWSJSON!) { createExam(input: $input) }', { input });
+    const res = await gql('mutation CreateExam($input: CreateExamInput!) { createExam(input: $input) }', { input });
     const d = parse(ok(res, 'createExam'));
     if (id(d)) env.exam_id = id(d);
     return d;
@@ -955,7 +955,7 @@ async function run() {
   await test('Create Target Class (Grade 2)', async () => {
     if (!env.campus_id || !env.to_academic_year_id) throw new Error('Need campus_id and to_academic_year_id');
     const input = JSON.stringify({ name: suffixName('Grade 2'), code: suffixCode('G2'), grade: '2', campusId: env.campus_id, academicYearId: env.to_academic_year_id });
-    const res = await gql('mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }', { input });
+    const res = await gql('mutation CreateClass($input: CreateClassInput!) { createClass(input: $input) }', { input });
     const d = parse(ok(res, 'createClass'));
     if (id(d)) env.to_class_id = id(d);
     return d;
@@ -968,7 +968,7 @@ async function run() {
       updates: [{ studentId: env.student_id, eligibility: 'ELIGIBLE' }],
     });
     const res = await gql(
-      'mutation SetEligibility($input: AWSJSON!) { setStudentPromotionEligibility(input: $input) }',
+      'mutation SetEligibility($input: typed input!) { setStudentPromotionEligibility(input: $input) }',
       { input },
     );
     return parse(ok(res, 'setStudentPromotionEligibility'));
@@ -988,7 +988,7 @@ async function run() {
       sectionStrategy:    'SAME_SECTION',
       feeAction:          'SKIP',
     });
-    const res = await gql('mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }', { input });
+    const res = await gql('mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }', { input });
     const d = parse(ok(res, 'promoteStudents'));
     const bid = id(d) || d?.batchId;
     if (bid) env.promotion_batch_id = bid;
@@ -1029,7 +1029,7 @@ async function run() {
 
   await test('Create Announcement', async () => {
     const input = JSON.stringify({ title: suffixName('Test Announcement'), content: 'This is a test announcement.', audience: ['ALL'] });
-    const res = await gql('mutation CreateAnnouncement($input: AWSJSON!) { createAnnouncement(input: $input) }', { input });
+    const res = await gql('mutation CreateAnnouncement($input: CreateAnnouncementInput!) { createAnnouncement(input: $input) }', { input });
     return parse(ok(res, 'createAnnouncement'));
   });
 
@@ -1053,7 +1053,7 @@ async function run() {
 
   await test('Get Upload URL', async () => {
     const input = JSON.stringify({ fileName: `test-${SHORT_ID}.pdf`, contentType: 'application/pdf', folder: 'docs' });
-    const res = await gql('mutation GetUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }', { input });
+    const res = await gql('mutation GetUploadUrl($input: typed input!) { getUploadUrl(input: $input) }', { input });
     return parse(ok(res, 'getUploadUrl'));
   });
 
@@ -1105,3 +1105,4 @@ async function run() {
 }
 
 run().catch(err => { console.error('\n⛔ Fatal:', err); process.exit(1); });
+

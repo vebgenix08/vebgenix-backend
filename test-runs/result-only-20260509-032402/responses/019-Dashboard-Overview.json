@@ -1,0 +1,13 @@
+{
+  "data": {
+    "dashboardOverview": {
+      "totals": {
+        "activeStudents": 12,
+        "staff": 0,
+        "admissionsToday": 2
+      },
+      "campusName": null,
+      "generatedAt": "2026-05-08T21:02:08.999Z"
+    }
+  }
+}

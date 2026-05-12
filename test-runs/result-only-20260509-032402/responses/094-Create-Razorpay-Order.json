@@ -1,0 +1,23 @@
+{
+  "data": {
+    "createPaymentOrder": null
+  },
+  "errors": [
+    {
+      "path": [
+        "createPaymentOrder"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 64,
+          "sourceName": null
+        }
+      ],
+      "message": "Internal server error"
+    }
+  ]
+}

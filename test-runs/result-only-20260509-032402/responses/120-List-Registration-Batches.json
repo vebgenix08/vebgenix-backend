@@ -1,0 +1,36 @@
+{
+  "data": {
+    "listRegistrationBatches": [
+      {
+        "_id": "69fe4635397957680cac7c82",
+        "tenantId": "org_vqr1dsp1",
+        "academicYearId": "69fb5e883633f68d4d31a50f",
+        "campusId": "69f9c29a690fae033907970c",
+        "gradeId": "69fa25e7fc42e073eb5607f0",
+        "generationMode": "ALPHABETICAL",
+        "status": "PENDING",
+        "lastRegistrationNo": 0,
+        "createdAt": "2026-05-08T20:23:17.444Z",
+        "updatedAt": "2026-05-08T20:23:17.444Z",
+        "__v": 0
+      },
+      {
+        "_id": "69fe3874ea526ebb5edfba85",
+        "tenantId": "org_vqr1dsp1",
+        "academicYearId": "69fb5e883633f68d4d31a50f",
+        "campusId": "69f9c29a690fae033907970c",
+        "gradeId": "69fe386fea526ebb5edfb9d7",
+        "generationMode": "ALPHABETICAL",
+        "status": "FROZEN",
+        "lastRegistrationNo": 1,
+        "createdAt": "2026-05-08T19:24:36.697Z",
+        "updatedAt": "2026-05-08T19:24:39.572Z",
+        "__v": 0,
+        "generatedAt": "2026-05-08T19:24:39.197Z",
+        "generatedBy": "69f9c29a690fae0339079710",
+        "frozenAt": "2026-05-08T19:24:39.572Z",
+        "frozenBy": "69f9c29a690fae0339079710"
+      }
+    ]
+  }
+}

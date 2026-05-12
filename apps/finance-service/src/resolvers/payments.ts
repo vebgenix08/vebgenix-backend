@@ -37,7 +37,15 @@ export async function resolvePayments(
       const filter: Record<string, unknown> = {};
       if (args.invoiceId) filter.invoiceId = args.invoiceId;
       if (args.studentId) filter.studentId = args.studentId;
-      if (args.status)    filter.status    = args.status;
+      if (args.status) filter.status = args.status;
+      if (args.campusId) filter.campusId = args.campusId;
+      if (args.academicYearId) filter.academicYearId = args.academicYearId;
+      if (args.from || args.to) {
+        const createdAt: Record<string, Date> = {};
+        if (args.from) createdAt.$gte = new Date(args.from as string);
+        if (args.to) createdAt.$lte = new Date(args.to as string);
+        filter.createdAt = createdAt;
+      }
       const docs = await FinanceRepo.listPayments(tenantId, filter);
       return (docs as unknown[]).map(d => toGql(d));
     }
@@ -100,6 +108,14 @@ export async function resolvePayments(
       const filter: Record<string, unknown> = {};
       if (args.studentId) filter.studentId = args.studentId;
       if (args.invoiceId) filter.invoiceId = args.invoiceId;
+      if (args.campusId) filter.campusId = args.campusId;
+      if (args.academicYearId) filter.academicYearId = args.academicYearId;
+      if (args.from || args.to) {
+        const createdAt: Record<string, Date> = {};
+        if (args.from) createdAt.$gte = new Date(args.from as string);
+        if (args.to) createdAt.$lte = new Date(args.to as string);
+        filter.createdAt = createdAt;
+      }
       const docs = await FinanceRepo.listPayments(tenantId, { ...filter, status: 'SUCCESS', receiptNumber: { $exists: true, $ne: null } });
       return (docs as unknown[]).map(d => toGql(d));
     }

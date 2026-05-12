@@ -4,7 +4,7 @@
 - Requests documented: `172`
 - Generated: `2026-05-06`
 
-> Readable sample input shows the data you enter. For `AWSJSON` GraphQL inputs, the actual Postman body stringifies that JSON, so the raw request can contain escaped quotes. Passwords and tokens are redacted.
+> Readable sample input shows the data you enter. For `typed input` GraphQL inputs, the actual Postman body stringifies that JSON, so the raw request can contain escaped quotes. Passwords and tokens are redacted.
 
 ## Module Summary
 
@@ -53,7 +53,7 @@
 
 ```json
 {
-  "query": "mutation CreateClass($input: AWSJSON!) { createClass(input: $input) }",
+  "query": "mutation CreateClass($input: CreateClassInput!) { createClass(input: $input) }",
   "variables": {
     "input": "{\"name\":\"Grade 10\",\"code\":\"G10\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"programId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -145,7 +145,7 @@
 
 ```json
 {
-  "query": "mutation CreateSection($classId: ID!, $input: AWSJSON!) { createSection(classId: $classId, input: $input) }",
+  "query": "mutation CreateSection($classId: ID!, $input: CreateSectionInput!) { createSection(classId: $classId, input: $input) }",
   "variables": {
     "classId": "69fae2a012627d3790c2e8a1",
     "input": "{\"name\":\"A\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"capacity\":40}"
@@ -240,7 +240,7 @@
 
 ```json
 {
-  "query": "mutation CreateSubject($input: AWSJSON!) { createSubject(input: $input) }",
+  "query": "mutation CreateSubject($input: CreateSubjectInput!) { createSubject(input: $input) }",
   "variables": {
     "input": "{\"name\":\"Mathematics\",\"code\":\"MATH\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"type\":\"CORE\",\"creditsOrPeriods\":5}"
   }
@@ -552,7 +552,7 @@
 
 ```json
 {
-  "query": "mutation EnrollStudent($input: AWSJSON!) { enrollStudent(input: $input) }",
+  "query": "mutation EnrollStudent($input: EnrollStudentInput!) { enrollStudent(input: $input) }",
   "variables": {
     "input": "{\"firstName\":\"Arjun\",\"lastName\":\"Kumar\",\"dateOfBirth\":\"2010-03-15\",\"gender\":\"MALE\",\"phone\":\"9876543210\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"classId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\",\"guardians\":[{\"name\":\"Ravi Kumar\",\"relation\":\"Father\",\"phone\":\"9876543211\"}]}"
   }
@@ -647,7 +647,7 @@
 
 ```json
 {
-  "query": "mutation UpdateStudent($studentId: ID!, $input: AWSJSON!) { updateStudent(studentId: $studentId, input: $input) }",
+  "query": "mutation UpdateStudent($studentId: ID!, $input: UpdateStudentInput!) { updateStudent(studentId: $studentId, input: $input) }",
   "variables": {
     "studentId": "69fae2a012627d3790c2e8a1",
     "input": "{\"phone\":\"9876543212\"}"
@@ -699,7 +699,7 @@
 
 ```json
 {
-  "query": "mutation AssignStudentClass($studentId: ID!, $input: AWSJSON!) { assignStudentClass(studentId: $studentId, input: $input) }",
+  "query": "mutation AssignStudentClass($studentId: ID!, $input: AssignStudentClassInput!) { assignStudentClass(studentId: $studentId, input: $input) }",
   "variables": {
     "studentId": "69fae2a012627d3790c2e8a1",
     "input": "{\"classId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\"}"
@@ -840,7 +840,7 @@
 
 ```json
 {
-  "query": "mutation GenerateRegistrationNumbers($input: AWSJSON!) { generateRegistrationNumbers(input: $input) }",
+  "query": "mutation GenerateRegistrationNumbers($input: GenerateRegistrationNumbersInput!) { generateRegistrationNumbers(input: $input) }",
   "variables": {
     "input": "{\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"gradeId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -887,7 +887,7 @@
 
 ```json
 {
-  "query": "mutation FreezeRegistrationNumbers($input: AWSJSON!) { freezeRegistrationNumbers(input: $input) }",
+  "query": "mutation FreezeRegistrationNumbers($input: FreezeRegistrationNumbersInput!) { freezeRegistrationNumbers(input: $input) }",
   "variables": {
     "input": "{\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"gradeId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -973,7 +973,7 @@
 
 ```json
 {
-  "query": "mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }",
+  "query": "mutation GenerateRollNumbers($input: GenerateRollNumbersInput!) { generateRollNumbers(input: $input) }",
   "variables": {
     "input": "{\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"gradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\",\"generationMode\":\"ALPHABETICAL\"}"
   }
@@ -1022,7 +1022,7 @@
 
 ```json
 {
-  "query": "mutation GenerateRollNumbers($input: AWSJSON!) { generateRollNumbers(input: $input) }",
+  "query": "mutation GenerateRollNumbers($input: GenerateRollNumbersInput!) { generateRollNumbers(input: $input) }",
   "variables": {
     "input": "{\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"gradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\",\"generationMode\":\"SEQUENTIAL\"}"
   }
@@ -1070,7 +1070,7 @@
 
 ```json
 {
-  "query": "mutation FreezeRollNumbers($input: AWSJSON!) { freezeRollNumbers(input: $input) }",
+  "query": "mutation FreezeRollNumbers($input: FreezeRollNumbersInput!) { freezeRollNumbers(input: $input) }",
   "variables": {
     "input": "{\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"gradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -1364,7 +1364,7 @@
 
 ```json
 {
-  "query": "mutation CreateExam($input: AWSJSON!) { createExam(input: $input) }",
+  "query": "mutation CreateExam($input: CreateExamInput!) { createExam(input: $input) }",
   "variables": {
     "input": "{\"name\":\"Term 1 Exam 2025\",\"classId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"startDate\":\"2025-10-15\",\"endDate\":\"2025-10-20\",\"maxMarks\":100,\"passingMarks\":35,\"type\":\"UNIT_TEST\"}"
   }
@@ -1501,7 +1501,7 @@
 
 ```json
 {
-  "query": "mutation EnterMarks($input: AWSJSON!) { enterMarks(input: $input) }",
+  "query": "mutation EnterMarks($input: typed input!) { enterMarks(input: $input) }",
   "variables": {
     "input": "{\"examId\":\"69fae2a012627d3790c2e8a1\",\"studentId\":\"69fae2a012627d3790c2e8a1\",\"marksObtained\":78,\"maxMarks\":100,\"grade\":\"A\",\"remarks\":\"Good performance\"}"
   }
@@ -1758,7 +1758,7 @@
 
 ```json
 {
-  "query": "mutation UpdateExam($id: ID!, $input: AWSJSON!) { updateExam(id: $id, input: $input) }",
+  "query": "mutation UpdateExam($id: ID!, $input: UpdateExamInput!) { updateExam(id: $id, input: $input) }",
   "variables": {
     "id": "69fae2a012627d3790c2e8a1",
     "input": "{\"name\":\"Term 1 Exam 2025 (Updated)\"}"
@@ -1850,7 +1850,7 @@
 
 ```json
 {
-  "query": "mutation SetStudentPromotionEligibility($input: AWSJSON!) { setStudentPromotionEligibility(input: $input) }",
+  "query": "mutation SetStudentPromotionEligibility($input: SetPromotionEligibilityInput!) { setStudentPromotionEligibility(input: $input) }",
   "variables": {
     "input": "{\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"updates\":[{\"studentId\":\"69fae2a012627d3790c2e8a1\",\"eligibility\":\"ELIGIBLE\"}]}"
   }
@@ -1896,7 +1896,7 @@
 
 ```json
 {
-  "query": "mutation AutoEvaluatePromotionEligibility($input: AWSJSON!) { autoEvaluatePromotionEligibility(input: $input) }",
+  "query": "mutation AutoEvaluatePromotionEligibility($input: PromoteStudentsInput!) { autoEvaluatePromotionEligibility(input: $input) }",
   "variables": {
     "input": "{\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"gradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\",\"minAttendancePct\":75,\"minAvgMarks\":35}"
   }
@@ -1947,7 +1947,7 @@
 
 ```json
 {
-  "query": "mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }",
+  "query": "mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"fromGradeId\":\"69fae2a012627d3790c2e8a1\",\"toGradeId\":\"69fae2a012627d3790c2e8a1\",\"studentIds\":[\"69fae2a012627d3790c2e8a1\"],\"sectionStrategy\":\"SAME_SECTION\",\"eligibilityMode\":\"USE_ENROLLMENT_ELIGIBILITY\",\"feeAction\":\"SKIP\"}"
   }
@@ -2011,7 +2011,7 @@
 
 ```json
 {
-  "query": "mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }",
+  "query": "mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"fromGradeId\":\"69fae2a012627d3790c2e8a1\",\"toGradeId\":\"69fae2a012627d3790c2e8a1\",\"studentIds\":[\"69fae2a012627d3790c2e8a1\"],\"sectionStrategy\":\"MANUAL\",\"manualAssignments\":[{\"studentId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\"}],\"eligibilityMode\":\"PROMOTE_ALL\",\"feeAction\":\"COPY_PATTERN\"}"
   }
@@ -2067,7 +2067,7 @@
 
 ```json
 {
-  "query": "mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }",
+  "query": "mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"fromGradeId\":\"69fae2a012627d3790c2e8a1\",\"toGradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionStrategy\":\"AUTO_SHUFFLE\",\"eligibilityMode\":\"PROMOTE_ALL\",\"feeAction\":\"ASSIGN_EXISTING\",\"feeStructureId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -2122,7 +2122,7 @@
 
 ```json
 {
-  "query": "mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }",
+  "query": "mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"fromGradeId\":\"69fae2a012627d3790c2e8a1\",\"toGradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionStrategy\":\"GENDER_BALANCE\",\"eligibilityMode\":\"USE_ENROLLMENT_ELIGIBILITY\",\"feeAction\":\"SKIP\"}"
   }
@@ -2178,7 +2178,7 @@
 
 ```json
 {
-  "query": "mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }",
+  "query": "mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"fromGradeId\":\"69fae2a012627d3790c2e8a1\",\"toGradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionStrategy\":\"CAPACITY_LIMIT\",\"sectionCapacity\":40,\"eligibilityMode\":\"USE_ENROLLMENT_ELIGIBILITY\",\"feeAction\":\"SKIP\"}"
   }
@@ -2234,7 +2234,7 @@
 
 ```json
 {
-  "query": "mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }",
+  "query": "mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"fromGradeId\":\"69fae2a012627d3790c2e8a1\",\"toGradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionStrategy\":\"PERFORMANCE_RANK\",\"examId\":\"69fae2a012627d3790c2e8a1\",\"eligibilityMode\":\"USE_ENROLLMENT_ELIGIBILITY\",\"feeAction\":\"SKIP\"}"
   }
@@ -2295,7 +2295,7 @@
 
 ```json
 {
-  "query": "mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }",
+  "query": "mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"fromGradeId\":\"69fae2a012627d3790c2e8a1\",\"toGradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionStrategy\":\"SUBJECT_GROUP\",\"subjectGroupMappings\":[{\"subjectId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\"}],\"eligibilityMode\":\"PROMOTE_ALL\",\"feeAction\":\"SKIP\"}"
   }
@@ -2350,7 +2350,7 @@
 
 ```json
 {
-  "query": "mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }",
+  "query": "mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"fromGradeId\":\"69fae2a012627d3790c2e8a1\",\"toGradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionStrategy\":\"TRANSPORT_ROUTE\",\"eligibilityMode\":\"USE_ENROLLMENT_ELIGIBILITY\",\"feeAction\":\"SKIP\"}"
   }
@@ -2406,7 +2406,7 @@
 
 ```json
 {
-  "query": "mutation PromoteStudents($input: AWSJSON!) { promoteStudents(input: $input) }",
+  "query": "mutation PromoteStudents($input: PromoteStudentsInput!) { promoteStudents(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"fromGradeId\":\"69fae2a012627d3790c2e8a1\",\"toGradeId\":\"69fae2a012627d3790c2e8a1\",\"sectionStrategy\":\"EXCEL_IMPORT\",\"importFileKey\":\"promotions/section-map.csv\",\"eligibilityMode\":\"USE_ENROLLMENT_ELIGIBILITY\",\"feeAction\":\"SKIP\"}"
   }
@@ -2629,7 +2629,7 @@
 
 ```json
 {
-  "query": "mutation CreateEnquiry($input: AWSJSON!) { createEnquiry(input: $input) }",
+  "query": "mutation CreateEnquiry($input: CreateEnquiryInput!) { createEnquiry(input: $input) }",
   "variables": {
     "input": "{\"studentName\":\"Rahul Sharma\",\"phone\":\"9876543210\",\"email\":\"rahul@example.com\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"source\":\"WALK_IN\"}"
   }
@@ -2762,7 +2762,7 @@
 
 ```json
 {
-  "query": "mutation UpdateEnquiry($id: ID!, $input: AWSJSON!) { updateEnquiry(id: $id, input: $input) }",
+  "query": "mutation UpdateEnquiry($id: ID!, $input: UpdateEnquiryInput!) { updateEnquiry(id: $id, input: $input) }",
   "variables": {
     "id": "69fae2a012627d3790c2e8a1",
     "input": "{\"status\":\"CONTACTED\",\"notes\":\"Called and confirmed interest\"}"
@@ -2810,7 +2810,7 @@
 
 ```json
 {
-  "query": "mutation CheckDuplicate($input: AWSJSON!) { checkDuplicate(input: $input) }",
+  "query": "mutation CheckDuplicate($input: CheckDuplicateInput!) { checkDuplicate(input: $input) }",
   "variables": {
     "input": "{\"phone\":\"9876543210\",\"email\":\"rahul@example.com\"}"
   }
@@ -2939,7 +2939,7 @@
 
 ```json
 {
-  "query": "mutation CreateApplication($input: AWSJSON!) { createApplication(input: $input) }",
+  "query": "mutation CreateApplication($input: CreateApplicationInput!) { createApplication(input: $input) }",
   "variables": {
     "input": "{\"studentName\":\"Priya Patel\",\"phone\":\"9876500001\",\"email\":\"priya@example.com\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"programId\":\"69fae2a012627d3790c2e8a1\",\"enquiryId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -3156,7 +3156,7 @@
 
 ```json
 {
-  "query": "mutation ReviewApplication($id: ID!, $input: AWSJSON!) { reviewApplication(id: $id, input: $input) }",
+  "query": "mutation ReviewApplication($id: ID!, $input: ApplicationReviewInput!) { reviewApplication(id: $id, input: $input) }",
   "variables": {
     "id": "69fae2a012627d3790c2e8a1",
     "input": "{\"decision\":\"UNDER_REVIEW\",\"remarks\":\"Documents verified, proceeding to review\"}"
@@ -3496,7 +3496,7 @@
 
 ```json
 {
-  "query": "mutation MergeStudents($input: AWSJSON!) { mergeStudents(input: $input) }",
+  "query": "mutation MergeStudents($input: MergeInput!) { mergeStudents(input: $input) }",
   "variables": {
     "input": "{\"primaryStudentId\":\"69fae2a012627d3790c2e8a1\",\"duplicateStudentIds\":[]}"
   }
@@ -3764,7 +3764,7 @@
 
 ```json
 {
-  "query": "mutation CreateAnnouncement($input: AWSJSON!) { createAnnouncement(input: $input) }",
+  "query": "mutation CreateAnnouncement($input: CreateAnnouncementInput!) { createAnnouncement(input: $input) }",
   "variables": {
     "input": "{\"title\":\"School Notice — Test\",\"content\":\"This is a test announcement.\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"targetAudience\":\"ALL\"}"
   }
@@ -3940,7 +3940,7 @@
 
 ```json
 {
-  "query": "mutation CreateFeeCategory($input: AWSJSON!) { createFeeCategory(input: $input) }",
+  "query": "mutation CreateFeeCategory($input: CreateFeeCategoryInput!) { createFeeCategory(input: $input) }",
   "variables": {
     "input": "{\"name\":\"General Fees\",\"moduleType\":\"FEE\",\"feeType\":\"GENERAL\",\"invoicePrefix\":\"GF/INV\",\"receiptPrefix\":\"GF/REC\",\"defaultAllocationMethod\":\"PRO_RATA\"}"
   }
@@ -4031,7 +4031,7 @@
 
 ```json
 {
-  "query": "mutation UpdateFeeCategory($id: ID!, $input: AWSJSON!) { updateFeeCategory(id: $id, input: $input) }",
+  "query": "mutation UpdateFeeCategory($id: ID!, $input: UpdateFeeCategoryInput!) { updateFeeCategory(id: $id, input: $input) }",
   "variables": {
     "id": "69fae2a012627d3790c2e8a1",
     "input": "{\"defaultAllocationMethod\":\"PRO_RATA\"}"
@@ -4165,7 +4165,7 @@
 
 ```json
 {
-  "query": "mutation CreateFeeHead($input: AWSJSON!) { createFeeHead(input: $input) }",
+  "query": "mutation CreateFeeHead($input: CreateFeeHeadInput!) { createFeeHead(input: $input) }",
   "variables": {
     "input": "{\"name\":\"Tuition Fee\",\"prefix\":\"TF\",\"type\":\"RECURRING\",\"feeCategoryId\":\"69fae2a012627d3790c2e8a1\",\"isMandatory\":true,\"isRefundable\":false,\"priorityOrder\":1}"
   }
@@ -4212,7 +4212,7 @@
 
 ```json
 {
-  "query": "mutation UpdateFeeHead($id: ID!, $input: AWSJSON!) { updateFeeHead(id: $id, input: $input) }",
+  "query": "mutation UpdateFeeHead($id: ID!, $input: UpdateFeeHeadInput!) { updateFeeHead(id: $id, input: $input) }",
   "variables": {
     "id": "69fae2a012627d3790c2e8a1",
     "input": "{\"priorityOrder\":1}"
@@ -4358,7 +4358,7 @@
 
 ```json
 {
-  "query": "mutation CreateFeeSchedule($input: AWSJSON!) { createFeeSchedule(input: $input) }",
+  "query": "mutation CreateFeeSchedule($input: CreateFeeScheduleInput!) { createFeeSchedule(input: $input) }",
   "variables": {
     "input": "{\"name\":\"Annual Plan 2025-26\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"feeCategoryId\":\"69fae2a012627d3790c2e8a1\",\"collectionType\":\"PARTIAL_ALLOWED\",\"allowPartialPayment\":true,\"graceDays\":5,\"slots\":[{\"name\":\"Term 1\",\"dueDate\":\"2025-07-31\",\"percentOfTotal\":50},{\"name\":\"Term 2\",\"dueDate\":\"2025-12-31\",\"percentOfTotal\":50}]}"
   }
@@ -4405,7 +4405,7 @@
 
 ```json
 {
-  "query": "mutation UpdateFeeSchedule($id: ID!, $input: AWSJSON!) { updateFeeSchedule(id: $id, input: $input) }",
+  "query": "mutation UpdateFeeSchedule($id: ID!, $input: UpdateFeeScheduleInput!) { updateFeeSchedule(id: $id, input: $input) }",
   "variables": {
     "id": "69fae2a012627d3790c2e8a1",
     "input": "{\"graceDays\":7}"
@@ -4548,7 +4548,7 @@
 
 ```json
 {
-  "query": "mutation CreateFeeStructure($input: AWSJSON!) { createFeeStructure(input: $input) }",
+  "query": "mutation CreateFeeStructure($input: CreateFeeStructureInput!) { createFeeStructure(input: $input) }",
   "variables": {
     "input": "{\"name\":\"Grade 10 Annual Fee 2025-26\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"classId\":\"69fae2a012627d3790c2e8a1\",\"feeCategoryId\":\"69fae2a012627d3790c2e8a1\",\"feeScheduleId\":\"69fae2a012627d3790c2e8a1\",\"allocationMethod\":\"PRO_RATA\",\"components\":[{\"feeHeadId\":\"69fae2a012627d3790c2e8a1\",\"feeHeadName\":\"Tuition Fee\",\"amount\":50000,\"isOptional\":false,\"priorityOrder\":1}]}"
   }
@@ -4639,7 +4639,7 @@
 
 ```json
 {
-  "query": "mutation UpdateFeeStructure($id: ID!, $input: AWSJSON!) { updateFeeStructure(id: $id, input: $input) }",
+  "query": "mutation UpdateFeeStructure($id: ID!, $input: UpdateFeeStructureInput!) { updateFeeStructure(id: $id, input: $input) }",
   "variables": {
     "id": "69fae2a012627d3790c2e8a1",
     "input": "{\"name\":\"Grade 10 Annual Fee 2025-26\"}"
@@ -4730,7 +4730,7 @@
 
 ```json
 {
-  "query": "mutation CopyFeePattern($input: AWSJSON!) { copyFeePattern(input: $input) }",
+  "query": "mutation CopyFeePattern($input: CopyFeePatternInput!) { copyFeePattern(input: $input) }",
   "variables": {
     "input": "{\"fromAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"toAcademicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -4858,7 +4858,7 @@
 
 ```json
 {
-  "query": "mutation CreateFeeAssignment($input: AWSJSON!) { createFeeAssignment(input: $input) }",
+  "query": "mutation CreateFeeAssignment($input: CreateFeeAssignmentInput!) { createFeeAssignment(input: $input) }",
   "variables": {
     "input": "{\"studentId\":\"69fae2a012627d3790c2e8a1\",\"feeStructureId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -4957,7 +4957,7 @@
 
 ```json
 {
-  "query": "mutation BulkAssignFeeStructure($input: AWSJSON!) { bulkAssignFeeStructure(input: $input) }",
+  "query": "mutation BulkAssignFeeStructure($input: BulkFeeAssignInput!) { bulkAssignFeeStructure(input: $input) }",
   "variables": {
     "input": "{\"studentIds\":[\"69fae2a012627d3790c2e8a1\"],\"feeStructureId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -5263,7 +5263,7 @@
 
 ```json
 {
-  "query": "mutation CreateOneOffCharge($input: AWSJSON!) { createOneOffCharge(input: $input) }",
+  "query": "mutation CreateOneOffCharge($input: CreateOneOffChargeInput!) { createOneOffCharge(input: $input) }",
   "variables": {
     "input": "{\"studentId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\",\"classId\":\"69fae2a012627d3790c2e8a1\",\"amount\":500,\"description\":\"Library fine\",\"feeHeadId\":\"69fae2a012627d3790c2e8a1\",\"feeHeadName\":\"Tuition Fee\"}"
   }
@@ -5310,7 +5310,7 @@
 
 ```json
 {
-  "query": "mutation ReviseInvoice($id: ID!, $input: AWSJSON!) { reviseInvoice(id: $id, input: $input) }",
+  "query": "mutation ReviseInvoice($id: ID!, $input: ReviseInvoiceInput!) { reviseInvoice(id: $id, input: $input) }",
   "variables": {
     "id": "69fae2a012627d3790c2e8a1",
     "input": "{\"newAmount\":48000,\"reason\":\"Scholarship discount applied\"}"
@@ -5398,7 +5398,7 @@
 
 ```json
 {
-  "query": "mutation RecordPayment($input: AWSJSON!) { recordPayment(input: $input) }",
+  "query": "mutation RecordPayment($input: RecordPaymentInput!) { recordPayment(input: $input) }",
   "variables": {
     "input": "{\"invoiceId\":\"69fae2a012627d3790c2e8a1\",\"studentId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"amount\":10000,\"method\":\"CASH\",\"remarks\":\"Partial payment — Term 1\"}"
   }
@@ -5451,7 +5451,7 @@
 
 ```json
 {
-  "query": "mutation RecordPayment($input: AWSJSON!) { recordPayment(input: $input) }",
+  "query": "mutation RecordPayment($input: RecordPaymentInput!) { recordPayment(input: $input) }",
   "variables": {
     "input": "{\"invoiceId\":\"69fae2a012627d3790c2e8a1\",\"studentId\":\"69fae2a012627d3790c2e8a1\",\"campusId\":\"69fae2a012627d3790c2e8a1\",\"amount\":5000,\"method\":\"UPI\",\"referenceNumber\":\"UPI123456\",\"allocationMode\":\"MANUAL\",\"remarks\":\"UPI payment — manual allocation\"}"
   }
@@ -5500,7 +5500,7 @@
 
 ```json
 {
-  "query": "mutation CollectPaymentByStudent($studentId: ID!, $input: AWSJSON!) { collectPaymentByStudent(studentId: $studentId, input: $input) }",
+  "query": "mutation CollectPaymentByStudent($studentId: ID!, $input: CollectByStudentInput!) { collectPaymentByStudent(studentId: $studentId, input: $input) }",
   "variables": {
     "studentId": "69fae2a012627d3790c2e8a1",
     "input": "{\"amount\":5000,\"method\":\"CASH\",\"remarks\":\"Bulk collect across all outstanding invoices\"}"
@@ -5721,7 +5721,7 @@
 
 ```json
 {
-  "query": "mutation CreatePaymentOrder($input: AWSJSON!) { createPaymentOrder(input: $input) }",
+  "query": "mutation CreatePaymentOrder($input: typed input!) { createPaymentOrder(input: $input) }",
   "variables": {
     "input": "{\"invoiceId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -5769,7 +5769,7 @@
 
 ```json
 {
-  "query": "mutation VerifyPaymentSignature($input: AWSJSON!) { verifyPaymentSignature(input: $input) }",
+  "query": "mutation VerifyPaymentSignature($input: VerifyPaymentInput!) { verifyPaymentSignature(input: $input) }",
   "variables": {
     "input": "{\"razorpayOrderId\":\"order_test_id\",\"razorpayPaymentId\":\"pay_test_id\",\"razorpaySignature\":\"test_signature\"}"
   }
@@ -6461,7 +6461,7 @@
 
 ```json
 {
-  "query": "mutation CreateTenant($input: AWSJSON!) { createTenant(input: $input) }",
+  "query": "mutation CreateTenant($input: CreateTenantInput!) { createTenant(input: $input) }",
   "variables": {
     "input": "{\"name\":\"Test School\",\"slug\":\"test-school-demo\",\"plan\":\"BASIC\",\"adminEmail\":\"testadmin@example.com\"}"
   }
@@ -6507,7 +6507,7 @@
 
 ```json
 {
-  "query": "mutation UpdateTenant($id: ID!, $input: AWSJSON!) { updateTenant(id: $id, input: $input) }",
+  "query": "mutation UpdateTenant($id: ID!, $input: UpdateTenantInput!) { updateTenant(id: $id, input: $input) }",
   "variables": {
     "id": "69fae2a012627d3790c2e8a1",
     "input": "{\"plan\":\"STANDARD\"}"
@@ -6636,7 +6636,7 @@
 
 ```json
 {
-  "query": "mutation ProvisionTenant($input: AWSJSON!) { provisionTenant(input: $input) }",
+  "query": "mutation ProvisionTenant($input: ProvisionTenantInput!) { provisionTenant(input: $input) }",
   "variables": {
     "input": "{\"name\":\"Demo School\",\"slug\":\"demo-school\",\"plan\":\"STANDARD\",\"campusName\":\"Main Campus\",\"adminEmail\":\"demoadmin@example.com\",\"adminPassword\":\"<redacted>\"}"
   }
@@ -6927,7 +6927,7 @@
 
 ```json
 {
-  "query": "mutation SetFeatureFlag($input: AWSJSON!) { setFeatureFlag(input: $input) }",
+  "query": "mutation SetFeatureFlag($input: UpdateTenantFeaturesInput!) { setFeatureFlag(input: $input) }",
   "variables": {
     "input": "{\"flag\":\"ENABLE_PROMOTIONS\",\"value\":true,\"tenantId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -7179,7 +7179,7 @@
 
 ```json
 {
-  "query": "mutation CreateResultBatch($input: AWSJSON!) { createResultBatch(input: $input) }",
+  "query": "mutation CreateResultBatch($input: CreateResultBatchInput!) { createResultBatch(input: $input) }",
   "variables": {
     "input": "{\"examId\":\"69fae2a012627d3790c2e8a1\",\"classId\":\"69fae2a012627d3790c2e8a1\",\"sectionId\":\"69fae2a012627d3790c2e8a1\",\"academicYearId\":\"69fae2a012627d3790c2e8a1\"}"
   }
@@ -7452,7 +7452,7 @@
 
 ```json
 {
-  "query": "mutation CreateCampus($input: AWSJSON!) { createCampus(input: $input) }",
+  "query": "mutation CreateCampus($input: typed input!) { createCampus(input: $input) }",
   "variables": {
     "input": "{\"name\":\"Main Campus\",\"code\":\"MAIN\",\"type\":\"SCHOOL\"}"
   }
@@ -7543,7 +7543,7 @@
 
 ```json
 {
-  "query": "mutation CreateProgram($input: AWSJSON!) { createProgram(input: $input) }",
+  "query": "mutation CreateProgram($input: typed input!) { createProgram(input: $input) }",
   "variables": {
     "input": "{\"name\":\"School Program\",\"code\":\"SCH\",\"type\":\"SCHOOL\",\"durationYears\":12}"
   }
@@ -7715,7 +7715,7 @@
 
 ```json
 {
-  "query": "mutation UpdateTenantFeatures($input: AWSJSON!) { updateTenantFeatures(input: $input) }",
+  "query": "mutation UpdateTenantFeatures($input: UpdateTenantFeaturesInput!) { updateTenantFeatures(input: $input) }",
   "variables": {
     "input": "{\"admissions\":true,\"finance\":true,\"academics\":true,\"communications\":true}"
   }
@@ -7847,7 +7847,7 @@
 
 ```json
 {
-  "query": "mutation GenerateUploadUrl($input: AWSJSON!) { getUploadUrl(input: $input) }",
+  "query": "mutation GenerateUploadUrl($input: GetUploadUrlInput!) { getUploadUrl(input: $input) }",
   "variables": {
     "input": "{\"fileName\":\"test-document.pdf\",\"contentType\":\"application/pdf\",\"folder\":\"documents\"}"
   }
@@ -7891,7 +7891,7 @@
 
 ```json
 {
-  "query": "mutation GenerateDownloadUrl($input: AWSJSON!) { getDownloadUrl(input: $input) }",
+  "query": "mutation GenerateDownloadUrl($input: ID!) { getDownloadUrl(input: $input) }",
   "variables": {
     "input": "{\"key\":\"documents/test-document.pdf\"}"
   }
@@ -7911,3 +7911,4 @@
   }
 }
 ```
+

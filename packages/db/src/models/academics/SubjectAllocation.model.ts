@@ -8,8 +8,9 @@ export interface ISubjectAllocation extends Document {
   sectionId:      string;
   subjectId:      string;
   subjectName:    string;
-  teacherId:      string;   // Employee profileId
-  teacherName:    string;
+  subjectCode?:   string;
+  teacherId?:     string;   // Employee profileId
+  teacherName?:   string;
   periodsPerWeek: number;
   academicYearId: string;
   isActive:       boolean;
@@ -22,8 +23,9 @@ const SubjectAllocationSchema = new Schema<ISubjectAllocation>({
   sectionId:      { type: String, required: true },
   subjectId:      { type: String, required: true },
   subjectName:    { type: String, required: true },
-  teacherId:      { type: String, required: true },
-  teacherName:    { type: String, required: true },
+  subjectCode:    { type: String },
+  teacherId:      { type: String },
+  teacherName:    { type: String },
   periodsPerWeek: { type: Number, default: 5 },
   academicYearId: { type: String, required: true },
   isActive:       { type: Boolean, default: true },

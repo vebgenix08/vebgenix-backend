@@ -62,7 +62,7 @@ export async function resolveSections(
     case 'deleteSection':
     case 'DELETE:/api/tenant/classes/:classId/sections/:sectionId':
       authorize(ctx, 'academics.sections.delete');
-      return toGql(await Section.findOneAndUpdate(
+      return Boolean(await Section.findOneAndUpdate(
         { tenantId, _id: args.sectionId ?? args.id },
         { $set: { isActive: false } },
         { new: true },

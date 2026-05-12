@@ -1,0 +1,23 @@
+{
+  "data": {
+    "getStudentDues": null
+  },
+  "errors": [
+    {
+      "path": [
+        "getStudentDues"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 9,
+          "sourceName": null
+        }
+      ],
+      "message": "Internal server error"
+    }
+  ]
+}

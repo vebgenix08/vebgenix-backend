@@ -27,6 +27,7 @@ export async function resolveInvoices(
       if (args.studentId) filter.studentId = args.studentId;
       if (args.status)    filter.status    = args.status;
       if (args.campusId)  filter.campusId  = args.campusId;
+      if (args.academicYearId) filter.academicYearId = args.academicYearId;
       const docs = await FinanceRepo.listInvoices(tenantId, filter);
       return (docs as unknown[]).map(d => toGql(d));
     }

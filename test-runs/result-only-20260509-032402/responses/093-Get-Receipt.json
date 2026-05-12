@@ -1,0 +1,23 @@
+{
+  "data": {
+    "getReceipt": {
+      "id": "69fae2b852a604ab48e898d3",
+      "tenantId": "org_vqr1dsp1",
+      "campusId": "69f9c29a690fae033907970c",
+      "studentId": "69fae2b012627d3790c2e941",
+      "invoiceId": "69fae2b452a604ab48e89879",
+      "academicYearId": "69f9f492ddb79cfc595f6493",
+      "feeOrderId": "TF9O_25-26_ORD_000001",
+      "feeHeadPrefix": "TF9OE",
+      "receiptNumber": "TF9O_25-26_RCP_000002",
+      "amount": 1000,
+      "method": "CASH",
+      "status": "SUCCESS",
+      "remarks": "Collect test",
+      "paidAt": "2026-05-06T06:42:00.687Z",
+      "collectedBy": "69f9c29a690fae0339079710",
+      "createdAt": "2026-05-06T06:42:00.688Z",
+      "updatedAt": "2026-05-06T06:42:00.688Z"
+    }
+  }
+}

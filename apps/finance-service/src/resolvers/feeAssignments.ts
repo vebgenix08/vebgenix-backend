@@ -78,18 +78,76 @@ export async function resolveFeeAssignments(
     case 'getFeeAssignmentQueue':
     case 'GET:/api/admin/finance/fee-assignment-queue': {
       authorize(ctx, 'finance.fee_assignment.read');
-      const { Student } = await import('@vebgenix/db');
+      const { Class, Student } = await import('@vebgenix/db');
       const { Types: MongoTypes } = await import('mongoose');
-      const academicYearId = args.academicYearId as string;
+      const academicYearId = args.academicYearId as string | undefined;
       const campusId       = args.campusId       as string | undefined;
       const studentFilter: Record<string, unknown> = { tenantId, status: 'ACTIVE' };
-      if (campusId) studentFilter.campusId = new MongoTypes.ObjectId(campusId);
-      const allStudents = await Student.find(studentFilter, '_id firstName lastName fullName registrationNumber classId').lean();
-      const assigned = await FinanceRepo.listFeeAssignments(tenantId, { academicYearId });
-      const assignedIds = new Set((assigned as { studentId?: { toString(): string } }[]).map((a) => a.studentId?.toString()));
+      if (campusId && MongoTypes.ObjectId.isValid(campusId)) {
+        studentFilter.campusId = new MongoTypes.ObjectId(campusId);
+      }
+      if (academicYearId && MongoTypes.ObjectId.isValid(academicYearId)) {
+        studentFilter.academicYearId = new MongoTypes.ObjectId(academicYearId);
+      }
+
+      const allStudents = await Student.find(
+        studentFilter,
+        '_id firstName lastName fullName email campusId academicYearId applicationId admissionNo registrationNumber classId',
+      ).lean();
+      const assigned = await FinanceRepo.listFeeAssignments(
+        tenantId,
+        academicYearId ? { academicYearId } : {},
+      );
+      const assignedByStudentId = new Map(
+        (assigned as unknown[]).map((assignment) => {
+          const plain = toGql(assignment) ?? {};
+          return [String(plain.studentId ?? ''), plain];
+        }),
+      );
+      const classIds = Array.from(
+        new Set(
+          allStudents
+            .map((student) => student.classId?.toString())
+            .filter((id): id is string => typeof id === 'string' && MongoTypes.ObjectId.isValid(id)),
+        ),
+      );
+      const classDocs = classIds.length
+        ? await Class.find({ tenantId, _id: { $in: classIds.map((id) => new MongoTypes.ObjectId(id)) } }, '_id name').lean()
+        : [];
+      const classNameById = new Map(classDocs.map((classDoc) => [classDoc._id.toString(), classDoc.name]));
+
       return allStudents
-        .filter((s) => !assignedIds.has(s._id.toString()))
-        .map(d => toGql(d));
+        .filter((student) => !assignedByStudentId.has(student._id.toString()))
+        .map((student) => {
+          const studentId = student._id.toString();
+          const classId = student.classId?.toString();
+          const className = classId ? classNameById.get(classId) : undefined;
+          const studentName =
+            student.fullName ||
+            [student.firstName, student.lastName].filter(Boolean).join(' ') ||
+            'Unknown student';
+
+          return {
+            studentId,
+            id: studentId,
+            studentName,
+            fullName: studentName,
+            email: student.email,
+            campusId: student.campusId?.toString(),
+            applicationId: student.applicationId?.toString(),
+            admissionNo: student.admissionNo,
+            registrationNumber: student.registrationNumber,
+            classId,
+            className,
+            currentGrade: className,
+            gradeApplyingFor: className,
+            academicYear: student.academicYearId?.toString(),
+            hasFeeAssignment: false,
+            feeAssignment: null,
+            currentAssignment: null,
+            availableStructures: [],
+          };
+        });
     }
 
     case 'getAssignableFeeStructures':

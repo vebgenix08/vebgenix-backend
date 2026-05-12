@@ -1,0 +1,23 @@
+{
+  "data": {
+    "freezeRollNumbers": null
+  },
+  "errors": [
+    {
+      "path": [
+        "freezeRollNumbers"
+      ],
+      "data": null,
+      "errorType": "Lambda:Unhandled",
+      "errorInfo": null,
+      "locations": [
+        {
+          "line": 1,
+          "column": 48,
+          "sourceName": null
+        }
+      ],
+      "message": "Roll numbers must be generated before freezing"
+    }
+  ]
+}

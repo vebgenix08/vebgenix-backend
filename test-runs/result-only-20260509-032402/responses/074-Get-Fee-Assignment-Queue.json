@@ -1,0 +1,99 @@
+{
+  "data": {
+    "getFeeAssignmentQueue": [
+      {
+        "id": "69f9f627ad313bb63dd12507",
+        "registrationNumber": "ADM/26-27/0001",
+        "firstName": "John",
+        "lastName": "Doe",
+        "fullName": "John Doe",
+        "classId": "69f9f61bad313bb63dd1247b"
+      },
+      {
+        "id": "69f9f9d92f4beacb8dff3791",
+        "registrationNumber": "ADM/25-26/0002",
+        "firstName": "John",
+        "lastName": "Doe",
+        "fullName": "John Doe",
+        "classId": "69f9f73aad313bb63dd12567"
+      },
+      {
+        "id": "69fa25edfc42e073eb560873",
+        "registrationNumber": "ADM/25-26/0003",
+        "firstName": "Application",
+        "lastName": "Student SW40KD",
+        "fullName": "Application Student SW40KD",
+        "classId": "69fa25e7fc42e073eb5607f0"
+      },
+      {
+        "id": "69fa25eefc42e073eb560883",
+        "registrationNumber": "ADM/25-26/0004",
+        "firstName": "Numbering",
+        "lastName": "SW40KD",
+        "fullName": "Numbering SW40KD",
+        "classId": "69fa25e7fc42e073eb5607f0"
+      },
+      {
+        "id": "69fa44c2515958e3fbb7f195",
+        "registrationNumber": "ADM/25-26/0005",
+        "firstName": "John",
+        "lastName": "T0SVSY",
+        "fullName": "John T0SVSY",
+        "classId": "69fa44cb515958e3fbb7f21a"
+      },
+      {
+        "id": "69fa44c3515958e3fbb7f1bf",
+        "registrationNumber": "ADM/25-26/0006",
+        "firstName": "Application",
+        "lastName": "Student T0SVSY",
+        "fullName": "Application Student T0SVSY"
+      },
+      {
+        "id": "69fa4566515958e3fbb7f263",
+        "registrationNumber": "ADM/25-26/0007",
+        "firstName": "John",
+        "lastName": "T0WPZM",
+        "fullName": "John T0WPZM",
+        "classId": "69fa4578515958e3fbb7f2df"
+      },
+      {
+        "id": "69fa459e515958e3fbb7f328",
+        "registrationNumber": "ADM/25-26/0008",
+        "firstName": "John",
+        "lastName": "T0Y0LC",
+        "fullName": "John T0Y0LC",
+        "classId": "69fa45a4515958e3fbb7f3b0"
+      },
+      {
+        "id": "69fa459f515958e3fbb7f355",
+        "registrationNumber": "ADM/25-26/0009",
+        "firstName": "Application",
+        "lastName": "Student T0Y0LC",
+        "fullName": "Application Student T0Y0LC"
+      },
+      {
+        "id": "69fae2b012627d3790c2e941",
+        "registrationNumber": "ADM/25-26/0010",
+        "firstName": "John",
+        "lastName": "TOV9OE",
+        "fullName": "John TOV9OE",
+        "classId": "69fae2bb12627d3790c2e9cb"
+      },
+      {
+        "id": "69fae2b112627d3790c2e970",
+        "registrationNumber": "ADM/25-26/0011",
+        "firstName": "Application",
+        "lastName": "Student TOV9OE",
+        "fullName": "Application Student TOV9OE"
+      },
+      {
+        "id": "69fe3874ea526ebb5edfba7e",
+        "registrationNumber": "ADM/27-28/0001",
+        "firstName": "Arjun",
+        "lastName": "Kumar",
+        "fullName": "Arjun Kumar",
+        "classId": "69fe386fea526ebb5edfb9d7"
+      }
+    ]
+  }
+}
