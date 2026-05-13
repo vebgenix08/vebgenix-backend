@@ -49,7 +49,7 @@ export async function resolveOnboarding(
         authUserId,
         email,
         fullName,
-        personaRole:    'ADMIN',
+        personaRole:    'TENANT_ADMIN',
         isActive:       true,
         isPrimaryOwner: true,
         isAllCampuses:  true,
