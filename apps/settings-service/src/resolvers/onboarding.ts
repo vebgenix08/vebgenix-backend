@@ -29,10 +29,62 @@ export async function resolveOnboarding(
     case 'createFirstAdmin':
     case 'POST:/api/platform/tenants/:id/first-admin': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
-      throw new AppError(
-        'BAD_REQUEST',
-        'Primary admin is created by provisionTenant. Use provisionTenant for single-step tenant setup.',
-      );
+      const tid      = (args.tenantId ?? args.id) as string;
+      const email    = args.email as string;
+      const fullName = (args.fullName ?? args.full_name) as string;
+      if (!tid || !email || !fullName) throw new AppError('BAD_REQUEST', 'tenantId, email, and fullName are required');
+
+      // Create MongoDB AuthUser shell (cognitoSub filled by PostConfirmation trigger)
+      const existingAuth = await AuthUser.findOne({ email }).lean();
+      const authUserId = existingAuth
+        ? existingAuth._id
+        : (await AuthUser.create({ email, isActive: true, isPlatformAdmin: false }))._id;
+
+      // Create Profile as primary owner
+      const existing = await Profile.findOne({ tenantId: tid, authUserId }).lean();
+      if (existing) throw new AppError('CONFLICT', 'Primary admin already exists for this tenant');
+
+      const profile = await Profile.create({
+        tenantId:       tid,
+        authUserId,
+        email,
+        fullName,
+        personaRole:    'ADMIN',
+        isActive:       true,
+        isPrimaryOwner: true,
+        isAllCampuses:  true,
+        campusAccess:   [],
+        roles:          [],
+      });
+
+      // Send Cognito invite
+      const { AdminCreateUserCommand, CognitoIdentityProviderClient } =
+        await import('@aws-sdk/client-cognito-identity-provider');
+      const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+      try {
+        await cognito.send(new AdminCreateUserCommand({
+          UserPoolId:             process.env.COGNITO_USER_POOL_ID,
+          Username:               email,
+          DesiredDeliveryMediums: ['EMAIL'],
+          UserAttributes: [
+            { Name: 'email',           Value: email },
+            { Name: 'name',            Value: fullName },
+            { Name: 'custom:tenantId', Value: tid },
+            { Name: 'email_verified',  Value: 'true' },
+          ],
+        }));
+      } catch (err: unknown) {
+        const cognitoErr = err as { name?: string };
+        if (cognitoErr.name !== 'UsernameExistsException') throw err;
+      }
+
+      return {
+        id:          String(profile._id),
+        email:       profile.email,
+        fullName:    profile.fullName,
+        personaRole: profile.personaRole,
+        isActive:    profile.isActive,
+      };
     }
 
     case 'finalizeOnboarding':
