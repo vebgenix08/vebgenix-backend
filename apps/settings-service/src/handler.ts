@@ -45,8 +45,10 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     await ensureDB();
     const ctx = await resolveContext(event);
     const { operation, args } = parseEvent(event);
-    // Use optional chaining to avoid throwing for platform-only operations
-    const tenantId = ctx.membership?.tenantId ?? '';
+    // Platform admins have no membership, so fall back to x-tenant-id header
+    const tenantId = ctx.membership?.tenantId
+      ?? (event.request as Record<string, Record<string, string>> | undefined)?.headers?.['x-tenant-id']
+      ?? '';
 
     const resolvers = [
       () => resolveTenants(operation, args, ctx, tenantId),
