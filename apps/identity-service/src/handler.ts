@@ -75,6 +75,12 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     const ctx                  = await resolveContext(event);
     const { operation, args } = parseEvent(event);
 
+    // Platform admins pass x-tenant-id header; membership is null for them
+    const headerTenantId = (event.request as Record<string, Record<string, string>> | undefined)
+      ?.headers?.['x-tenant-id'] ?? '';
+    const resolveTenantId = (): string =>
+      (ctx.isPlatformAdmin && headerTenantId) ? headerTenantId : getTenantId(ctx);
+
     switch (operation) {
 
       // ── Who am I ──────────────────────────────────────────────────────────
@@ -103,7 +109,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       // ── Users ─────────────────────────────────────────────────────────────
       case 'listUsers':
       case 'GET:/api/admin/users': {
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const inputFilter = (args.filter as Record<string, unknown> | undefined) ?? {};
         const filter: Record<string, unknown> = { personaRole: { $ne: 'STUDENT' } };
         const isActive = inputFilter.isActive ?? args.isActive;
@@ -130,7 +136,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'getUser':
       case 'GET:/api/admin/users/:id': {
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         return toGql(await IdentityRepo.findProfileById(tenantId, args.id as string));
       }
 
@@ -152,7 +158,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'reactivateUser':
       case 'POST:/api/admin/users/:id/reactivate': {
         authorize(ctx, 'identity.users.update');
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const updated  = await IdentityRepo.updateProfile(tenantId, args.id as string, { isActive: true });
         if (!updated) throw new AppError('NOT_FOUND', 'User not found');
         return toGql(updated);
@@ -171,7 +177,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'listStaff':
       case 'GET:/api/admin/staff': {
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const filter: Record<string, unknown> = { personaRole: { $in: ['STAFF', 'TEACHER'] } };
         if (args.campusId) filter['campusAccess.campusId'] = args.campusId;
         const profiles = await IdentityRepo.listProfiles(tenantId, filter);
@@ -180,7 +186,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'getStaffMember':
       case 'GET:/api/admin/staff/:id': {
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         return toGql(await IdentityRepo.findProfileById(tenantId, args.id as string));
       }
 
@@ -188,7 +194,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'listEmployees':
       case 'GET:/api/admin/employees': {
         authorize(ctx, 'identity.staff.read');
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const filter: Record<string, unknown> = { tenantId };
         if (args.staffType)   filter.staffType   = args.staffType;
         if (args.campusId)    filter.campusId     = args.campusId;
@@ -200,14 +206,14 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'getEmployee':
       case 'GET:/api/admin/employees/:id': {
         authorize(ctx, 'identity.staff.read');
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         return toGql(await Employee.findOne({ tenantId, _id: args.id as string }).lean());
       }
 
       case 'updateEmployee':
       case 'PATCH:/api/admin/employees/:id': {
         authorize(ctx, 'identity.staff.update');
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const id = args.id as string;
         const update = (args.input as Record<string, unknown>) ?? (() => {
           const { id: _id, ...rest } = args as Record<string, unknown>;
@@ -224,7 +230,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'addCampusAccess':
       case 'POST:/api/admin/users/:id/campus-access': {
         authorize(ctx, 'identity.users.update');
-        const tenantId  = getTenantId(ctx);
+        const tenantId  = resolveTenantId();
         const profileId = (args.userId ?? args.id) as string;
         const campusId  = args.campusId as string;
         const roleAtCampus = args.role as string | undefined;
@@ -245,7 +251,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'removeCampusAccess':
       case 'DELETE:/api/admin/users/:id/campus-access/:campusId': {
         authorize(ctx, 'identity.users.update');
-        const tenantId  = getTenantId(ctx);
+        const tenantId  = resolveTenantId();
         const profileId = (args.id ?? args.profileId) as string;
         const campusId  = args.campusId as string;
         const profile = await IdentityRepo.findProfileById(tenantId, profileId);
@@ -259,7 +265,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'listCampusAccess':
       case 'GET:/api/admin/users/:id/campus-access': {
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const profile  = await IdentityRepo.findProfileById(tenantId, args.id as string);
         if (!profile) throw new AppError('NOT_FOUND', 'User not found');
         return profile.campusAccess ?? [];
@@ -282,7 +288,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'assignRole':
       case 'POST:/api/admin/users/:id/roles': {
         authorize(ctx, 'identity.roles.assign');
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const targetId = (args.userId ?? args.id) as string;
         const profile  = await IdentityRepo.findProfileById(tenantId, targetId);
         if (!profile) throw new AppError('NOT_FOUND', 'User not found');
@@ -301,7 +307,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'removeRole':
       case 'DELETE:/api/admin/users/:id/roles/:role': {
         authorize(ctx, 'identity.roles.assign');
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const profile  = await IdentityRepo.findProfileById(tenantId, args.id as string);
         if (!profile) throw new AppError('NOT_FOUND', 'User not found');
         const filtered = (profile.roles ?? []).filter(
@@ -352,7 +358,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'uploadTenantLogo':
       case 'POST:/api/admin/settings/logo': {
         authorize(ctx, 'tenant.settings.update');
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const key      = `${tenantId}/logos/tenant-logo-${Date.now()}.png`;
         return {
           key,
@@ -363,7 +369,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'resendInvite':
       case 'POST:/api/admin/staff/:id/resend-invite': {
         authorize(ctx, 'identity.users.update');
-        const tenantId = getTenantId(ctx);
+        const tenantId = resolveTenantId();
         const profileId = (args.staffId ?? args.id) as string;
         const profile  = await IdentityRepo.findProfileById(tenantId, profileId);
         if (!profile) throw new AppError('NOT_FOUND', 'Staff member not found');
@@ -410,7 +416,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'bulkDeactivateUsers':
       case 'POST:/api/admin/users/bulk-deactivate': {
         authorize(ctx, 'identity.users.delete');
-        const tenantId  = getTenantId(ctx);
+        const tenantId  = resolveTenantId();
         const userIds   = args.userIds as string[];
         if (!Array.isArray(userIds) || userIds.length === 0) {
           throw new AppError('BAD_REQUEST', 'userIds array is required');
