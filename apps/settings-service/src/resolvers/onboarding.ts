@@ -1,7 +1,22 @@
-import { Tenant, Profile } from '@vebgenix/db';
+import { AuthUser, Tenant, Profile } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
+
+function tenantToGql(doc: Record<string, unknown> | null) {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const { _id, __v, ...rest } = plain;
+  return {
+    ...rest,
+    id: rest.tenantId ?? String(_id),
+    features: [],
+    fullDomain: rest.slug ? `${String(rest.slug)}.vebgenix.com` : null,
+    isActive: rest.isActive ?? true,
+    onboardingComplete: rest.onboardingComplete ?? false,
+    createdAt: rest.createdAt ? String(rest.createdAt) : new Date().toISOString(),
+  };
+}
 
 export async function resolveOnboarding(
   operation: string,
@@ -25,11 +40,12 @@ export async function resolveOnboarding(
     case 'POST:/api/platform/tenants/:id/finalize': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const id = (args.id ?? args.tenantId) as string;
-      return Tenant.findOneAndUpdate(
+      const doc = await Tenant.findOneAndUpdate(
         { tenantId: id },
         { $set: { onboardingComplete: true, isActive: true, finalizedAt: new Date(), finalizedBy: ctx.userId } },
         { new: true }
       ).lean();
+      return tenantToGql(doc as Record<string, unknown> | null);
     }
 
     case 'listTenantUsers':
@@ -51,8 +67,8 @@ export async function resolveOnboarding(
       const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
       const email   = args.email as string;
       const role    = (args.role as string) ?? 'STAFF';
-      const name    = (args.name as string) ?? email;
-      await cognito.send(new AdminCreateUserCommand({
+      const name    = ((args.fullName ?? args.name) as string) ?? email;
+      const createResp = await cognito.send(new AdminCreateUserCommand({
         UserPoolId:             process.env.COGNITO_USER_POOL_ID,
         Username:               email,
         DesiredDeliveryMediums: ['EMAIL'],
@@ -64,11 +80,19 @@ export async function resolveOnboarding(
           { Name: 'email_verified',  Value: 'true' },
         ],
       }));
+      const cognitoSub = createResp.User?.Attributes?.find(a => a.Name === 'sub')?.Value;
+      if (!cognitoSub) throw new AppError('BAD_REQUEST', 'Cognito did not return a user id');
+      const authUser = await AuthUser.create({
+        cognitoSub,
+        email,
+        isActive:        true,
+        isPlatformAdmin: false,
+      });
       const profile = await Profile.create({
         tenantId:    tid,
+        authUserId:  authUser._id,
         email,
-        firstName:   name.split(' ')[0],
-        lastName:    name.split(' ').slice(1).join(' '),
+        fullName:    name,
         personaRole: role,
         isActive:    true,
       });

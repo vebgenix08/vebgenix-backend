@@ -2,11 +2,32 @@ import { AuditLog, PlatformAuditLog } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 
-function toGql(doc: unknown): Record<string, unknown> | null {
+function toPlatformAuditListGql(doc: unknown): Record<string, unknown> | null {
   if (!doc) return null;
   const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
-  const { _id, __v, ...rest } = plain;
-  return _id !== undefined ? { id: String(_id), ...rest } : rest;
+  return {
+    id:          String(plain._id),
+    at:          plain.createdAt ? String(plain.createdAt) : new Date().toISOString(),
+    actorId:     String(plain.actorId ?? ''),
+    action:      plain.action ?? 'UNKNOWN',
+    targetType:  plain.entityType ?? 'TENANT',
+    targetId:    plain.entityId ?? null,
+    metaSummary: plain.metaSummary ?? (plain.entityName ? String(plain.entityName) : null),
+  };
+}
+
+function toPlatformAuditDetailGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  return {
+    id:         String(plain._id),
+    at:         plain.createdAt ? String(plain.createdAt) : new Date().toISOString(),
+    actorId:    String(plain.actorId ?? ''),
+    action:     plain.action ?? 'UNKNOWN',
+    targetType: plain.entityType ?? 'TENANT',
+    targetId:   plain.entityId ?? null,
+    meta:       plain.meta ? JSON.stringify(plain.meta) : null,
+  };
 }
 
 function toAuditLogGql(doc: unknown): Record<string, unknown> | null {
@@ -94,18 +115,46 @@ export async function resolveAuditLogs(
     case 'listPlatformAuditLogs':
     case 'GET:/api/platform/audit-logs': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
-      // AppSync: args.input = { filter, limit, cursor }  |  REST: args.limit / args.offset
       const inp    = (args.input as Record<string, unknown>) ?? args;
-      const limit  = Math.min((inp.limit as number) ?? (args.limit as number) ?? 50, 200);
-      const offset = (inp.offset as number) ?? (args.offset as number) ?? 0;
-      const docs = await PlatformAuditLog.find({}).sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
-      return { edges: docs.map(d => ({ cursor: String((d as Record<string,unknown>)._id), node: toGql(d) })), pageInfo: { hasNextPage: docs.length === limit } };
+      const limit  = Math.min((inp.limit as number) ?? (args.limit as number) ?? 25, 200);
+      const cursor = (inp.cursor as string | undefined) ?? null;
+      const filter = (inp.filter as Record<string, unknown>) ?? {};
+
+      const query: Record<string, unknown> = {};
+      if (filter.actorId)    query.actorId    = filter.actorId;
+      if (filter.action)     query.action     = filter.action;
+      if (filter.targetType) query.entityType = filter.targetType;
+      if (filter.targetId)   query.entityId   = filter.targetId;
+      if (filter.fromAt || filter.toAt) {
+        const dateFilter: Record<string, unknown> = {};
+        if (filter.fromAt) dateFilter.$gte = new Date(filter.fromAt as string);
+        if (filter.toAt)   dateFilter.$lte = new Date(filter.toAt as string);
+        query.createdAt = dateFilter;
+      }
+      if (cursor) {
+        const existing = (query.createdAt as Record<string, unknown>) ?? {};
+        query.createdAt = { ...existing, $lt: new Date(cursor) };
+      }
+
+      const docs = await PlatformAuditLog.find(query).sort({ createdAt: -1 }).limit(limit + 1).lean();
+      const hasNextPage = docs.length > limit;
+      const items = hasNextPage ? docs.slice(0, limit) : docs;
+      const lastDoc = items[items.length - 1] as Record<string, unknown> | undefined;
+      const nextCursor = hasNextPage && lastDoc ? String(lastDoc.createdAt) : null;
+
+      return {
+        edges: items.map(d => ({
+          cursor: String((d as Record<string, unknown>).createdAt),
+          node:   toPlatformAuditListGql(d),
+        })),
+        pageInfo: { hasNextPage, nextCursor },
+      };
     }
 
     case 'getPlatformAuditLog':
     case 'GET:/api/platform/audit-logs/:id': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
-      return toGql(await PlatformAuditLog.findById(args.id as string).lean());
+      return toPlatformAuditDetailGql(await PlatformAuditLog.findById(args.id as string).lean());
     }
 
     default:

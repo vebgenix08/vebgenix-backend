@@ -550,11 +550,11 @@ export async function resolveTenants(
     case 'updateTenant':
     case 'PATCH:/api/platform/tenants/:id':
     case 'PATCH:/api/admin/settings/tenant': {
-      const id = (args.tenantId ?? args.id) as string | undefined;
+      const input = (args.input as Record<string, unknown>) ?? args;
+      const id = (args.tenantId ?? args.id ?? input.id) as string | undefined;
       const resolvedTenantId = id ?? tenantId;
       if (!ctx.isPlatformAdmin) authorize(ctx, 'tenant.settings.update');
-      const input = (args.input as Record<string, unknown>) ?? args;
-      const { isActive: _isActive, slug: _slug, tenantId: _inputTenantId, ...safeInput } = input;
+      const { isActive: _isActive, slug: _slug, tenantId: _inputTenantId, id: _id, ...safeInput } = input;
       return toGql(await Tenant.findOneAndUpdate(
         { tenantId: resolvedTenantId },
         { $set: safeInput },
