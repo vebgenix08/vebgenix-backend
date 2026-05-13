@@ -160,8 +160,14 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       // ── Staff ─────────────────────────────────────────────────────────────
       case 'inviteStaff':
-      case 'POST:/api/admin/staff':
-        return InviteStaff.execute(ctx, args as Parameters<typeof InviteStaff.execute>[1]);
+      case 'POST:/api/admin/staff': {
+        const input = { ...(args as Parameters<typeof InviteStaff.execute>[1]) };
+        if (ctx.isPlatformAdmin && !ctx.membership) {
+          input.tenantId = (event.request as Record<string, Record<string, string>> | undefined)
+            ?.headers?.['x-tenant-id'] ?? '';
+        }
+        return InviteStaff.execute(ctx, input);
+      }
 
       case 'listStaff':
       case 'GET:/api/admin/staff': {

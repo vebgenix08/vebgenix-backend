@@ -28,14 +28,18 @@ export interface InviteStaffInput {
   designation?: string;
   department?: string;
   employeeCode?: string;
+  tenantId?: string;
 }
 
 export class InviteStaff {
   static async execute(ctx: AuthContext, input: InviteStaffInput) {
     authorize(ctx, 'staff.invite');
-    const tenantId = getTenantId(ctx);
+    // Platform admins acting on behalf of a tenant pass tenantId in the input
+    const tenantId = (ctx.isPlatformAdmin && input.tenantId)
+      ? input.tenantId
+      : getTenantId(ctx);
     const campusId = input.campusId ?? input.campusIds?.[0];
-    if (!campusId) throw new AppError('BAD_REQUEST', 'campusId or campusIds[0] is required');
+    if (!campusId && !input.allCampuses) throw new AppError('BAD_REQUEST', 'campusId or campusIds[0] is required');
     const staffType = input.staffType ?? 'TEACHER';
     const staffCategory = input.staffCategory ?? (staffType === 'TEACHER' || staffType === 'LECTURER' || staffType === 'LAB_FACULTY'
       ? 'TEACHING'
@@ -71,24 +75,27 @@ export class InviteStaff {
     });
 
     const employeeCode = input.employeeCode ?? `EMP${new Types.ObjectId().toString().slice(-8).toUpperCase()}`;
-    const employee = await Employee.create({
-      tenantId,
-      campusId:      new Types.ObjectId(campusId),
-      profileId:     profile._id,
-      authUserId:    authUser._id,
-      employeeCode,
-      fullName:      input.fullName,
-      email:         input.email,
-      phone:         input.phone,
-      designation:   input.designation,
-      department:    input.department,
-      staffType,
-      staffCategory,
-      employmentType: input.employmentType ?? 'FULL_TIME',
-      joiningDate:    new Date(),
-      isActive:       true,
-    });
-    await IdentityRepo.updateProfile(tenantId, profile._id.toString(), { employeeId: employee._id } as never);
+    let employee: { _id: Types.ObjectId } | null = null;
+    if (campusId) {
+      employee = await Employee.create({
+        tenantId,
+        campusId:      new Types.ObjectId(campusId),
+        profileId:     profile._id,
+        authUserId:    authUser._id,
+        employeeCode,
+        fullName:      input.fullName,
+        email:         input.email,
+        phone:         input.phone,
+        designation:   input.designation,
+        department:    input.department,
+        staffType,
+        staffCategory,
+        employmentType: input.employmentType ?? 'FULL_TIME',
+        joiningDate:    new Date(),
+        isActive:       true,
+      });
+      await IdentityRepo.updateProfile(tenantId, profile._id.toString(), { employeeId: employee._id } as never);
+    }
 
     // ── 3. Create the Cognito user and send the invite email ──────────────
     // Cognito sends a temporary-password email automatically (AdminCreateUser).
@@ -136,7 +143,7 @@ export class InviteStaff {
       success:      true,
       membershipId: profile._id.toString(),
       id:           profile._id.toString(),
-      employeeId:   employee._id.toString(),
+      employeeId:   employee ? employee._id.toString() : null,
       email:        profile.email,
       fullName:     profile.fullName,
     };
