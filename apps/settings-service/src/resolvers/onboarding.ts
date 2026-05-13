@@ -106,8 +106,15 @@ export async function resolveOnboarding(
       const tid    = (args.id ?? args.tenantId) as string;
       const limit  = Math.min((args.limit as number) ?? 50, 200);
       const offset = (args.offset as number) ?? 0;
-      return Profile.find({ tenantId: tid, isActive: true })
+      const docs   = await Profile.find({ tenantId: tid, isActive: true })
         .sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
+      return docs.map((d: Record<string, unknown>) => ({
+        id:          String(d._id),
+        email:       d.email,
+        fullName:    d.fullName,
+        personaRole: d.personaRole,
+        isActive:    d.isActive,
+      }));
     }
 
     case 'provisionTenantUser':
