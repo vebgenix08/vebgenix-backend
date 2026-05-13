@@ -163,6 +163,29 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'POST:/api/admissions/applications':
         return toGql(await CreateApplication.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateApplication.execute>[1]));
 
+      case 'updateApplication':
+      case 'PATCH:/api/admissions/applications/:id': {
+        authorize(ctx, 'admissions.application.update');
+        const input = ((args.input as Record<string, unknown>) ?? {}) as Record<string, unknown>;
+        return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, {
+          ...(input.academicYearId ? { academicYearId: input.academicYearId } : {}),
+          ...(input.programId ? { programId: input.programId } : {}),
+          ...(input.studentName ? { studentName: input.studentName } : {}),
+          ...(input.phone ? { phone: input.phone } : {}),
+          ...(input.email !== undefined ? { email: input.email } : {}),
+          ...(input.dateOfBirth !== undefined ? { dateOfBirth: input.dateOfBirth } : {}),
+          ...(input.gender !== undefined ? { gender: input.gender } : {}),
+          ...(input.address !== undefined ? { address: input.address } : {}),
+          ...(input.guardianName !== undefined ? { guardianName: input.guardianName } : {}),
+          ...(input.guardianPhone !== undefined ? { guardianPhone: input.guardianPhone } : {}),
+          ...(input.guardianRelation !== undefined ? { guardianRelation: input.guardianRelation } : {}),
+          ...(input.status ? { status: input.status } : {}),
+          ...(input.documents ? { documents: input.documents } : {}),
+          ...(input.photoUrl !== undefined ? { photoUrl: input.photoUrl } : {}),
+          ...(input.photoKey !== undefined ? { photoKey: input.photoKey } : {}),
+        } as never));
+      }
+
       case 'submitApplication':
       case 'POST:/api/admissions/applications/:id/submit': {
         authorize(ctx, 'admissions.application.update');
@@ -202,6 +225,12 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
           throw new AppError('BAD_REQUEST', `Cannot withdraw — status is ${app.status}`);
         }
         return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, { status: 'WITHDRAWN' }));
+      }
+
+      case 'updateApplicationStatus':
+      case 'PATCH:/api/admissions/applications/:id/status': {
+        authorize(ctx, 'admissions.application.update');
+        return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, { status: args.status as never }));
       }
 
       case 'approveApplication':

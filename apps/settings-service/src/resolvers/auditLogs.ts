@@ -9,6 +9,33 @@ function toGql(doc: unknown): Record<string, unknown> | null {
   return _id !== undefined ? { id: String(_id), ...rest } : rest;
 }
 
+function toAuditLogGql(doc: unknown): Record<string, unknown> | null {
+  if (!doc) return null;
+  const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
+  const before = plain.before as Record<string, unknown> | undefined;
+  const after = plain.after as Record<string, unknown> | undefined;
+  const meta = JSON.stringify({
+    ...(before ? { before } : {}),
+    ...(after ? { after } : {}),
+    ...(plain.userAgent ? { userAgent: plain.userAgent } : {}),
+  });
+
+  return {
+    id: String(plain._id ?? plain.id),
+    at: plain.createdAt ?? new Date().toISOString(),
+    actorId: plain.userId ? String(plain.userId) : '',
+    actorEmail: plain.userEmail ?? null,
+    action: plain.action,
+    category: plain.entityType ?? null,
+    severity: 'INFO',
+    targetType: plain.entityType ?? 'Unknown',
+    targetId: plain.entityId ?? null,
+    targetName: plain.entityName ?? null,
+    meta,
+    ipAddress: plain.ipAddress ?? null,
+  };
+}
+
 export async function resolveAuditLogs(
   operation: string,
   args: Record<string, unknown>,
@@ -19,13 +46,49 @@ export async function resolveAuditLogs(
 
     case 'listAuditLogs':
     case 'GET:/api/admin/audit-logs': {
-      const limit  = Math.min((args.limit as number) ?? 50, 200);
+      const inputFilter = (args.filter as Record<string, unknown>) ?? {};
+      const limit  = Math.min((args.limit as number) ?? 200, 200);
       const offset = (args.offset as number) ?? 0;
       const filter: Record<string, unknown> = { tenantId };
-      if (args.entityType) filter.entityType = args.entityType;
-      if (args.profileId)  filter.profileId  = args.profileId;
+      const fromAt = inputFilter.fromAt ?? args.fromAt;
+      const toAt = inputFilter.toAt ?? args.toAt;
+      const campusId = inputFilter.campusId ?? args.campusId;
+      const academicYearId = inputFilter.academicYearId ?? args.academicYearId;
+
+      if (inputFilter.action ?? args.action) {
+        filter.action = (inputFilter.action ?? args.action) as string;
+      }
+      if (inputFilter.category ?? args.category) {
+        filter.entityType = (inputFilter.category ?? args.category) as string;
+      }
+      if (inputFilter.targetType ?? args.entityType ?? args.targetType) {
+        filter.entityType = (inputFilter.targetType ?? args.entityType ?? args.targetType) as string;
+      }
+      if (inputFilter.targetId ?? args.targetId) {
+        filter.entityId = (inputFilter.targetId ?? args.targetId) as string;
+      }
+      if (inputFilter.actorId ?? args.profileId ?? args.actorId) {
+        filter.userId = (inputFilter.actorId ?? args.profileId ?? args.actorId) as string;
+      }
+      if (fromAt || toAt) {
+        filter.createdAt = {};
+        if (fromAt) (filter.createdAt as Record<string, unknown>).$gte = fromAt;
+        if (toAt) (filter.createdAt as Record<string, unknown>).$lte = toAt;
+      }
+      if (campusId || academicYearId) {
+        const scopeClauses: Record<string, unknown>[] = [];
+        if (campusId) {
+          scopeClauses.push({ 'before.campusId': campusId }, { 'after.campusId': campusId });
+        }
+        if (academicYearId) {
+          scopeClauses.push({ 'before.academicYearId': academicYearId }, { 'after.academicYearId': academicYearId });
+        }
+        if (scopeClauses.length > 0) {
+          filter.$or = scopeClauses;
+        }
+      }
       const docs = await AuditLog.find(filter).sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
-      return docs.map(d => toGql(d));
+      return docs.map(d => toAuditLogGql(d));
     }
 
     case 'listPlatformAuditLogs':

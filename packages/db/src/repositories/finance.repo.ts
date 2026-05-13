@@ -222,25 +222,32 @@ export const FinanceRepo: any = {
 
   // ── Reports ────────────────────────────────────────────────────────────────
 
-  async dayBookReport(tenantId: string, from: Date, to: Date, campusId?: string) {
+  async dayBookReport(tenantId: string, from: Date, to: Date, campusId?: string, academicYearId?: string) {
     const matchStage: Record<string, unknown> = {
       tenantId,
       status: 'SUCCESS',
       createdAt: { $gte: from, $lte: to },
     };
     if (campusId) matchStage.campusId = toObjectId(campusId);
-    const payments = await Payment.aggregate([
-      { $match: matchStage },
-      { $group: {
-        _id:         '$method',
-        totalAmount: { $sum: '$amount' },
-        count:       { $sum: 1 },
-        payments:    { $push: { _id: '$_id', amount: '$amount', invoiceId: '$invoiceId', createdAt: '$createdAt', receiptNumber: '$receiptNumber' } },
-      }},
-      { $sort: { _id: 1 } },
-    ]);
-    const grandTotal = payments.reduce((acc: number, g: Record<string, unknown>) => acc + (g.totalAmount as number), 0);
-    return { from, to, byMethod: payments, grandTotal };
+    if (academicYearId) matchStage.academicYearId = toObjectId(academicYearId);
+
+    const payments = await Payment.find(matchStage).sort({ createdAt: 1 }).lean();
+    const entries = payments.map((payment: Record<string, any>) => ({
+      paymentId: String(payment._id),
+      receiptNumber: payment.receiptNumber ?? null,
+      studentId: String(payment.studentId),
+      studentName: null,
+      amount: Number(payment.amount ?? 0),
+      method: payment.method,
+      collectedBy: payment.collectedBy ? String(payment.collectedBy) : null,
+      paidAt: (payment.paidAt ?? payment.createdAt)?.toISOString?.() ?? null,
+    }));
+
+    return {
+      date: from.toISOString().slice(0, 10),
+      totalAmount: entries.reduce((sum: number, entry: { amount: number }) => sum + entry.amount, 0),
+      entries,
+    };
   },
 
   async feeCollectionAnalytics(

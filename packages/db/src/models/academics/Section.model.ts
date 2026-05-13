@@ -33,6 +33,7 @@ const SectionSchema = new Schema<ISection>({
 SectionSchema.index({ tenantId: 1 });
 SectionSchema.index({ tenantId: 1, createdAt: -1 });
 SectionSchema.index({ tenantId: 1, academicYearId: 1 });
+SectionSchema.index({ tenantId: 1, campusId: 1, academicYearId: 1 });
 SectionSchema.index({ tenantId: 1, classId: 1, academicYearId: 1 });
 SectionSchema.index({ tenantId: 1, classId: 1, academicYearId: 1, name: 1 }, { unique: true });
 

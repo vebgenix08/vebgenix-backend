@@ -188,6 +188,7 @@ type Tenant {
   id:                 ID!
   name:               String!
   slug:               String
+  logoUrl:            String
   fullDomain:         String
   isActive:           Boolean!
   onboardingComplete: Boolean!
@@ -1086,6 +1087,7 @@ type Application {
   enquiryId: ID
   academicYearId: ID!
   programId: ID
+  programName: String
   applicationNumber: String!
   status: String!
   studentName: String!
@@ -1103,6 +1105,8 @@ type Application {
   approvedAt: String
   rejectedAt: String
   rejectionReason: String
+  photoUrl: String
+  photoKey: String
   createdBy: ID
   createdAt: AWSDateTime
   updatedAt: AWSDateTime
@@ -1122,6 +1126,31 @@ input CreateApplicationInput {
   guardianName: String
   guardianPhone: String
   guardianRelation: String
+}
+
+input ApplicationDocumentInput {
+  type: String!
+  url: String!
+  key: String!
+  uploadedAt: String
+}
+
+input UpdateApplicationInput {
+  academicYearId: ID
+  programId: ID
+  studentName: String
+  phone: String
+  email: String
+  dateOfBirth: String
+  gender: String
+  address: String
+  guardianName: String
+  guardianPhone: String
+  guardianRelation: String
+  status: String
+  documents: [ApplicationDocumentInput!]
+  photoUrl: String
+  photoKey: String
 }
 
 input ApplicationReviewInput {
@@ -1893,6 +1922,8 @@ input AuditLogFilterInput {
   category: String
   targetType: String
   targetId: String
+  campusId: ID
+  academicYearId: ID
   fromAt: String
   toAt: String
   actorId: String
@@ -2086,6 +2117,7 @@ type StudentAttendanceSummary {
 input BulkAttendanceInput {
   sectionId: ID!
   campusId: ID!
+  academicYearId: ID
   date: AWSDate!
   records: [AttendanceRecordInput!]!
 }
@@ -2131,6 +2163,7 @@ type Announcement {
   id: ID!
   tenantId: String
   campusId: ID
+  academicYearId: ID
   title: String!
   content: String!
   targetGroups: [String!]!
@@ -2145,6 +2178,7 @@ input CreateAnnouncementInput {
   title: String!
   content: String!
   campusId: ID
+  academicYearId: ID
   targetGroups: [String!]
 }
 
@@ -2152,6 +2186,7 @@ input UpdateAnnouncementInput {
   title: String
   content: String
   campusId: ID
+  academicYearId: ID
   targetGroups: [String!]
   status: String
 }
@@ -2160,6 +2195,7 @@ type CalendarEvent {
   id: ID!
   tenantId: String
   campusId: ID
+  academicYearId: ID
   title: String!
   description: String
   startDate: String!
@@ -2176,6 +2212,7 @@ input CreateEventInput {
   startDate: String!
   endDate: String!
   campusId: ID
+  academicYearId: ID
   description: String
   venue: String
   isPublic: Boolean
@@ -2186,6 +2223,7 @@ input UpdateEventInput {
   startDate: String
   endDate: String
   campusId: ID
+  academicYearId: ID
   description: String
   venue: String
   isPublic: Boolean
@@ -2208,6 +2246,7 @@ type LeaveRequest {
 }
 
 input CreateLeaveRequestInput {
+  profileId: ID
   type: String!
   fromDate: String!
   toDate: String!
@@ -2264,6 +2303,7 @@ type PublicResult {
   title: String!
   description: String
   fileKey: String
+  fileUrl: String
   status: String!
   publishedAt: String
   campusId: String
@@ -2368,7 +2408,7 @@ type Query {
   getFeeRevisions(invoiceId: ID!): [FeeRevision!]!
 
   # Finance — Reports & Analytics
-  dayBookReport(date: String, campusId: ID): DayBookReport!
+  dayBookReport(date: String, from: String, to: String, campusId: ID, academicYearId: ID): DayBookReport!
   feeCollectionAnalytics(campusId: ID, academicYearId: ID, from: String, to: String): FeeCollectionAnalytics!
   classFeeStats(classId: ID!, academicYearId: ID): ClassFeeStats!
   studentFinancialSummary(studentId: ID!): StudentFinancialSummary!
@@ -2404,10 +2444,10 @@ type Query {
 
   # Attendance
   listAttendance(studentId: ID, sectionId: ID, from: String, to: String): [AttendanceDayRecord!]!
-  getSectionAttendance(sectionId: ID!, date: AWSDate!): [AttendanceRecord!]!
-  getSectionAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!): AttendanceSummary!
-  getClassAttendance(sectionId: ID!, date: AWSDate!): [AttendanceRecord!]!
-  getStudentAttendance(studentId: ID!, from: AWSDate!, to: AWSDate!): [AttendanceRecord!]!
+  getSectionAttendance(sectionId: ID!, date: AWSDate!, campusId: ID, academicYearId: ID): [AttendanceRecord!]!
+  getSectionAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!, campusId: ID, academicYearId: ID): AttendanceSummary!
+  getClassAttendance(sectionId: ID!, date: AWSDate!, campusId: ID, academicYearId: ID): [AttendanceRecord!]!
+  getStudentAttendance(studentId: ID!, from: AWSDate!, to: AWSDate!, campusId: ID, academicYearId: ID): [AttendanceRecord!]!
   getAttendanceSummary(sectionId: ID!, from: AWSDate!, to: AWSDate!): AttendanceSummary!
 
   # Exams & Marks
@@ -2443,9 +2483,9 @@ type Query {
   getPlatformAuditLog(id: ID!): PlatformAuditLogDetail!
 
   # Comms
-  listAnnouncements(campusId: ID, status: String, limit: Int, nextToken: String): [Announcement!]!
+  listAnnouncements(campusId: ID, academicYearId: ID, status: String, limit: Int, nextToken: String): [Announcement!]!
   getAnnouncement(id: ID!): Announcement
-  listEvents(campusId: ID, from: String, to: String, limit: Int, nextToken: String): [CalendarEvent!]!
+  listEvents(campusId: ID, academicYearId: ID, from: String, to: String, limit: Int, nextToken: String): [CalendarEvent!]!
   getEvent(id: ID!): CalendarEvent
   listLeaveRequests(profileId: ID, status: String, limit: Int, nextToken: String): [LeaveRequest!]!
   getLeaveRequest(id: ID!): LeaveRequest
@@ -2515,6 +2555,8 @@ type Mutation {
   deleteEnquiry(id: ID!): Boolean
   checkDuplicate(input: CheckDuplicateInput!): DuplicateCheckResult!
   createApplication(input: CreateApplicationInput!): Application!
+  updateApplication(id: ID!, input: UpdateApplicationInput!): Application!
+  updateApplicationStatus(id: ID!, status: String!): Application!
   submitApplication(id: ID!): Application!
   reviewApplication(id: ID!, input: ApplicationReviewInput!): Application!
   withdrawApplication(id: ID!): Application!

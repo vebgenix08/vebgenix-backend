@@ -50,6 +50,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         authorize(ctx, 'comms.announcements.read');
         const filter: Record<string, unknown> = { tenantId };
         if (args.status)      filter.status      = args.status;
+        if (args.campusId)    filter.campusId    = args.campusId;
+        if (args.academicYearId) filter.academicYearId = args.academicYearId;
         if (args.targetGroup) filter.targetGroups = args.targetGroup;
         const docs = await Announcement.find(filter).sort({ createdAt: -1 }).lean();
         return docs.map(d => toGql(d));
@@ -125,6 +127,14 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
           filter.startDate = { $gte: new Date() };
         }
         if (args.campusId) filter.campusId = args.campusId;
+        if (args.academicYearId) filter.academicYearId = args.academicYearId;
+        if (args.from || args.to) {
+          filter.startDate = {
+            ...((filter.startDate as Record<string, unknown>) ?? {}),
+            ...(args.from ? { $gte: new Date(args.from as string) } : {}),
+            ...(args.to ? { $lte: new Date(args.to as string) } : {}),
+          };
+        }
         const docs = await EventModel.find(filter).sort({ startDate: 1 }).lean();
         return docs.map(d => toGql(d));
       }

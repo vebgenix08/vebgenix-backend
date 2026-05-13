@@ -29,6 +29,7 @@ const ClassSchema = new Schema<IClass>({
 ClassSchema.index({ tenantId: 1 });
 ClassSchema.index({ tenantId: 1, createdAt: -1 });
 ClassSchema.index({ tenantId: 1, campusId: 1 });
+ClassSchema.index({ tenantId: 1, campusId: 1, programId: 1 });
 ClassSchema.index({ tenantId: 1, code: 1 }, { unique: true });
 ClassSchema.index({ tenantId: 1, programId: 1 });
 

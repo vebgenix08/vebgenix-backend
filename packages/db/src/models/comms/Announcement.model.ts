@@ -6,6 +6,7 @@ export type AnnouncementTargetGroup = 'ALL' | 'STAFF' | 'TEACHERS' | 'STUDENTS' 
 export interface IAnnouncement extends Document {
   tenantId:     string;
   campusId?:    string;
+  academicYearId?: string;
   title:        string;
   content:      string;
   targetGroups: AnnouncementTargetGroup[];
@@ -19,6 +20,7 @@ export interface IAnnouncement extends Document {
 const AnnouncementSchema = new Schema<IAnnouncement>({
   tenantId:     { type: String, required: true },
   campusId:     { type: String },
+  academicYearId:{ type: String },
   title:        { type: String, required: true },
   content:      { type: String, required: true },
   targetGroups: [{ type: String, enum: ['ALL','STAFF','TEACHERS','STUDENTS','PARENTS'] }],
@@ -31,5 +33,6 @@ AnnouncementSchema.index({ tenantId: 1 });
 AnnouncementSchema.index({ tenantId: 1, createdAt: -1 });
 AnnouncementSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 AnnouncementSchema.index({ tenantId: 1, campusId: 1 });
+AnnouncementSchema.index({ tenantId: 1, campusId: 1, academicYearId: 1 });
 
 export const Announcement = model<IAnnouncement>('Announcement', AnnouncementSchema);

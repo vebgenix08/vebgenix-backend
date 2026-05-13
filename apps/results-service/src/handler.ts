@@ -14,6 +14,10 @@ import { resolveContext } from '@vebgenix/auth';
 import { AppError, isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 import { authorize } from '@vebgenix/permissions';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+const s3 = new S3Client({});
 
 function toGql(doc: unknown): Record<string, unknown> | null {
   if (!doc) return null;
@@ -51,7 +55,17 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       if (!token) throw new AppError('BAD_REQUEST', 'Token is required');
       const batch  = await PublishedResultBatch.findOne({ publicToken: token, status: 'PUBLISHED' }).lean();
       if (!batch) throw new AppError('NOT_FOUND', 'Result not found or not published');
-      return toGql(batch);
+      const plain = toGql(batch) as Record<string, unknown>;
+      const bucket = process.env.DOCUMENTS_BUCKET;
+      let fileUrl: string | null = null;
+      if (bucket && typeof plain.fileKey === 'string' && plain.fileKey) {
+        fileUrl = await getSignedUrl(
+          s3,
+          new GetObjectCommand({ Bucket: bucket, Key: plain.fileKey }),
+          { expiresIn: 900 },
+        );
+      }
+      return { ...plain, fileUrl };
     }
 
     // ── All other routes require auth ────────────────────────────────────────

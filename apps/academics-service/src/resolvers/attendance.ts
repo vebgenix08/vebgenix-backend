@@ -18,6 +18,18 @@ function asDate(value: unknown): string {
   return new Date(value as string).toISOString().split('T')[0];
 }
 
+function assertSectionScope(
+  section: Record<string, unknown>,
+  scope: { campusId?: unknown; academicYearId?: unknown },
+) {
+  if (scope.campusId && asId(section.campusId) !== String(scope.campusId)) {
+    throw new AppError('BAD_REQUEST', 'Section does not belong to the selected campus.');
+  }
+  if (scope.academicYearId && asId(section.academicYearId) !== String(scope.academicYearId)) {
+    throw new AppError('BAD_REQUEST', 'Section does not belong to the selected academic year.');
+  }
+}
+
 function toAttendanceStudentInfo(studentId: string, student?: Record<string, unknown>) {
   const firstName = student?.firstName as string | undefined;
   const lastName  = student?.lastName  as string | undefined;
@@ -69,6 +81,12 @@ export async function resolveAttendance(
     case 'getSectionAttendance':
     case 'getClassAttendance':                               // alias — same semantics
     case 'GET:/api/tenant/sections/:sectionId/attendance': {
+      const section = await Section.findOne({ tenantId, _id: args.sectionId as string }).lean();
+      if (!section) throw new AppError('NOT_FOUND', 'Section not found');
+      assertSectionScope(section as Record<string, unknown>, {
+        campusId: args.campusId,
+        academicYearId: args.academicYearId,
+      });
       const rows = await AcademicsRepo.listAttendance(
         tenantId,
         { sectionId: args.sectionId as string },
@@ -89,10 +107,23 @@ export async function resolveAttendance(
     // ── Read: by student + date range ─────────────────────────────────────────
     case 'getStudentAttendance':
     case 'GET:/api/tenant/students/:studentId/attendance': {
-      const { studentId, from, to } = args as { studentId: string; from: string; to: string };
+      const { studentId, from, to, campusId, academicYearId } = args as {
+        studentId: string; from: string; to: string; campusId?: string; academicYearId?: string;
+      };
+      if (campusId || academicYearId) {
+        const studentFilter: Record<string, unknown> = {
+          tenantId,
+          _id: new Types.ObjectId(studentId),
+        };
+        if (campusId) studentFilter.campusId = new Types.ObjectId(campusId);
+        if (academicYearId) studentFilter.academicYearId = new Types.ObjectId(academicYearId);
+        const student = await Student.findOne(studentFilter).select('_id').lean();
+        if (!student) return [];
+      }
       return Attendance.find({
         tenantId,
         studentId: new Types.ObjectId(studentId),
+        ...(campusId ? { campusId: new Types.ObjectId(campusId) } : {}),
         date: { $gte: new Date(from), $lte: new Date(to) },
       })
         .sort({ date: 1 })
@@ -115,9 +146,11 @@ export async function resolveAttendance(
       const date      = new Date(input.date as string);
       const sectionId = (input.sectionId ?? args.sectionId) as string;
       const campusId  = (input.campusId  ?? args.campusId)  as string | undefined;
+      const academicYearId = (input.academicYearId ?? args.academicYearId) as string | undefined;
       const sectionObjectId = new Types.ObjectId(sectionId);
       const section = await Section.findOne({ tenantId, _id: sectionObjectId }).lean();
       if (!section) throw new AppError('NOT_FOUND', 'Section not found');
+      assertSectionScope(section as Record<string, unknown>, { campusId, academicYearId });
       const classObjectId  = new Types.ObjectId(String((input.classId ?? section.classId) as string));
       const campusObjectId = new Types.ObjectId(String(campusId ?? section.campusId));
       const studentObjectIds = records.map(r => new Types.ObjectId(r.studentId));
@@ -154,11 +187,17 @@ export async function resolveAttendance(
     case 'getAttendanceSummary':                            // alias — same semantics
     case 'GET:/api/tenant/sections/:sectionId/attendance/summary': {
       const { sectionId, fromDate, toDate, from, to } = args as {
-        sectionId: string; fromDate?: string; toDate?: string; from?: string; to?: string;
+        sectionId: string; fromDate?: string; toDate?: string; from?: string; to?: string; campusId?: string; academicYearId?: string;
       };
       const start = new Date((fromDate ?? from) as string);
       const end   = new Date((toDate   ?? to)   as string);
       const sectionObjectId = new Types.ObjectId(sectionId);
+      const section = await Section.findOne({ tenantId, _id: sectionObjectId }).lean();
+      if (!section) throw new AppError('NOT_FOUND', 'Section not found');
+      assertSectionScope(section as Record<string, unknown>, {
+        campusId: args.campusId,
+        academicYearId: args.academicYearId,
+      });
 
       // Count total school days in range
       const totalDays = Math.max(

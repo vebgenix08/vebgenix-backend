@@ -22,6 +22,7 @@ export async function resolveSections(
     case 'GET:/api/tenant/sections': {
       const filter: Record<string, unknown> = { tenantId, isActive: true };
       if (args.academicYearId) filter.academicYearId = args.academicYearId;
+      if (args.campusId)       filter.campusId       = args.campusId;
       if (args.classId)        filter.classId        = args.classId;
       const docs = await Section.find(filter).sort({ displayName: 1 }).lean();
       return docs.map(d => toGql(d));

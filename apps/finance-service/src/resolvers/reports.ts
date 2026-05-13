@@ -19,7 +19,13 @@ export async function resolveReports(
       const to   = args.to
         ? new Date(new Date(args.to as string).setHours(23, 59, 59, 999))
         : new Date(new Date(baseDate).setHours(23, 59, 59, 999));
-      return FinanceRepo.dayBookReport(tenantId, from, to, args.campusId as string | undefined);
+      return FinanceRepo.dayBookReport(
+        tenantId,
+        from,
+        to,
+        args.campusId as string | undefined,
+        args.academicYearId as string | undefined,
+      );
     }
 
     case 'feeCollectionAnalytics':
