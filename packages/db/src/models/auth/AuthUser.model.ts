@@ -23,7 +23,7 @@ export interface IAuthUser extends Document {
 
 const AuthUserSchema = new Schema<IAuthUser>(
   {
-    cognitoSub:      { type: String, required: true },
+    cognitoSub:      { type: String, required: false, sparse: true },
     email:           { type: String, required: true },
     phone:           { type: String },
     isActive:        { type: Boolean, default: true },
@@ -33,7 +33,7 @@ const AuthUserSchema = new Schema<IAuthUser>(
 );
 
 // cognitoSub is globally unique — one MongoDB record per Cognito user
-AuthUserSchema.index({ cognitoSub: 1 }, { unique: true });
+AuthUserSchema.index({ cognitoSub: 1 }, { unique: true, sparse: true });
 // Email is globally unique across all tenants (same Cognito account = one email)
 AuthUserSchema.index({ email: 1 }, { unique: true });
 // Optional phone
