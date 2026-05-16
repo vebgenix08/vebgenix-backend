@@ -24,10 +24,9 @@ export interface IStudentAcademicEnrollment extends Document {
   joiningType: JoiningType;
   status: EnrollmentStatus;
 
-  // Set by admin before running promotion to control eligibility routing
   promotionEligibility?: PromotionEligibility;
 
-  // Groups students sharing the same elective subject/language stream (e.g. 'FRENCH', 'HINDI')
+  // Groups students sharing the same elective subject/language stream (e.g. 'HINDI')
   subjectGroupId?: string;
 
   // Promotion links — set when status becomes PROMOTED
