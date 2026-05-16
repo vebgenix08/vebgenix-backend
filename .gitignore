@@ -48,7 +48,6 @@ apps/*/dist/
 .env.*
 !.env.example
 
-# Claude Code local data (worktrees, session files, etc.)
 .claude/
 
 postman/reports/

@@ -7,6 +7,7 @@ export interface IFeeHead extends Document {
   name: string;
   prefix?: string;
   type: FeeHeadType;
+  category?: string;
   description?: string;
   isActive: boolean;
   createdBy: Types.ObjectId;
@@ -14,6 +15,8 @@ export interface IFeeHead extends Document {
   code?: string;
   isRefundable: boolean;
   isMandatory: boolean;
+  allowConcession: boolean;
+  allowLateFee: boolean;
   priorityOrder: number;
   createdAt: Date;
   updatedAt: Date;
@@ -21,18 +24,21 @@ export interface IFeeHead extends Document {
 
 const FeeHeadSchema = new Schema<IFeeHead>(
   {
-    tenantId:      { type: String, required: true },
-    name:          { type: String, required: true },
-    prefix:        { type: String, uppercase: true, trim: true },
-    type:          { type: String, enum: ['RECURRING','ONE_TIME','OPTIONAL'], required: true },
-    description:   { type: String },
-    isActive:      { type: Boolean, default: true },
-    createdBy:     { type: Schema.Types.ObjectId, required: true, ref: 'Profile' },
-    feeCategoryId: { type: Schema.Types.ObjectId, ref: 'FeeCategory' },
-    code:          { type: String, uppercase: true, trim: true },
-    isRefundable:  { type: Boolean, default: false },
-    isMandatory:   { type: Boolean, default: true },
-    priorityOrder: { type: Number, default: 0 },
+    tenantId:        { type: String, required: true },
+    name:            { type: String, required: true },
+    prefix:          { type: String, uppercase: true, trim: true },
+    type:            { type: String, enum: ['RECURRING','ONE_TIME','OPTIONAL'], required: true },
+    category:        { type: String },
+    description:     { type: String },
+    isActive:        { type: Boolean, default: true },
+    createdBy:       { type: Schema.Types.ObjectId, required: true, ref: 'Profile' },
+    feeCategoryId:   { type: Schema.Types.ObjectId, ref: 'FeeCategory' },
+    code:            { type: String, uppercase: true, trim: true },
+    isRefundable:    { type: Boolean, default: false },
+    isMandatory:     { type: Boolean, default: true },
+    allowConcession: { type: Boolean, default: false },
+    allowLateFee:    { type: Boolean, default: false },
+    priorityOrder:   { type: Number, default: 0 },
   },
   { timestamps: true }
 );

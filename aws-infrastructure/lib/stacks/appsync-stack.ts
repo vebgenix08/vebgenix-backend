@@ -101,6 +101,7 @@ export class AppSyncStack extends cdk.Stack {
       actions: [
         'cognito-idp:AdminCreateUser',
         'cognito-idp:AdminUpdateUserAttributes',
+        'cognito-idp:AdminSetUserPassword',
         'cognito-idp:AdminDisableUser',
         'cognito-idp:AdminEnableUser',
         'cognito-idp:AdminDeleteUser',
@@ -199,11 +200,15 @@ export class AppSyncStack extends cdk.Stack {
       'SettingsLambda', 'settings-resolver',
       'apps/settings-service/src/handler.ts',
     );
+    const sesPolicy = new iam.PolicyStatement({
+      actions:   ['ses:SendEmail', 'ses:SendRawEmail'],
+      resources: ['*'],
+    });
     const tenantsLambda = makeServiceLambda(
       'TenantsLambda', 'tenants-resolver',
       'apps/settings-service/src/handler.ts',
       {},
-      [cognitoAdminPolicy],
+      [cognitoAdminPolicy, sesPolicy],
     );
 
     // ── 6. Storage service (presigned S3 URLs) ──────────────────────────────
@@ -491,6 +496,7 @@ export class AppSyncStack extends cdk.Stack {
     tenants('Mutation', 'createTenant');
     tenants('Mutation', 'provisionTenant');
     tenants('Mutation', 'deactivateTenant');
+    tenants('Mutation', 'reactivateTenant');
     tenants('Mutation', 'requestTenantDeletion');
     tenants('Mutation', 'confirmTenantDeletion');
     tenants('Mutation', 'createFirstAdmin');

@@ -193,6 +193,8 @@ type Tenant {
   isActive:           Boolean!
   onboardingComplete: Boolean!
   features:           [TenantFeatureItem!]!
+  campusCount:        Int
+  primaryAdminEmail:  String
   createdAt:          String!
 }
 
@@ -484,12 +486,15 @@ type FeeHead {
   tenantId: String
   name: String!
   type: String!
+  category: String
   prefix: String
   code: String
   description: String
   feeCategoryId: ID
   isRefundable: Boolean!
   isMandatory: Boolean!
+  allowConcession: Boolean!
+  allowLateFee: Boolean!
   priorityOrder: Int!
   isActive: Boolean!
   createdAt: AWSDateTime
@@ -499,24 +504,30 @@ type FeeHead {
 input CreateFeeHeadInput {
   name: String!
   type: String!
+  category: String
   feeCategoryId: ID
   code: String
   prefix: String
   description: String
   isRefundable: Boolean
   isMandatory: Boolean
+  allowConcession: Boolean
+  allowLateFee: Boolean
   priorityOrder: Int
 }
 
 input UpdateFeeHeadInput {
   name: String
   type: String
+  category: String
   feeCategoryId: ID
   code: String
   prefix: String
   description: String
   isRefundable: Boolean
   isMandatory: Boolean
+  allowConcession: Boolean
+  allowLateFee: Boolean
   priorityOrder: Int
   isActive: Boolean
 }
@@ -546,6 +557,8 @@ type FeeStructure {
   academicYearId: ID!
   programId: ID
   classId: ID
+  classFrom: Int
+  classTo: Int
   name: String!
   components: [FeeComponent!]!
   totalAmount: Float!
@@ -564,6 +577,8 @@ input CreateFeeStructureInput {
   academicYearId: ID!
   programId: ID
   classId: ID
+  classFrom: Int
+  classTo: Int
   feeCategoryId: ID
   feeScheduleId: ID
   allocationMethod: String
@@ -576,6 +591,8 @@ input UpdateFeeStructureInput {
   academicYearId: ID
   programId: ID
   classId: ID
+  classFrom: Int
+  classTo: Int
   feeCategoryId: ID
   feeScheduleId: ID
   allocationMethod: String
@@ -726,12 +743,29 @@ type FeeAssignmentQueueItem {
 
 # ─── Finance — Installment Plans ─────────────────────────────────────────────
 
+type InstallmentEntry {
+  label: String!
+  percentage: Float!
+  dueDateType: String!
+  fixedDate: String
+  monthsOffset: Int
+}
+
+input InstallmentEntryInput {
+  label: String!
+  percentage: Float!
+  dueDateType: String!
+  fixedDate: String
+  monthsOffset: Int
+}
+
 type InstallmentPlan {
   id: ID!
   tenantId: String
   name: String!
   numberOfInstallments: Int!
   description: String
+  installments: [InstallmentEntry!]
   isActive: Boolean!
   createdAt: AWSDateTime
   updatedAt: AWSDateTime
@@ -741,12 +775,14 @@ input CreateInstallmentPlanInput {
   name: String!
   numberOfInstallments: Int!
   description: String
+  installments: [InstallmentEntryInput!]
 }
 
 input UpdateInstallmentPlanInput {
   name: String
   numberOfInstallments: Int
   description: String
+  installments: [InstallmentEntryInput!]
   isActive: Boolean
 }
 
@@ -1357,6 +1393,7 @@ type GradeClass {
   tenantId: String
   campusId: ID!
   programId: ID
+  academicYearId: ID
   name: String!
   code: String!
   year: Int
@@ -1370,6 +1407,7 @@ input CreateClassInput {
   code: String!
   campusId: ID!
   programId: ID
+  academicYearId: ID
   year: Int
 }
 
@@ -1378,6 +1416,7 @@ input UpdateClassInput {
   code: String
   campusId: ID
   programId: ID
+  academicYearId: ID
   year: Int
   isActive: Boolean
 }
@@ -2530,6 +2569,7 @@ type Mutation {
   createTenant(input: CreateTenantInput!): Tenant!
   updateTenant(input: UpdateTenantInput!): Tenant!
   deactivateTenant(id: ID!): Boolean
+  reactivateTenant(id: ID!): Tenant
   provisionTenant(input: ProvisionTenantInput!): ProvisionTenantResult!
   requestTenantDeletion(tenantId: ID!): TenantDeletionOtpResult!
   confirmTenantDeletion(tenantId: ID!, otp: String!): Boolean!

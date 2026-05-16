@@ -322,19 +322,41 @@ export async function resolveTenants(
       const tenantIds = docs
         .map(doc => String((doc as PlainDoc).tenantId ?? ''))
         .filter(Boolean);
-      const featureDocs = tenantIds.length
-        ? await TenantFeature.find({ tenantId: { $in: tenantIds } }).lean()
-        : [];
+      const [featureDocs, campusCounts, primaryAdmins] = await Promise.all([
+        tenantIds.length ? TenantFeature.find({ tenantId: { $in: tenantIds } }).lean() : [],
+        tenantIds.length
+          ? Campus.aggregate([
+              { $match: { tenantId: { $in: tenantIds }, isActive: { $ne: false } } },
+              { $group: { _id: '$tenantId', count: { $sum: 1 } } },
+            ])
+          : [],
+        tenantIds.length
+          ? Profile.find({ tenantId: { $in: tenantIds }, isPrimaryOwner: true, isActive: { $ne: false } })
+              .select('tenantId email').lean()
+          : [],
+      ]);
       const featureMap = new Map(
         featureDocs.map(doc => [
           String((doc as PlainDoc).tenantId),
           (doc as PlainDoc).features as FeatureFlags | undefined,
         ]),
       );
+      const campusCountMap = new Map(
+        (campusCounts as { _id: string; count: number }[]).map(r => [r._id, r.count]),
+      );
+      const adminMap = new Map(
+        (primaryAdmins as PlainDoc[]).map(p => [String(p.tenantId), String(p.email ?? '')]),
+      );
       return {
         items: docs.map(doc => {
           const plain = doc as PlainDoc;
-          return toGql(plain, featureMap.get(String(plain.tenantId)));
+          const tid = String(plain.tenantId);
+          const base = toGql(plain, featureMap.get(tid));
+          return {
+            ...base,
+            campusCount: campusCountMap.get(tid) ?? 0,
+            primaryAdminEmail: adminMap.get(tid) ?? null,
+          };
         }),
         nextToken: null,
       };
@@ -566,9 +588,20 @@ export async function resolveTenants(
     case 'DELETE:/api/platform/tenants/:id': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const id = (args.tenantId ?? args.id) as string;
-      return toGql(await Tenant.findOneAndUpdate(
+      await Tenant.findOneAndUpdate(
         { tenantId: id },
         { $set: { isActive: false } },
+        { new: true },
+      ).lean();
+      return true;
+    }
+
+    case 'reactivateTenant': {
+      if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
+      const id = (args.tenantId ?? args.id) as string;
+      return toGql(await Tenant.findOneAndUpdate(
+        { tenantId: id },
+        { $set: { isActive: true } },
         { new: true },
       ).lean() as PlainDoc | null);
     }

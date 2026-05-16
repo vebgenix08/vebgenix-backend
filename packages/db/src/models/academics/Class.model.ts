@@ -2,28 +2,30 @@
  * Class — a grade/year level within a program.
  * e.g.: "Grade 10", "Year 1", "Semester 1 — B.Tech CS"
  */
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
 export interface IClass extends Document {
-  tenantId:   string;
-  campusId:   string;
-  programId?: string;
-  name:       string;   // "Grade 10" / "Year 1"
-  code:       string;   // "G10" / "Y1"
-  year?:      number;   // year number within program (1-indexed)
-  isActive:   boolean;
-  createdAt:  Date;
-  updatedAt:  Date;
+  tenantId:       string;
+  campusId:       Types.ObjectId;
+  programId?:     Types.ObjectId;
+  academicYearId?: Types.ObjectId;
+  name:           string;   // "Grade 10" / "Year 1"
+  code:           string;   // "G10" / "Y1"
+  year?:          number;   // year number within program (1-indexed)
+  isActive:       boolean;
+  createdAt:      Date;
+  updatedAt:      Date;
 }
 
 const ClassSchema = new Schema<IClass>({
-  tenantId:  { type: String, required: true },
-  campusId:  { type: String, required: true },
-  programId: { type: String },
-  name:      { type: String, required: true },
-  code:      { type: String, required: true },
-  year:      { type: Number },
-  isActive:  { type: Boolean, default: true },
+  tenantId:       { type: String, required: true },
+  campusId:       { type: Schema.Types.ObjectId, required: true, ref: 'Campus' },
+  programId:      { type: Schema.Types.ObjectId, ref: 'Program' },
+  academicYearId: { type: Schema.Types.ObjectId, ref: 'AcademicYear' },
+  name:           { type: String, required: true },
+  code:           { type: String, required: true },
+  year:           { type: Number },
+  isActive:       { type: Boolean, default: true },
 }, { timestamps: true });
 
 ClassSchema.index({ tenantId: 1 });

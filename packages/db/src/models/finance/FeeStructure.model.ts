@@ -16,6 +16,8 @@ export interface IFeeStructure extends Document {
   academicYearId: Types.ObjectId;
   programId?: Types.ObjectId;
   classId?: Types.ObjectId;
+  classFrom?: number;
+  classTo?: number;
   name: string;
   components: IFeeComponent[];
   totalAmount: number;
@@ -36,6 +38,8 @@ const FeeStructureSchema = new Schema<IFeeStructure>(
     academicYearId:   { type: Schema.Types.ObjectId, required: true, ref: 'AcademicYear' },
     programId:        { type: Schema.Types.ObjectId },
     classId:          { type: Schema.Types.ObjectId },
+    classFrom:        { type: Number },
+    classTo:          { type: Number },
     name:             { type: String, required: true },
     components: [{
       feeHeadId:     { type: Schema.Types.ObjectId, required: true, ref: 'FeeHead' },

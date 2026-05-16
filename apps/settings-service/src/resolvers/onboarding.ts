@@ -3,6 +3,74 @@ import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
 
+/** Generates a temp password that satisfies Cognito policy (10+ chars, upper+lower+digit). */
+function generateTempPassword(): string {
+  const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower   = 'abcdefghijkmnpqrstuvwxyz';
+  const digits  = '23456789';
+  const all     = upper + lower + digits;
+  let pwd = upper[Math.floor(Math.random() * upper.length)]
+          + lower[Math.floor(Math.random() * lower.length)]
+          + digits[Math.floor(Math.random() * digits.length)];
+  for (let i = 0; i < 9; i++) pwd += all[Math.floor(Math.random() * all.length)];
+  return pwd.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+/** Sends a branded "Activate your account" email via SES. */
+async function sendInviteEmail(toEmail: string, fullName: string, tempPassword: string): Promise<void> {
+  const { SESClient, SendEmailCommand } = await import('@aws-sdk/client-ses');
+  const ses        = new SESClient({ region: process.env.COGNITO_REGION ?? 'ap-south-1' });
+  const appBaseUrl = (process.env.APP_BASE_URL ?? 'http://localhost:5001').replace(/\/$/, '');
+  const link       = `${appBaseUrl}/invite/accept?email=${encodeURIComponent(toEmail)}&token=${encodeURIComponent(tempPassword)}`;
+  const fromEmail  = process.env.INVITE_FROM_EMAIL ?? 'contact@vebgenix.com';
+  const firstName  = fullName.split(' ')[0] || fullName;
+
+  await ses.send(new SendEmailCommand({
+    Source:      fromEmail,
+    Destination: { ToAddresses: [toEmail] },
+    Message: {
+      Subject: { Data: 'You\'ve been invited to Vebgenix — Activate your account' },
+      Body: {
+        Html: {
+          Data: `<!DOCTYPE html>
+<html>
+<body style="font-family:Arial,sans-serif;background:#f4f6f9;margin:0;padding:40px 0">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+  <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+    <tr><td style="background:#1a56db;padding:32px 40px;text-align:center">
+      <h1 style="color:#fff;margin:0;font-size:24px;font-weight:700">Vebgenix</h1>
+    </td></tr>
+    <tr><td style="padding:40px">
+      <h2 style="color:#111827;margin:0 0 12px">Hello ${firstName},</h2>
+      <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px">
+        You've been invited to join <strong>Vebgenix</strong> as a tenant administrator.<br>
+        Click the button below to activate your account and set your password.
+      </p>
+      <div style="text-align:center;margin:32px 0">
+        <a href="${link}" style="background:#1a56db;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;display:inline-block">
+          Activate My Account
+        </a>
+      </div>
+      <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:24px 0 0">
+        This link is valid for 7 days. If you didn't expect this invitation, you can safely ignore this email.
+      </p>
+    </td></tr>
+    <tr><td style="background:#f9fafb;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb">
+      <p style="color:#9ca3af;font-size:12px;margin:0">© 2025 Vebgenix. All rights reserved.</p>
+    </td></tr>
+  </table>
+  </td></tr></table>
+</body>
+</html>`,
+        },
+        Text: {
+          Data: `Hello ${firstName},\n\nYou've been invited to Vebgenix as a tenant administrator.\n\nActivate your account here:\n${link}\n\nThis link is valid for 7 days.\n\nVebgenix Team`,
+        },
+      },
+    },
+  }));
+}
+
 function tenantToGql(doc: Record<string, unknown> | null) {
   if (!doc) return null;
   const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
@@ -57,15 +125,21 @@ export async function resolveOnboarding(
         roles:          [],
       });
 
-      // Send Cognito invite
-      const { AdminCreateUserCommand, CognitoIdentityProviderClient } =
-        await import('@aws-sdk/client-cognito-identity-provider');
-      const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+      // Create Cognito user (suppress default email — we send our own invite link)
+      const {
+        AdminCreateUserCommand,
+        AdminSetUserPasswordCommand,
+        AdminUpdateUserAttributesCommand,
+        CognitoIdentityProviderClient,
+      } = await import('@aws-sdk/client-cognito-identity-provider');
+      const cognito  = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+      const tempPwd  = generateTempPassword();
       try {
         await cognito.send(new AdminCreateUserCommand({
-          UserPoolId:             process.env.COGNITO_USER_POOL_ID,
-          Username:               email,
-          DesiredDeliveryMediums: ['EMAIL'],
+          UserPoolId:       process.env.COGNITO_USER_POOL_ID,
+          Username:         email,
+          TemporaryPassword: tempPwd,
+          MessageAction:    'SUPPRESS',
           UserAttributes: [
             { Name: 'email',           Value: email },
             { Name: 'name',            Value: fullName },
@@ -76,7 +150,24 @@ export async function resolveOnboarding(
       } catch (err: unknown) {
         const cognitoErr = err as { name?: string };
         if (cognitoErr.name !== 'UsernameExistsException') throw err;
+        // User already exists — update attributes and set a fresh temp password
+        await cognito.send(new AdminUpdateUserAttributesCommand({
+          UserPoolId:     process.env.COGNITO_USER_POOL_ID,
+          Username:       email,
+          UserAttributes: [
+            { Name: 'custom:tenantId', Value: tid },
+            { Name: 'name',            Value: fullName },
+          ],
+        }));
+        await cognito.send(new AdminSetUserPasswordCommand({
+          UserPoolId: process.env.COGNITO_USER_POOL_ID,
+          Username:   email,
+          Password:   tempPwd,
+          Permanent:  false,
+        }));
       }
+      // Send branded invite-link email via SES
+      await sendInviteEmail(email, fullName, tempPwd);
 
       return {
         id:          String(profile._id),
@@ -183,15 +274,52 @@ export async function resolveOnboarding(
       }).lean();
       const email = (args.email as string | undefined) ?? adminProfile?.email;
       if (!email) throw new AppError('BAD_REQUEST', 'No primary admin email found for this tenant');
-      const { AdminCreateUserCommand, CognitoIdentityProviderClient } =
-        await import('@aws-sdk/client-cognito-identity-provider');
-      const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
-      await cognito.send(new AdminCreateUserCommand({
-        UserPoolId:    process.env.COGNITO_USER_POOL_ID,
-        Username:      email,
-        MessageAction: 'RESEND',
-      }));
-      return { success: true, message: `Invitation resent to ${email}` };
+      const {
+        AdminCreateUserCommand,
+        AdminSetUserPasswordCommand,
+        AdminUpdateUserAttributesCommand,
+        CognitoIdentityProviderClient,
+      } = await import('@aws-sdk/client-cognito-identity-provider');
+      const cognito  = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+      const fullName = (adminProfile?.fullName as string | undefined) ?? email;
+      const tempPwd  = generateTempPassword();
+      try {
+        // Set a fresh temp password (works for both FORCE_CHANGE_PASSWORD and CONFIRMED users)
+        await cognito.send(new AdminSetUserPasswordCommand({
+          UserPoolId: process.env.COGNITO_USER_POOL_ID,
+          Username:   email,
+          Password:   tempPwd,
+          Permanent:  false,
+        }));
+      } catch (err: unknown) {
+        const e = err as { name?: string };
+        if (e.name === 'UserNotFoundException') {
+          // User doesn't exist in Cognito — create fresh (suppressed)
+          await cognito.send(new AdminCreateUserCommand({
+            UserPoolId:        process.env.COGNITO_USER_POOL_ID,
+            Username:          email,
+            TemporaryPassword: tempPwd,
+            MessageAction:     'SUPPRESS',
+            UserAttributes: [
+              { Name: 'email',           Value: email },
+              { Name: 'name',            Value: fullName },
+              { Name: 'custom:tenantId', Value: tenantId },
+              { Name: 'email_verified',  Value: 'true' },
+            ],
+          }));
+        } else {
+          throw err;
+        }
+      }
+      // Ensure tenantId attribute is up to date
+      await cognito.send(new AdminUpdateUserAttributesCommand({
+        UserPoolId:     process.env.COGNITO_USER_POOL_ID,
+        Username:       email,
+        UserAttributes: [{ Name: 'custom:tenantId', Value: tenantId }],
+      })).catch(() => { /* ignore if user state prevents it */ });
+      // Send branded invite-link email via SES
+      await sendInviteEmail(email, fullName, tempPwd);
+      return true;
     }
 
     default:

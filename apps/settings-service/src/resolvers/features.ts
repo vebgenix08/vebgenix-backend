@@ -13,6 +13,12 @@ function toGql(doc: unknown): Record<string, unknown> | null {
 /** All platform features that can be toggled per-tenant. */
 const AVAILABLE_FEATURES = [
   {
+    key:            'dashboard',
+    name:           'Dashboard',
+    description:    'Main dashboard with stats and quick-access cards',
+    defaultEnabled: true,
+  },
+  {
     key:            'admissions',
     name:           'Admissions',
     description:    'Enquiry management, application workflow, document uploads',

@@ -1,0 +1,12 @@
+{
+  "name": "vebgenix-runtime-deps-layer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stable runtime dependencies shared through AWS Lambda Layer.",
+  "dependencies": {
+    "aws-jwt-verify": "4.0.1",
+    "mongoose": "8.23.1",
+    "nodemailer": "8.0.7",
+    "razorpay": "2.9.6"
+  }
+}

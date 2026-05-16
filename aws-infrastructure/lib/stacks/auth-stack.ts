@@ -64,6 +64,11 @@ export class AuthStack extends cdk.Stack {
       selfSignUpEnabled: false,          // Only platform provisions users via InviteStaff
       signInAliases:   { email: true },
       autoVerify:      { email: true },
+      // Email via SES — configured live on the user pool via CLI:
+      //   EmailSendingAccount=DEVELOPER, From=contact@vebgenix.com
+      //   SourceArn=arn:aws:ses:ap-south-1:278035644568:identity/vebgenix.com
+      // CDK withSES() requires an email-address identity (not domain), so we keep
+      // the CDK neutral here and manage the SES config out-of-band to avoid rollback.
       standardAttributes: {
         email:    { required: true, mutable: true },
         fullname: { required: true, mutable: true },

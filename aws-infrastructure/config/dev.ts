@@ -24,6 +24,9 @@ export const devConfig: EnvConfig = {
   // Database (MongoDB Atlas — no RDS needed)
   enableDatabase: false,
 
+  // App
+  appBaseUrl: 'http://localhost:5173',
+
   // AppSync
   enableWaf: false,
 
