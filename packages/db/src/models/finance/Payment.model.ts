@@ -7,7 +7,7 @@ export interface IPayment extends Document {
   tenantId: string;
   campusId: Types.ObjectId;
   studentId: Types.ObjectId;
-  invoiceId: Types.ObjectId;
+  invoiceId?: Types.ObjectId;
   academicYearId: Types.ObjectId;
   classId?: Types.ObjectId;
   feeOrderId: string;
@@ -23,33 +23,49 @@ export interface IPayment extends Document {
   remarks?: string;
   paidAt?: Date;
   collectedBy: Types.ObjectId;
+  orders?: Array<{
+    orderId: Types.ObjectId;
+    orderNo: string;
+    paidAmount: number;
+  }>;
+  totalPaidAmount?: number;
+  excessAmount?: number;
+  refundAmount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const PaymentSchema = new Schema<IPayment>(
   {
-    tenantId:           { type: String, required: true },
-    campusId:           { type: Schema.Types.ObjectId, required: true, ref: 'Campus' },
-    studentId:          { type: Schema.Types.ObjectId, required: true, ref: 'Student' },
-    invoiceId:          { type: Schema.Types.ObjectId, required: true, ref: 'Invoice' },
-    academicYearId:     { type: Schema.Types.ObjectId, required: true, ref: 'AcademicYear' },
-    classId:            { type: Schema.Types.ObjectId, ref: 'Class' },
-    feeOrderId:         { type: String, required: true },
-    feeHeadPrefix:      { type: String, required: true, uppercase: true, trim: true },
-    receiptNumber:      { type: String },
-    amount:             { type: Number, required: true },
-    method:             { type: String, enum: ['CASH','CHEQUE','BANK_TRANSFER','UPI','CARD','ONLINE'], required: true },
-    status:             { type: String, enum: ['PENDING','SUCCESS','FAILED','REFUNDED'], default: 'PENDING' },
-    razorpayOrderId:    { type: String },
-    razorpayPaymentId:  { type: String },
-    razorpaySignature:  { type: String },
-    referenceNumber:    { type: String },
-    remarks:            { type: String },
-    paidAt:             { type: Date },
-    collectedBy:        { type: Schema.Types.ObjectId, required: true, ref: 'Profile' },
+    tenantId:          { type: String, required: true },
+    campusId:          { type: Schema.Types.ObjectId, required: true, ref: 'Campus' },
+    studentId:         { type: Schema.Types.ObjectId, required: true, ref: 'Student' },
+    invoiceId:         { type: Schema.Types.ObjectId, ref: 'Invoice' },
+    academicYearId:    { type: Schema.Types.ObjectId, required: true, ref: 'AcademicYear' },
+    classId:           { type: Schema.Types.ObjectId, ref: 'Class' },
+    feeOrderId:        { type: String, required: true },
+    feeHeadPrefix:     { type: String, required: true, uppercase: true, trim: true },
+    receiptNumber:     { type: String },
+    amount:            { type: Number, required: true },
+    method:            { type: String, enum: ['CASH', 'CHEQUE', 'BANK_TRANSFER', 'UPI', 'CARD', 'ONLINE'], required: true },
+    status:            { type: String, enum: ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'], default: 'PENDING' },
+    razorpayOrderId:   { type: String },
+    razorpayPaymentId: { type: String },
+    razorpaySignature: { type: String },
+    referenceNumber:   { type: String },
+    remarks:           { type: String },
+    paidAt:            { type: Date },
+    collectedBy:       { type: Schema.Types.ObjectId, required: true, ref: 'Profile' },
+    orders: [{
+      orderId:     { type: Schema.Types.ObjectId, ref: 'StudentFeeOrder', required: true },
+      orderNo:     { type: String, required: true },
+      paidAmount:  { type: Number, required: true },
+    }],
+    totalPaidAmount:   { type: Number, default: 0 },
+    excessAmount:      { type: Number, default: 0 },
+    refundAmount:      { type: Number, default: 0 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 PaymentSchema.index({ tenantId: 1 });

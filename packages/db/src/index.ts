@@ -78,6 +78,8 @@ export { FeeHead } from './models/finance/FeeHead.model';
 export type { IFeeHead, FeeHeadType } from './models/finance/FeeHead.model';
 export { FeeStructure } from './models/finance/FeeStructure.model';
 export type { IFeeStructure, IFeeComponent } from './models/finance/FeeStructure.model';
+export { FeeStructureClassMapping } from './models/finance/FeeStructureClassMapping.model';
+export type { IFeeStructureClassMapping, FeeStructureClassMappingStatus } from './models/finance/FeeStructureClassMapping.model';
 export { FeeAssignment } from './models/finance/FeeAssignment.model';
 export type { IFeeAssignment, FeeAssignmentStatus } from './models/finance/FeeAssignment.model';
 export { FeeSchedule } from './models/finance/FeeSchedule.model';
@@ -96,6 +98,9 @@ export { FeeCategory } from './models/finance/FeeCategory.model';
 export type { IFeeCategory, AllocationMethod, FeeCategoryFeeType, FeeCategoryModuleType } from './models/finance/FeeCategory.model';
 export { PaymentAllocation } from './models/finance/PaymentAllocation.model';
 export type { IPaymentAllocation } from './models/finance/PaymentAllocation.model';
+export { StudentTransaction } from './models/finance/StudentTransaction.model';
+export type { IStudentTransaction, StudentTransactionType, StudentTransactionStatus } from './models/finance/StudentTransaction.model';
+export { default as StudentFeeOrder } from './models/finance/StudentFeeOrders.model';
 
 // ── Models: Comms ─────────────────────────────────────────────────────────────
 export { Announcement } from './models/comms/Announcement.model';

@@ -18,13 +18,16 @@ import { verifyRazorpaySignature } from './razorpay';
 import { resolveFeeCategories } from './resolvers/feeCategories';
 import { resolveFeeHeads } from './resolvers/feeHeads';
 import { resolveFeeStructures } from './resolvers/feeStructures';
+import { resolveFeeStructureMappings } from './resolvers/feeStructureMappings';
 import { resolveFeeAssignments } from './resolvers/feeAssignments';
 import { resolveFeeSchedules } from './resolvers/feeSchedules';
 import { resolveInstallmentPlans } from './resolvers/installmentPlans';
 import { resolveInvoices } from './resolvers/invoices';
 import { resolvePayments } from './resolvers/payments';
+import { resolveStudentOrders } from './resolvers/studentOrders';
+import { resolveTransactions } from './resolvers/transactions';
 import { resolveReports } from './resolvers/reports';
-import { RecordPayment } from './use-cases/RecordPayment';
+import { PaymentService } from './services/payment.service';
 
 function parseEvent(event: Record<string, unknown>) {
   if (event.info) {
@@ -62,7 +65,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
           const orderId = paymentEntity.order_id as string;
           const payment = await FinanceRepo.findPaymentByRazorpayOrderId(orderId);
           if (payment) {
-            await RecordPayment.applyOnlineSuccess(
+            await PaymentService.applyOnlineSuccess(
               payment.tenantId.toString(),
               payment._id.toString(),
               paymentEntity.id as string,
@@ -90,6 +93,9 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     result = await resolveFeeStructures(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
+    result = await resolveFeeStructureMappings(operation, args, ctx, tenantId);
+    if (result !== undefined) return result;
+
     result = await resolveFeeAssignments(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
@@ -103,6 +109,12 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     if (result !== undefined) return result;
 
     result = await resolvePayments(operation, args, ctx, tenantId);
+    if (result !== undefined) return result;
+
+    result = await resolveStudentOrders(operation, args, ctx, tenantId);
+    if (result !== undefined) return result;
+
+    result = await resolveTransactions(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
     result = await resolveReports(operation, args, ctx, tenantId);

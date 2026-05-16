@@ -1,13 +1,11 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
 export type InvoiceStatus = 'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED' | 'OVERDUE' | 'PENDING';
-
 export type CollectionType =
   | 'FULL_ONLY'
   | 'PARTIAL_ALLOWED'
   | 'PARTIAL_WITH_MINIMUM_AMOUNT'
   | 'PARTIAL_WITH_MINIMUM_PERCENTAGE';
-
 export type AllocationMethod = 'PRO_RATA' | 'PRIORITY_WISE' | 'MANUAL';
 
 export interface IInvoiceItem {
@@ -23,42 +21,41 @@ export interface IInvoiceItem {
 }
 
 export interface IInvoice extends Document {
-  tenantId:             string;
-  campusId:             Types.ObjectId;
-  studentId:            Types.ObjectId;
-  academicYearId:       Types.ObjectId;
-  classId?:             Types.ObjectId;
-  feeOrderId:           string;
-  feeHeadPrefix:        string;
-  invoiceNumber:        string;
-  status:               InvoiceStatus;
-  items:                IInvoiceItem[];
-  totalAmount:          number;
-  concessionAmount:     number;
-  netAmount:            number;
-  paidAmount:           number;
-  dueAmount:            number;
-  dueDate?:             Date;
-  issuedAt?:            Date;
-  issuedBy:             Types.ObjectId;
-  feeScheduleId?:       Types.ObjectId;
-  installmentLabel?:    string;
-  cancelledAt?:         Date;
-  cancelledBy?:         Types.ObjectId;
-  cancelReason?:        string;
-  // snapshot fields — copied at invoice creation so schedule edits don't affect existing invoices
-  feeCategoryId?:       Types.ObjectId;
-  feeStructureId?:      Types.ObjectId;
-  allocationMethod:     AllocationMethod;
-  collectionType:       CollectionType;
-  minimumAmount:        number;
-  minimumPercentage:    number;
-  allowPartialPayment:  boolean;
-  graceDays:            number;
-  invoicePrefix:        string;
-  receiptPrefix:        string;
-  createdAt:            Date;
-  updatedAt:            Date;
+  tenantId: string;
+  campusId: Types.ObjectId;
+  studentId: Types.ObjectId;
+  academicYearId: Types.ObjectId;
+  classId?: Types.ObjectId;
+  feeOrderId: string;
+  feeHeadPrefix: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  items: IInvoiceItem[];
+  totalAmount: number;
+  concessionAmount: number;
+  netAmount: number;
+  paidAmount: number;
+  dueAmount: number;
+  dueDate?: Date;
+  issuedAt?: Date;
+  issuedBy: Types.ObjectId;
+  feeScheduleId?: Types.ObjectId;
+  installmentLabel?: string;
+  cancelledAt?: Date;
+  cancelledBy?: Types.ObjectId;
+  cancelReason?: string;
+  feeCategoryId?: Types.ObjectId;
+  feeStructureId?: Types.ObjectId;
+  allocationMethod: AllocationMethod;
+  collectionType: CollectionType;
+  minimumAmount: number;
+  minimumPercentage: number;
+  allowPartialPayment: boolean;
+  graceDays: number;
+  invoicePrefix: string;
+  receiptPrefix: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const InvoiceSchema = new Schema<IInvoice>(
@@ -71,11 +68,7 @@ const InvoiceSchema = new Schema<IInvoice>(
     feeOrderId:      { type: String, required: true },
     feeHeadPrefix:   { type: String, required: true, uppercase: true, trim: true },
     invoiceNumber:   { type: String, required: true },
-    status:          {
-      type: String,
-      enum: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID', 'PAID', 'CANCELLED', 'OVERDUE', 'PENDING'],
-      default: 'PENDING',
-    },
+    status:          { type: String, enum: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID', 'PAID', 'CANCELLED', 'OVERDUE', 'PENDING'], default: 'PENDING' },
     items: [{
       feeHeadId:     { type: Schema.Types.ObjectId, required: true },
       feeHeadName:   { type: String, required: true },
@@ -99,23 +92,18 @@ const InvoiceSchema = new Schema<IInvoice>(
     cancelledAt:      { type: Date },
     cancelledBy:      { type: Schema.Types.ObjectId, ref: 'Profile' },
     cancelReason:     { type: String },
-    // snapshot fields
     feeCategoryId:    { type: Schema.Types.ObjectId, ref: 'FeeCategory' },
     feeStructureId:   { type: Schema.Types.ObjectId, ref: 'FeeStructure' },
     allocationMethod: { type: String, enum: ['PRO_RATA', 'PRIORITY_WISE', 'MANUAL'], default: 'PRO_RATA' },
-    collectionType:   {
-      type: String,
-      enum: ['FULL_ONLY', 'PARTIAL_ALLOWED', 'PARTIAL_WITH_MINIMUM_AMOUNT', 'PARTIAL_WITH_MINIMUM_PERCENTAGE'],
-      default: 'PARTIAL_ALLOWED',
-    },
-    minimumAmount:       { type: Number, default: 0 },
-    minimumPercentage:   { type: Number, default: 0 },
+    collectionType:   { type: String, enum: ['FULL_ONLY', 'PARTIAL_ALLOWED', 'PARTIAL_WITH_MINIMUM_AMOUNT', 'PARTIAL_WITH_MINIMUM_PERCENTAGE'], default: 'PARTIAL_ALLOWED' },
+    minimumAmount:    { type: Number, default: 0 },
+    minimumPercentage: { type: Number, default: 0 },
     allowPartialPayment: { type: Boolean, default: true },
-    graceDays:           { type: Number, default: 0 },
-    invoicePrefix:       { type: String, default: '' },
-    receiptPrefix:       { type: String, default: '' },
+    graceDays:        { type: Number, default: 0 },
+    invoicePrefix:    { type: String, default: '' },
+    receiptPrefix:    { type: String, default: '' },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 InvoiceSchema.index({ tenantId: 1 });
@@ -128,10 +116,6 @@ InvoiceSchema.index({ tenantId: 1, campusId: 1, dueDate: 1 });
 InvoiceSchema.index({ tenantId: 1, feeScheduleId: 1 }, { sparse: true });
 InvoiceSchema.index({ tenantId: 1, feeCategoryId: 1 }, { sparse: true });
 InvoiceSchema.index({ tenantId: 1, feeStructureId: 1 }, { sparse: true });
-// duplicate assignment guard
-InvoiceSchema.index(
-  { tenantId: 1, studentId: 1, feeStructureId: 1, academicYearId: 1 },
-  { sparse: true },
-);
+InvoiceSchema.index({ tenantId: 1, studentId: 1, feeStructureId: 1, academicYearId: 1 }, { sparse: true });
 
 export const Invoice = model<IInvoice>('Invoice', InvoiceSchema);

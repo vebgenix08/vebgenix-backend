@@ -12,9 +12,9 @@ export interface IFinanceSequence extends Document {
 const FinanceSequenceSchema = new Schema<IFinanceSequence>(
   {
     tenantId: { type: String, required: true },
-    scope:   { type: String, required: true },
-    key:     { type: String, required: true },
-    value:   { type: Number, required: true, default: 0 },
+    scope: { type: String, required: true },
+    key: { type: String, required: true },
+    value: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

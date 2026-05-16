@@ -11,6 +11,20 @@ function toGql(doc: unknown): Record<string, unknown> | null {
   return _id !== undefined ? { id: String(_id), ...rest } : rest;
 }
 
+type StudentQueueDoc = {
+  _id: { toString(): string };
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+  campusId?: { toString(): string };
+  academicYearId?: { toString(): string };
+  applicationId?: { toString(): string };
+  admissionNo?: string;
+  registrationNumber?: string;
+  classId?: { toString(): string };
+};
+
 export async function resolveFeeAssignments(
   operation: string,
   args: Record<string, unknown>,
@@ -48,7 +62,7 @@ export async function resolveFeeAssignments(
     case 'POST:/api/admin/finance/fee-assignments': {
       const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
       const result = await AssignFeeStructure.execute(ctx, input as unknown as Parameters<typeof AssignFeeStructure.execute>[1]);
-      return toGql(result);
+      return toGql((result as { assignment?: unknown }).assignment ?? result);
     }
 
     case 'bulkAssignFeeStructure':
@@ -62,8 +76,8 @@ export async function resolveFeeAssignments(
       if (classId && ids.length === 0) {
         const { Student } = await import('@vebgenix/db');
         const { Types: MongoTypes } = await import('mongoose');
-        const students = await Student.find({ tenantId, classId: new MongoTypes.ObjectId(classId), status: 'ACTIVE' }, '_id');
-        ids.push(...students.map((s) => s._id.toString()));
+        const students = (await Student.find({ tenantId, classId: new MongoTypes.ObjectId(classId), status: 'ACTIVE' }, '_id').lean()) as StudentQueueDoc[];
+        ids.push(...students.map((student: StudentQueueDoc) => student._id.toString()));
       }
       const results = await Promise.allSettled(
         ids.map((studentId) =>
@@ -90,16 +104,16 @@ export async function resolveFeeAssignments(
         studentFilter.academicYearId = new MongoTypes.ObjectId(academicYearId);
       }
 
-      const allStudents = await Student.find(
+      const allStudents = (await Student.find(
         studentFilter,
         '_id firstName lastName fullName email campusId academicYearId applicationId admissionNo registrationNumber classId',
-      ).lean();
+      ).lean()) as StudentQueueDoc[];
       const assigned = await FinanceRepo.listFeeAssignments(
         tenantId,
         academicYearId ? { academicYearId } : {},
       );
       const assignedByStudentId = new Map(
-        (assigned as unknown[]).map((assignment) => {
+        (assigned as unknown[]).map((assignment: unknown) => {
           const plain = toGql(assignment) ?? {};
           return [String(plain.studentId ?? ''), plain];
         }),
@@ -107,18 +121,18 @@ export async function resolveFeeAssignments(
       const classIds = Array.from(
         new Set(
           allStudents
-            .map((student) => student.classId?.toString())
+            .map((student: StudentQueueDoc) => student.classId?.toString())
             .filter((id): id is string => typeof id === 'string' && MongoTypes.ObjectId.isValid(id)),
         ),
       );
       const classDocs = classIds.length
         ? await Class.find({ tenantId, _id: { $in: classIds.map((id) => new MongoTypes.ObjectId(id)) } }, '_id name').lean()
         : [];
-      const classNameById = new Map(classDocs.map((classDoc) => [classDoc._id.toString(), classDoc.name]));
+      const classNameById = new Map((classDocs as Array<{ _id: { toString(): string }; name: string }>).map((classDoc) => [classDoc._id.toString(), classDoc.name]));
 
       return allStudents
-        .filter((student) => !assignedByStudentId.has(student._id.toString()))
-        .map((student) => {
+        .filter((student: StudentQueueDoc) => !assignedByStudentId.has(student._id.toString()))
+        .map((student: StudentQueueDoc) => {
           const studentId = student._id.toString();
           const classId = student.classId?.toString();
           const className = classId ? classNameById.get(classId) : undefined;

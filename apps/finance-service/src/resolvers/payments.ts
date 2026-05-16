@@ -2,9 +2,8 @@ import { FinanceRepo } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
-import { RecordPayment } from '../use-cases/RecordPayment';
-import { createRazorpayOrder, verifyRazorpaySignature } from '../razorpay';
-import { Types } from 'mongoose';
+import { PaymentService } from '../services/payment.service';
+import { verifyRazorpaySignature } from '../razorpay';
 
 /** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
 function toGql(doc: unknown): Record<string, unknown> | null {
@@ -23,7 +22,11 @@ export async function resolvePayments(
   switch (operation) {
     case 'recordPayment':
     case 'POST:/api/admin/finance/payments': {
-      const result = await RecordPayment.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof RecordPayment.execute>[1]);
+      const result = await PaymentService.record(
+        ctx,
+        tenantId,
+        ((args.input as Record<string, unknown>) ?? args) as never,
+      );
       return {
         payment:       toGql(result.payment),
         receiptNumber: result.receiptNumber,
@@ -58,31 +61,7 @@ export async function resolvePayments(
     case 'createPaymentOrder':
     case 'POST:/api/finance/payments/create-order': {
       authorize(ctx, 'finance.payment.create');
-      const invoice = await FinanceRepo.findInvoiceById(tenantId, args.invoiceId as string);
-      if (!invoice) throw new AppError('NOT_FOUND', 'Invoice not found');
-      const amountToPay = args.amount ? Number(args.amount) : invoice.dueAmount;
-      if (amountToPay <= 0) throw new AppError('BAD_REQUEST', 'Amount must be greater than 0');
-      const order = await createRazorpayOrder({
-        amount:   Math.round(amountToPay * 100), // paise
-        currency: 'INR',
-        receipt:  `inv_${invoice._id.toString().slice(-8)}`,
-        notes:    { invoiceId: invoice._id.toString(), tenantId, studentId: invoice.studentId.toString() },
-      });
-      const payment = await FinanceRepo.createPayment(tenantId, {
-        campusId:        invoice.campusId,
-        studentId:       invoice.studentId,
-        invoiceId:       new Types.ObjectId(invoice._id.toString()),
-        academicYearId:  invoice.academicYearId,
-        classId:         invoice.classId,
-        feeOrderId:      invoice.feeOrderId,
-        feeHeadPrefix:   invoice.feeHeadPrefix,
-        amount:          amountToPay,
-        method:          'ONLINE',
-        status:          'PENDING',
-        razorpayOrderId: order.id,
-        collectedBy:     new Types.ObjectId(ctx.membership!.profileId),
-      });
-      return { orderId: order.id, amount: order.amount, currency: order.currency, paymentId: String((payment as { _id: unknown })._id) };
+      return PaymentService.createPaymentOrder(ctx, tenantId, args.invoiceId as string, args.amount ? Number(args.amount) : undefined);
     }
 
     case 'verifyPaymentSignature':
@@ -98,7 +77,7 @@ export async function resolvePayments(
       if (!valid) throw new AppError('BAD_REQUEST', 'Invalid payment signature');
       const payment = await FinanceRepo.findPaymentByRazorpayOrderId(razorpayOrderId);
       if (!payment) throw new AppError('NOT_FOUND', 'Payment record not found');
-      await RecordPayment.applyOnlineSuccess(tenantId, payment._id.toString(), razorpayPaymentId, razorpaySignature);
+      await PaymentService.applyOnlineSuccess(tenantId, payment._id.toString(), razorpayPaymentId, razorpaySignature);
       return { success: true, paymentId: String(payment._id) };
     }
 
@@ -143,10 +122,11 @@ export async function resolvePayments(
       for (const inv of invoices) {
         if (remaining <= 0) break;
         const toPay = Math.min(remaining, inv.dueAmount);
-        const result = await RecordPayment.execute(ctx, {
+        const result = await PaymentService.record(ctx, tenantId, {
           invoiceId:   inv._id.toString(),
           studentId:   inv.studentId.toString(),
           campusId:    inv.campusId.toString(),
+          academicYearId: inv.academicYearId.toString(),
           amount:      toPay,
           method:      method as 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI' | 'CARD' | 'ONLINE',
           remarks:     input.remarks as string | undefined,

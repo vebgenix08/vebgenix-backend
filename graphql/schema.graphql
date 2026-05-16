@@ -696,6 +696,149 @@ type FeeAssignment {
   updatedAt: AWSDateTime
 }
 
+type FeeStructureClassMapping {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  academicYearId: ID!
+  classId: ID!
+  feeScheduleId: ID!
+  feeStructureId: ID!
+  priority: Int!
+  effectiveFrom: String
+  effectiveTo: String
+  status: String!
+  createdBy: ID!
+  updatedBy: ID
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateFeeStructureClassMappingInput {
+  campusId: ID!
+  academicYearId: ID!
+  classId: ID!
+  feeScheduleId: ID!
+  feeStructureId: ID!
+  priority: Int
+  effectiveFrom: String
+  effectiveTo: String
+}
+
+input UpdateFeeStructureClassMappingInput {
+  campusId: ID
+  academicYearId: ID
+  classId: ID
+  feeScheduleId: ID
+  feeStructureId: ID
+  priority: Int
+  effectiveFrom: String
+  effectiveTo: String
+  status: String
+}
+
+type FeeHeadSnapshot {
+  feeHeadId: ID!
+  feeHeadName: String!
+  amount: Float!
+  concessionAmount: Float!
+  lateFeeAmount: Float!
+  paidAmount: Float!
+  balanceAmount: Float!
+  finalAmount: Float!
+  status: String!
+}
+
+type StudentFeeOrder {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  academicYearId: ID!
+  studentId: ID!
+  classId: ID!
+  sectionId: ID
+  feeScheduleId: ID!
+  feeStructureId: ID!
+  feeStructureClassMappingId: ID!
+  orderNo: String!
+  installmentNo: Int!
+  installmentTitle: String!
+  dueDate: String!
+  feeHeads: [FeeHeadSnapshot!]!
+  grossAmount: Float!
+  concessionAmount: Float!
+  lateFeeAmount: Float!
+  payableAmount: Float!
+  paidAmount: Float!
+  balanceAmount: Float!
+  paymentCompletionPercentage: Float!
+  status: String!
+  paymentStatus: String!
+  generatedAt: AWSDateTime
+  remarks: String
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input UpdateStudentFeeOrderInput {
+  dueDate: String
+  remarks: String
+  status: String
+  paymentStatus: String
+}
+
+type PaymentOrderLine {
+  orderId: ID!
+  orderNo: String!
+  paidAmount: Float!
+}
+
+type StudentTransaction {
+  id: ID!
+  tenantId: String
+  campusId: ID!
+  academicYearId: ID!
+  studentId: ID!
+  classId: ID
+  sectionId: ID
+  feeAssignmentId: ID
+  feeOrderId: ID
+  invoiceId: ID
+  paymentId: ID
+  transactionType: String!
+  status: String!
+  amount: Float!
+  balanceBefore: Float!
+  balanceAfter: Float!
+  referenceNumber: String
+  remarks: String
+  metadata: AWSJSON
+  createdBy: ID!
+  updatedBy: ID
+  createdAt: AWSDateTime
+  updatedAt: AWSDateTime
+}
+
+input CreateStudentTransactionInput {
+  campusId: ID!
+  academicYearId: ID!
+  studentId: ID!
+  classId: ID
+  sectionId: ID
+  feeAssignmentId: ID
+  feeOrderId: ID
+  invoiceId: ID
+  paymentId: ID
+  transactionType: String!
+  status: String
+  amount: Float!
+  balanceBefore: Float!
+  balanceAfter: Float!
+  referenceNumber: String
+  remarks: String
+  metadata: AWSJSON
+}
+
 input CreateFeeAssignmentInput {
   studentId: ID!
   feeStructureId: ID!
@@ -890,7 +1033,7 @@ type Payment {
   tenantId: String
   campusId: ID!
   studentId: ID!
-  invoiceId: ID!
+  invoiceId: ID
   academicYearId: ID!
   classId: ID
   receiptNumber: String
@@ -903,6 +1046,10 @@ type Payment {
   collectedBy: ID!
   razorpayOrderId: String
   razorpayPaymentId: String
+  orders: [PaymentOrderLine!]
+  totalPaidAmount: Float
+  excessAmount: Float
+  refundAmount: Float
   createdAt: AWSDateTime
   updatedAt: AWSDateTime
 }
@@ -922,14 +1069,16 @@ type RecordPaymentResult {
 }
 
 input RecordPaymentInput {
-  invoiceId: ID!
+  invoiceId: ID
   studentId: ID!
   campusId: ID!
+  academicYearId: ID
   amount: Float!
   method: String!
   referenceNumber: String
   remarks: String
   paidAt: String
+  orderIds: [ID!]
 }
 
 type PaymentOrder {
@@ -2437,6 +2586,13 @@ type Query {
   getStudentFeeAssignment(studentId: ID!, academicYearId: ID): FeeAssignment
   listFeeSchedules(academicYearId: ID, feeCategoryId: ID): [FeeSchedule!]!
   listInstallmentPlans(isActive: Boolean): [InstallmentPlan!]!
+  listFeeStructureClassMappings(campusId: ID, academicYearId: ID, classId: ID, status: String): [FeeStructureClassMapping!]!
+  getFeeStructureClassMapping(id: ID!): FeeStructureClassMapping
+  listStudentFeeOrders(studentId: ID, academicYearId: ID, campusId: ID, classId: ID, status: String): [StudentFeeOrder!]!
+  getStudentFeeOrder(id: ID!): StudentFeeOrder
+  listStudentTransactions(studentId: ID!, academicYearId: ID): [StudentTransaction!]!
+  getStudentTransaction(id: ID!): StudentTransaction
+  outstandingReport(studentId: ID, classId: ID, academicYearId: ID): [StudentFeeOrder!]!
 
   # Finance — Invoices & Payments
   listInvoices(studentId: ID, status: String, campusId: ID, academicYearId: ID, limit: Int, nextToken: String): [Invoice!]!
@@ -2630,6 +2786,10 @@ type Mutation {
   createInstallmentPlan(input: CreateInstallmentPlanInput!): InstallmentPlan!
   updateInstallmentPlan(id: ID!, input: UpdateInstallmentPlanInput!): InstallmentPlan!
   deleteInstallmentPlan(id: ID!): Boolean
+  createFeeStructureClassMapping(input: CreateFeeStructureClassMappingInput!): FeeStructureClassMapping!
+  bulkCreateFeeStructureClassMappings(input: [CreateFeeStructureClassMappingInput!]!): [FeeStructureClassMapping!]!
+  updateFeeStructureClassMapping(id: ID!, input: UpdateFeeStructureClassMappingInput!): FeeStructureClassMapping!
+  deleteFeeStructureClassMapping(id: ID!): Boolean
 
   # Finance — Invoices
   updateInvoice(id: ID!, input: UpdateInvoiceInput!): Invoice!
@@ -2644,6 +2804,10 @@ type Mutation {
   verifyPaymentSignature(input: VerifyPaymentInput!): PaymentVerifyResult!
   collectPaymentByStudent(studentId: ID!, input: CollectByStudentInput!): CollectByStudentResult!
   generatePaymentLink(invoiceId: ID!): PaymentLink!
+  generateStudentFeeOrders(assignmentId: ID!): [StudentFeeOrder!]!
+  updateStudentFeeOrder(id: ID!, input: UpdateStudentFeeOrderInput!): StudentFeeOrder!
+  cancelStudentFeeOrder(id: ID!): Boolean
+  createStudentTransaction(input: CreateStudentTransactionInput!): StudentTransaction!
 
   # Academics — Classes & Sections
   createClass(input: CreateClassInput!): GradeClass!

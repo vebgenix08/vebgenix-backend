@@ -14,13 +14,13 @@ export interface IPaymentAllocation extends Document {
 
 const PaymentAllocationSchema = new Schema<IPaymentAllocation>(
   {
-    tenantId:      { type: String, required: true },
-    paymentId:     { type: Schema.Types.ObjectId, required: true, ref: 'Payment' },
-    invoiceId:     { type: Schema.Types.ObjectId, required: true, ref: 'Invoice' },
-    invoiceItemId: { type: Schema.Types.ObjectId, required: true },
-    feeHeadId:     { type: Schema.Types.ObjectId, required: true, ref: 'FeeHead' },
-    feeHeadName:   { type: String, required: true },
-    allocatedAmount: { type: Number, required: true },
+    tenantId:       { type: String, required: true },
+    paymentId:      { type: Schema.Types.ObjectId, required: true, ref: 'Payment' },
+    invoiceId:      { type: Schema.Types.ObjectId, required: true, ref: 'Invoice' },
+    invoiceItemId:  { type: Schema.Types.ObjectId, required: true },
+    feeHeadId:      { type: Schema.Types.ObjectId, required: true, ref: 'FeeHead' },
+    feeHeadName:    { type: String, required: true },
+    allocatedAmount:{ type: Number, required: true },
   },
   { timestamps: true },
 );

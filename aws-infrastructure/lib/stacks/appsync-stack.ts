@@ -340,6 +340,12 @@ export class AppSyncStack extends cdk.Stack {
     finance('Query',    'getStudentFeeAssignment');
     finance('Query',    'listFeeSchedules');
     finance('Query',    'listInstallmentPlans');
+    finance('Query',    'listFeeStructureClassMappings');
+    finance('Query',    'getFeeStructureClassMapping');
+    finance('Query',    'listStudentFeeOrders');
+    finance('Query',    'getStudentFeeOrder');
+    finance('Query',    'listStudentTransactions');
+    finance('Query',    'getStudentTransaction');
     // Invoices & Payments
     finance('Query',    'listInvoices');
     finance('Query',    'getInvoice');
@@ -357,6 +363,7 @@ export class AppSyncStack extends cdk.Stack {
     finance('Query',    'getFeeAssignmentQueue');
     finance('Query',    'getAssignableFeeStructures');
     finance('Query',    'getStudentDues');
+    finance('Query',    'outstandingReport');
     // Fee Category mutations
     finance('Mutation', 'createFeeCategory');
     finance('Mutation', 'updateFeeCategory');
@@ -369,6 +376,10 @@ export class AppSyncStack extends cdk.Stack {
     finance('Mutation', 'createFeeStructure');
     finance('Mutation', 'updateFeeStructure');
     finance('Mutation', 'deleteFeeStructure');
+    finance('Mutation', 'createFeeStructureClassMapping');
+    finance('Mutation', 'bulkCreateFeeStructureClassMappings');
+    finance('Mutation', 'updateFeeStructureClassMapping');
+    finance('Mutation', 'deleteFeeStructureClassMapping');
     finance('Mutation', 'copyFeePatternToNextYear');
     finance('Mutation', 'createFeeAssignment');
     finance('Mutation', 'bulkAssignFeeStructure');
@@ -392,6 +403,10 @@ export class AppSyncStack extends cdk.Stack {
     finance('Mutation', 'verifyPaymentSignature');
     finance('Mutation', 'collectPaymentByStudent');
     finance('Mutation', 'generatePaymentLink');
+    finance('Mutation', 'generateStudentFeeOrders');
+    finance('Mutation', 'updateStudentFeeOrder');
+    finance('Mutation', 'cancelStudentFeeOrder');
+    finance('Mutation', 'createStudentTransaction');
 
     // ── Academics resolvers ─────────────────────────────────────────────────
     const academics = R(academicsDs);
