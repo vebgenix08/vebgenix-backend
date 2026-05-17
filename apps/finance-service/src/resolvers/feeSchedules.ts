@@ -47,7 +47,7 @@ export async function resolveFeeSchedules(
           throw new AppError('BAD_REQUEST', 'minimumPercentage must be between 1 and 100 when collectionType is PARTIAL_WITH_MINIMUM_PERCENTAGE');
         }
       }
-      return toGql(await FinanceRepo.createFeeSchedule(tenantId, { ...payload, createdBy: ctx.membership!.profileId }));
+      return toGql(await FinanceRepo.createFeeSchedule(tenantId, { ...payload, createdBy: ctx.membership?.profileId ?? ctx.userId }));
     }
 
     case 'updateFeeSchedule':

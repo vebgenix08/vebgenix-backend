@@ -1,5 +1,7 @@
 import { connection as mongooseConnection, Types } from 'mongoose';
 import { FinanceRepo, IInvoice, IPayment } from '@vebgenix/db';
+
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
 import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 import { generateReceiptNumberForInvoice, generateFinanceNumber, resolveAcademicYearCode } from '../numbering';
@@ -127,7 +129,7 @@ export class PaymentService {
       method: 'ONLINE',
       status: 'PENDING',
       razorpayOrderId: order.id,
-      collectedBy: new Types.ObjectId(ctx.membership!.profileId),
+      collectedBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
     });
 
     return { orderId: order.id, amount: payable, currency: order.currency ?? 'INR', paymentId: payment._id.toString() };
@@ -176,7 +178,7 @@ export class PaymentService {
         status: 'PENDING',
         referenceNumber: input.referenceNumber,
         remarks: input.remarks,
-        collectedBy: new Types.ObjectId(ctx.membership!.profileId),
+        collectedBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
         orders: paymentPlan.lines,
         totalPaidAmount: paymentPlan.appliedAmount,
         excessAmount: paymentPlan.excessAmount,
@@ -228,7 +230,7 @@ export class PaymentService {
             referenceNumber: input.referenceNumber,
             remarks: input.remarks,
             metadata: { orderNo: order.order_no },
-            createdBy: new Types.ObjectId(ctx.membership!.profileId),
+            createdBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
           });
         }
 
@@ -258,7 +260,7 @@ export class PaymentService {
           referenceNumber: input.referenceNumber,
           remarks: input.remarks,
           paidAt: input.method === 'ONLINE' ? undefined : new Date(),
-          collectedBy: new Types.ObjectId(ctx.membership!.profileId),
+          collectedBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
           orders: paymentLines,
           totalPaidAmount: finalPaymentAmount,
           excessAmount: remaining > 0 ? remaining : 0,

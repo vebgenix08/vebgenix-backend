@@ -6,6 +6,8 @@ import { getTenantId } from '@vebgenix/tenant';
 import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
 
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
+
 export interface FeeComponent {
   feeHeadId:     string;
   feeHeadName:   string;
@@ -74,7 +76,7 @@ export class CreateFeeStructure {
       })),
       totalAmount,
       isActive:  true,
-      createdBy: new Types.ObjectId(ctx.membership!.profileId),
+      createdBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
     });
 
     await AuditLogger.logTenantAction({

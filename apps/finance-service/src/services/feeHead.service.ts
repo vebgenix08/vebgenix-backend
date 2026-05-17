@@ -4,6 +4,8 @@ import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 import { normalizeUpper } from '../helpers/finance';
 
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
+
 export interface CreateFeeHeadInput {
   name: string;
   type: 'RECURRING' | 'ONE_TIME' | 'OPTIONAL';
@@ -57,7 +59,7 @@ export class FeeHeadService {
       allowConcession: input.allowConcession ?? false,
       allowLateFee: input.allowLateFee ?? false,
       priorityOrder: input.priorityOrder ?? 0,
-      createdBy: new Types.ObjectId(ctx.membership!.profileId),
+      createdBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
     });
   }
 

@@ -7,6 +7,8 @@ import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
 import { normalizeFeePrefix } from '../numbering';
 
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
+
 export interface CreateFeeHeadInput {
   name: string;
   type: 'RECURRING' | 'ONE_TIME' | 'OPTIONAL';
@@ -44,7 +46,7 @@ export class CreateFeeHead {
       isRefundable:  input.isRefundable  ?? false,
       isMandatory:   input.isMandatory   ?? true,
       priorityOrder: input.priorityOrder ?? 0,
-      createdBy: new Types.ObjectId(ctx.membership!.profileId),
+      createdBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
     });
 
     await AuditLogger.logTenantAction({

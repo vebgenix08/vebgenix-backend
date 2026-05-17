@@ -7,6 +7,8 @@ import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
 import { generateFeeOrderId, normalizeFeePrefix } from '../numbering';
 
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
+
 export interface InvoiceItemInput {
   feeHeadId:   string;
   feeHeadName: string;
@@ -141,7 +143,7 @@ export class CreateInvoice {
           dueAmount:       slotNetAmount,
           dueDate:         slot.dueDate,
           issuedAt:        new Date(),
-          issuedBy:        new Types.ObjectId(ctx.membership!.profileId),
+          issuedBy:        safeOid(ctx.membership?.profileId ?? ctx.userId),
           installmentLabel: slot.name,
           feeScheduleId:   new Types.ObjectId(input.feeScheduleId!),
           invoicePrefix:   prefix,
@@ -180,7 +182,7 @@ export class CreateInvoice {
       dueAmount:       netAmount,
       dueDate:         input.dueDate ? new Date(input.dueDate) : undefined,
       issuedAt:        new Date(),
-      issuedBy:        new Types.ObjectId(ctx.membership!.profileId),
+      issuedBy:        safeOid(ctx.membership?.profileId ?? ctx.userId),
       invoicePrefix:   prefix,
       receiptPrefix:   receiptPfx,
     });

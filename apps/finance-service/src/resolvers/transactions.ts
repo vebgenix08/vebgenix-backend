@@ -37,8 +37,8 @@ export async function resolveTransactions(
       authorize(ctx, 'finance.reports.read');
       return TransactionService.dayBook(
         tenantId,
-        new Date(args.from as string),
-        new Date(args.to as string),
+        args.from ? new Date(args.from as string) : new Date(new Date().setHours(0, 0, 0, 0)),
+        args.to ? new Date(args.to as string) : new Date(new Date().setHours(23, 59, 59, 999)),
         args.campusId as string | undefined,
         args.academicYearId as string | undefined,
       );

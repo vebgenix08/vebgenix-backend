@@ -56,7 +56,7 @@ export class FeeScheduleService {
       academicYearId: input.academicYearId,
       feeCategoryId: input.feeCategoryId ? new Types.ObjectId(input.feeCategoryId) : undefined,
       campusId: input.campusId ? new Types.ObjectId(input.campusId) : undefined,
-      createdBy: ctx.membership!.profileId,
+      createdBy: ctx.membership?.profileId ?? ctx.userId,
       slots,
     });
   }

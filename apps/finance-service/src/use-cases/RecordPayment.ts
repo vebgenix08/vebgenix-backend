@@ -7,6 +7,8 @@ import { AppError } from '@vebgenix/errors';
 import { Types, connection as mongooseConnection } from 'mongoose';
 import { generateReceiptNumberForInvoice } from '../numbering';
 
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
+
 export interface ManualAllocationLine {
   invoiceItemId: string;
   amount: number;
@@ -166,7 +168,7 @@ export class RecordPayment {
         status:          'PENDING',
         referenceNumber: input.referenceNumber,
         remarks:         input.remarks,
-        collectedBy:     new Types.ObjectId(ctx.membership!.profileId),
+        collectedBy:     safeOid(ctx.membership?.profileId ?? ctx.userId),
       });
       return { payment, receiptNumber: null, allocations: [] };
     }
@@ -221,7 +223,7 @@ export class RecordPayment {
           referenceNumber: input.referenceNumber,
           remarks:         input.remarks,
           paidAt:          new Date(),
-          collectedBy:     new Types.ObjectId(ctx.membership!.profileId),
+          collectedBy:     safeOid(ctx.membership?.profileId ?? ctx.userId),
         }], { session });
         payment = created;
 

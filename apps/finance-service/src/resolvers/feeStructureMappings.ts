@@ -54,7 +54,7 @@ export async function resolveFeeStructureMappings(
           effectiveFrom: input.effectiveFrom ? new Date(String(input.effectiveFrom)) : undefined,
           effectiveTo: input.effectiveTo ? new Date(String(input.effectiveTo)) : undefined,
           status: input.status ?? 'ACTIVE',
-          createdBy: ctx.membership!.profileId,
+          createdBy: ctx.membership?.profileId ?? ctx.userId,
         })),
       );
       return (created as unknown[]).map(d => toGql(d));

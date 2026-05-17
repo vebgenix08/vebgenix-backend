@@ -5,6 +5,8 @@ import { authorize } from '@vebgenix/permissions';
 import { getTenantId } from '@vebgenix/tenant';
 import { Types } from 'mongoose';
 
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
+
 export interface CopyFeePatternToNextYearInput {
   fromAcademicYearId: string;
   toAcademicYearId:   string;
@@ -25,7 +27,7 @@ export class CopyFeePatternToNextYear {
   static async execute(ctx: AuthContext, input: CopyFeePatternToNextYearInput) {
     authorize(ctx, 'finance.fee_pattern.copy');
     const tenantId = getTenantId(ctx);
-    const profileId = ctx.membership!.profileId;
+    const profileId = ctx.membership?.profileId ?? ctx.userId;
 
     // ── Find source fee schedules ─────────────────────────────────────────────
     const scheduleFilter: Record<string, unknown> = { academicYearId: input.fromAcademicYearId };
@@ -111,7 +113,7 @@ export class CopyFeePatternToNextYear {
         })),
         totalAmount:      src.totalAmount,
         isActive:         input.activateCopies ?? false,
-        createdBy:        new Types.ObjectId(profileId),
+        createdBy:        safeOid(profileId),
       } as never);
 
       copiedStructureIds.push(copied._id.toString());

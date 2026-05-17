@@ -1,5 +1,7 @@
 import { Types } from 'mongoose';
 import { FinanceRepo, IFeeAssignment, IFeeSchedule, IFeeStructure, IFeeStructureClassMapping } from '@vebgenix/db';
+
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
 import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 import { generateFeeOrderId } from '../numbering';
@@ -118,7 +120,7 @@ export class StudentFeeOrderService {
       return roundMoney(totalNet / input.schedule.slots.length);
     });
 
-    const assignedBy = new Types.ObjectId(ctx.membership!.profileId);
+    const assignedBy = safeOid(ctx.membership?.profileId ?? ctx.userId);
     const feeHeadSnapshots = input.structure.components.map((component: { feeHeadId: Types.ObjectId; feeHeadName: string; amount: number; priorityOrder?: number }) => ({
       feeHeadId: component.feeHeadId,
       feeHeadName: component.feeHeadName,

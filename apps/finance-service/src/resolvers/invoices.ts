@@ -3,6 +3,8 @@ import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
+
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
 import { CreateInvoice } from '../use-cases/CreateInvoice';
 
 /** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
@@ -64,7 +66,7 @@ export async function resolveInvoices(
       return toGql(await FinanceRepo.updateInvoice(tenantId, args.id as string, {
         status: 'CANCELLED',
         cancelledAt: new Date(),
-        cancelledBy: new Types.ObjectId(ctx.membership!.profileId),
+        cancelledBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
         cancelReason: args.reason as string | undefined,
       }));
     }
@@ -81,7 +83,7 @@ export async function resolveInvoices(
       await FinanceRepo.createFeeRevision(tenantId, {
         studentId:   invoice.studentId.toString(),
         invoiceId:   invoice._id.toString(),
-        revisedBy:   ctx.membership!.profileId,
+        revisedBy:   ctx.membership?.profileId ?? ctx.userId,
         previousAmount,
         newAmount,
         difference,

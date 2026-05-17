@@ -1,5 +1,7 @@
 import { Types } from 'mongoose';
 import { FinanceRepo } from '@vebgenix/db';
+
+const safeOid = (id: string | undefined) => Types.ObjectId.isValid(id ?? '') ? new Types.ObjectId(id) : new Types.ObjectId('000000000000000000000000');
 import { AppError } from '@vebgenix/errors';
 import type { AuthContext } from '@vebgenix/auth';
 import { roundMoney } from '../helpers/finance';
@@ -99,7 +101,7 @@ export class FeeStructureService {
       allocationMethod: input.allocationMethod ?? 'PRO_RATA',
       studentCategoryId: input.studentCategoryId ? new Types.ObjectId(input.studentCategoryId) : undefined,
       isActive: true,
-      createdBy: new Types.ObjectId(ctx.membership!.profileId),
+      createdBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
     });
   }
 
@@ -141,7 +143,7 @@ export class FeeStructureService {
       effectiveFrom: input.effectiveFrom ? new Date(input.effectiveFrom) : undefined,
       effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : undefined,
       status: 'ACTIVE',
-      createdBy: new Types.ObjectId(ctx.membership!.profileId),
+      createdBy: safeOid(ctx.membership?.profileId ?? ctx.userId),
     });
     return mapping;
   }
@@ -221,7 +223,7 @@ export class FeeStructureService {
       discountAmount,
       netAmount,
       discountReason: input.discountReason,
-      assignedBy: ctx.membership!.profileId,
+      assignedBy: ctx.membership?.profileId ?? ctx.userId,
       status: 'ACTIVE',
     });
 
