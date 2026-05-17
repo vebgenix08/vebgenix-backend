@@ -2243,7 +2243,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateFeeHead($input: CreateFeeHeadInput!) { createFeeHead(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Tuition Fee\\\",\\\"prefix\\\":\\\"TF\\\",\\\"type\\\":\\\"RECURRING\\\",\\\"feeCategoryId\\\":\\\"{{fee_category_id}}\\\",\\\"isMandatory\\\":true,\\\"isRefundable\\\":false,\\\"priorityOrder\\\":1}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateFeeHead($input: CreateFeeHeadInput!) { createFeeHead(input: $input) { id name type category allowConcession allowLateFee isMandatory isRefundable priorityOrder isActive } }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Tuition Fee\",\n      \"prefix\": \"TF\",\n      \"type\": \"RECURRING\",\n      \"category\": \"ACADEMIC\",\n      \"feeCategoryId\": \"{{fee_category_id}}\",\n      \"isMandatory\": true,\n      \"isRefundable\": false,\n      \"allowConcession\": false,\n      \"allowLateFee\": true,\n      \"priorityOrder\": 1\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2302,7 +2302,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateFeeHead($id: ID!, $input: UpdateFeeHeadInput!) { updateFeeHead(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_head_id}}\",\n    \"input\": \"{\\\"priorityOrder\\\":1}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateFeeHead($id: ID!, $input: UpdateFeeHeadInput!) { updateFeeHead(id: $id, input: $input) { id name type category allowConcession allowLateFee isMandatory isRefundable priorityOrder isActive } }\",\n  \"variables\": {\n    \"id\": \"{{fee_head_id}}\",\n    \"input\": {\n      \"priorityOrder\": 1,\n      \"allowConcession\": true,\n      \"allowLateFee\": true\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2341,7 +2341,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query { listFeeHeads }\"\n}"
+                  "raw": "{\n  \"query\": \"query { listFeeHeads { id name type category allowConcession allowLateFee isMandatory isRefundable priorityOrder isActive feeCategoryId createdAt } }\"\n}"
                 }
               },
               "event": [
@@ -2426,7 +2426,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateFeeSchedule($input: CreateFeeScheduleInput!) { createFeeSchedule(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Annual Plan 2025-26\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"feeCategoryId\\\":\\\"{{fee_category_id}}\\\",\\\"collectionType\\\":\\\"PARTIAL_ALLOWED\\\",\\\"allowPartialPayment\\\":true,\\\"graceDays\\\":5,\\\"slots\\\":[{\\\"name\\\":\\\"Term 1\\\",\\\"dueDate\\\":\\\"2025-07-31\\\",\\\"percentOfTotal\\\":50},{\\\"name\\\":\\\"Term 2\\\",\\\"dueDate\\\":\\\"2025-12-31\\\",\\\"percentOfTotal\\\":50}]}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateFeeSchedule($input: CreateFeeScheduleInput!) { createFeeSchedule(input: $input) { id name academicYearId feeCategoryId campusId isActive allowPartialPayment collectionType minimumAmount minimumPercentage graceDays lateFeeEnabled notificationEnabled slots { name dueDate percentOfTotal fixedAmount } createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Annual Plan 2025-26\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"feeCategoryId\": \"{{fee_category_id}}\",\n      \"collectionType\": \"PARTIAL_ALLOWED\",\n      \"allowPartialPayment\": true,\n      \"graceDays\": 5,\n      \"lateFeeEnabled\": true,\n      \"notificationEnabled\": true,\n      \"slots\": [\n        { \"name\": \"Term 1\", \"dueDate\": \"2026-07-31\", \"percentOfTotal\": 50 },\n        { \"name\": \"Term 2\", \"dueDate\": \"2026-12-31\", \"percentOfTotal\": 50 }\n      ]\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2446,7 +2446,7 @@
                       "  pm.sendRequest({",
                       "    url: pm.environment.get('appsync_url'), method: 'POST',",
                       "    header: [{key:'Content-Type',value:'application/json'},{key:'Authorization',value:pm.environment.get('id_token')},{key:'x-tenant-id',value:pm.environment.get('tenant_id')}],",
-                      "    body: { mode:'raw', raw: JSON.stringify({ query: 'query { listFeeSchedules }' }) }",
+                      "    body: { mode:'raw', raw: JSON.stringify({ query: 'query { listFeeSchedules { id name } }' }) }",
                       "  }, (err, res) => {",
                       "    if (err) return;",
                       "    const d2 = res.json(); const raw2 = d2.data && d2.data.listFeeSchedules;",
@@ -2484,7 +2484,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateFeeSchedule($id: ID!, $input: UpdateFeeScheduleInput!) { updateFeeSchedule(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_schedule_id}}\",\n    \"input\": \"{\\\"graceDays\\\":7}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateFeeSchedule($id: ID!, $input: UpdateFeeScheduleInput!) { updateFeeSchedule(id: $id, input: $input) { id name academicYearId feeCategoryId campusId isActive allowPartialPayment collectionType minimumAmount minimumPercentage graceDays lateFeeEnabled notificationEnabled slots { name dueDate percentOfTotal fixedAmount } createdAt updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{fee_schedule_id}}\",\n    \"input\": {\n      \"graceDays\": 7\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2523,7 +2523,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query { listFeeSchedules }\"\n}"
+                  "raw": "{\n  \"query\": \"query { listFeeSchedules { id name academicYearId feeCategoryId campusId isActive allowPartialPayment collectionType minimumAmount minimumPercentage graceDays lateFeeEnabled notificationEnabled slots { name dueDate percentOfTotal fixedAmount } createdAt updatedAt } }\"\n}"
                 }
               },
               "event": [
@@ -2545,22 +2545,163 @@
                 "method": "POST",
                 "url": "{{appsync_url}}",
                 "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "{{id_token}}"
-                  },
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "x-tenant-id",
-                    "value": "{{tenant_id}}"
-                  }
+                  { "key": "Authorization", "value": "{{id_token}}" },
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-tenant-id", "value": "{{tenant_id}}" }
                 ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"query\": \"mutation DeleteFeeSchedule($id: ID!) { deleteFeeSchedule(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{fee_schedule_id}}\"\n  }\n}"
+                }
+              },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"] } }]
+            },
+            {
+              "name": "Add Schedule Slot",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  { "key": "Authorization", "value": "{{id_token}}" },
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-tenant-id", "value": "{{tenant_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation AddScheduleSlot($id: ID!, $slot: FeeScheduleSlotInput!) { addScheduleSlot(id: $id, slot: $slot) { id name slots { name dueDate percentOfTotal fixedAmount } updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{fee_schedule_id}}\",\n    \"slot\": {\n      \"name\": \"Extra Installment\",\n      \"dueDate\": \"2027-01-15\",\n      \"percentOfTotal\": 10\n    }\n  }\n}"
+                }
+              },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "const r = pm.response.json(); if (r.errors) console.warn('addScheduleSlot:', r.errors[0].message); pm.test('No crash', () => pm.expect(r.data || r.errors).to.exist);"] } }]
+            },
+            {
+              "name": "Delete Schedule Slot",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  { "key": "Authorization", "value": "{{id_token}}" },
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-tenant-id", "value": "{{tenant_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation DeleteScheduleSlot($id: ID!, $slotIndex: Int!) { deleteScheduleSlot(id: $id, slotIndex: $slotIndex) }\",\n  \"variables\": {\n    \"id\": \"{{fee_schedule_id}}\",\n    \"slotIndex\": 0\n  }\n}"
+                }
+              },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"] } }]
+            }
+          ]
+        },
+        {
+          "name": "Installment Plans",
+          "item": [
+            {
+              "name": "Create Installment Plan",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  { "key": "Authorization", "value": "{{id_token}}" },
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-tenant-id", "value": "{{tenant_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation CreateInstallmentPlan($input: CreateInstallmentPlanInput!) { createInstallmentPlan(input: $input) { id name numberOfInstallments description installments { label percentage dueDateType fixedDate monthsOffset } isActive createdAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Quarterly Plan\",\n      \"numberOfInstallments\": 4,\n      \"description\": \"4 equal quarterly installments\",\n      \"installments\": [\n        { \"label\": \"Q1\", \"percentage\": 25, \"dueDateType\": \"FIXED\", \"fixedDate\": \"2025-06-01\" },\n        { \"label\": \"Q2\", \"percentage\": 25, \"dueDateType\": \"FIXED\", \"fixedDate\": \"2025-09-01\" },\n        { \"label\": \"Q3\", \"percentage\": 25, \"dueDateType\": \"FIXED\", \"fixedDate\": \"2025-12-01\" },\n        { \"label\": \"Q4\", \"percentage\": 25, \"dueDateType\": \"FIXED\", \"fixedDate\": \"2026-03-01\" }\n      ]\n    }\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "if (r.errors) console.warn('createInstallmentPlan:', r.errors[0] && r.errors[0].message);",
+                      "const d = r.data && r.data.createInstallmentPlan;",
+                      "if (d && d.id) { pm.environment.set('installment_plan_id', d.id); console.log('installment_plan_id:', d.id); }",
+                      "pm.test('No crash', () => pm.expect(r.data || r.errors).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Installment Plans",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  { "key": "Authorization", "value": "{{id_token}}" },
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-tenant-id", "value": "{{tenant_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"query { listInstallmentPlans { id name numberOfInstallments description installments { label percentage dueDateType fixedDate monthsOffset } isActive createdAt } }\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "if (r.errors) console.warn('listInstallmentPlans:', r.errors[0] && r.errors[0].message);",
+                      "const list = r.data && r.data.listInstallmentPlans;",
+                      "if (Array.isArray(list) && list.length > 0 && !pm.environment.get('installment_plan_id')) { pm.environment.set('installment_plan_id', list[0].id); }",
+                      "pm.test('listInstallmentPlans exists', () => pm.expect(r.data).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Update Installment Plan",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  { "key": "Authorization", "value": "{{id_token}}" },
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-tenant-id", "value": "{{tenant_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation UpdateInstallmentPlan($id: ID!, $input: UpdateInstallmentPlanInput!) { updateInstallmentPlan(id: $id, input: $input) { id name numberOfInstallments installments { label percentage dueDateType fixedDate monthsOffset } isActive } }\",\n  \"variables\": {\n    \"id\": \"{{installment_plan_id}}\",\n    \"input\": {\n      \"isActive\": true\n    }\n  }\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                      "const r = pm.response.json();",
+                      "if (r.errors) console.warn('updateInstallmentPlan:', r.errors[0] && r.errors[0].message);",
+                      "pm.test('No crash', () => pm.expect(r.data || r.errors).to.exist);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Delete Installment Plan",
+              "request": {
+                "method": "POST",
+                "url": "{{appsync_url}}",
+                "header": [
+                  { "key": "Authorization", "value": "{{id_token}}" },
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "x-tenant-id", "value": "{{tenant_id}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"mutation DeleteInstallmentPlan($id: ID!) { deleteInstallmentPlan(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{installment_plan_id}}\"\n  }\n}"
                 }
               },
               "event": [
@@ -2602,7 +2743,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation CreateFeeStructure($input: CreateFeeStructureInput!) { createFeeStructure(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"name\\\":\\\"Grade 10 Annual Fee 2025-26\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"academicYearId\\\":\\\"{{academic_year_id}}\\\",\\\"classId\\\":\\\"{{class_id}}\\\",\\\"feeCategoryId\\\":\\\"{{fee_category_id}}\\\",\\\"feeScheduleId\\\":\\\"{{fee_schedule_id}}\\\",\\\"allocationMethod\\\":\\\"PRO_RATA\\\",\\\"components\\\":[{\\\"feeHeadId\\\":\\\"{{fee_head_id}}\\\",\\\"feeHeadName\\\":\\\"Tuition Fee\\\",\\\"amount\\\":50000,\\\"isOptional\\\":false,\\\"priorityOrder\\\":1}]}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation CreateFeeStructure($input: CreateFeeStructureInput!) { createFeeStructure(input: $input) { id name classFrom classTo totalAmount isActive campusId academicYearId feeCategoryId components { feeHeadId feeHeadName amount isOptional priorityOrder } } }\",\n  \"variables\": {\n    \"input\": {\n      \"name\": \"Grade 10 Annual Fee 2025-26\",\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"classId\": \"{{class_id}}\",\n      \"classFrom\": null,\n      \"classTo\": null,\n      \"feeCategoryId\": \"{{fee_category_id}}\",\n      \"feeScheduleId\": \"{{fee_schedule_id}}\",\n      \"allocationMethod\": \"PRO_RATA\",\n      \"components\": [\n        {\n          \"feeHeadId\": \"{{fee_head_id}}\",\n          \"feeHeadName\": \"Tuition Fee\",\n          \"amount\": 50000,\n          \"isOptional\": false,\n          \"priorityOrder\": 1\n        }\n      ]\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2660,7 +2801,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query GetFeeStructure($id: ID!) { getFeeStructure(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{fee_structure_id}}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"query GetFeeStructure($id: ID!) { getFeeStructure(id: $id) { id name classFrom classTo totalAmount isActive campusId academicYearId feeCategoryId allocationMethod components { feeHeadId feeHeadName amount isOptional priorityOrder } createdAt } }\",\n  \"variables\": {\n    \"id\": \"{{fee_structure_id}}\"\n  }\n}"
                 }
               },
               "event": [
@@ -2699,7 +2840,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation UpdateFeeStructure($id: ID!, $input: UpdateFeeStructureInput!) { updateFeeStructure(id: $id, input: $input) }\",\n  \"variables\": {\n    \"id\": \"{{fee_structure_id}}\",\n    \"input\": \"{\\\"name\\\":\\\"Grade 10 Annual Fee 2025-26\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation UpdateFeeStructure($id: ID!, $input: UpdateFeeStructureInput!) { updateFeeStructure(id: $id, input: $input) { id name classFrom classTo totalAmount isActive } }\",\n  \"variables\": {\n    \"id\": \"{{fee_structure_id}}\",\n    \"input\": {\n      \"name\": \"Grade 10 Annual Fee 2025-26\",\n      \"classFrom\": 10,\n      \"classTo\": 10\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -2738,7 +2879,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query { listFeeStructures(academicYearId: \\\"{{academic_year_id}}\\\") }\"\n}"
+                  "raw": "{\n  \"query\": \"query { listFeeStructures(academicYearId: \\\"{{academic_year_id}}\\\") { id name classFrom classTo totalAmount isActive campusId academicYearId feeCategoryId allocationMethod components { feeHeadId feeHeadName amount isOptional priorityOrder } createdAt } }\"\n}"
                 }
               },
               "event": [
@@ -3383,7 +3524,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"mutation RecordPayment($input: RecordPaymentInput!) { recordPayment(input: $input) }\",\n  \"variables\": {\n    \"input\": \"{\\\"invoiceId\\\":\\\"{{invoice_id}}\\\",\\\"studentId\\\":\\\"{{student_id}}\\\",\\\"campusId\\\":\\\"{{campus_id}}\\\",\\\"amount\\\":10000,\\\"method\\\":\\\"CASH\\\",\\\"remarks\\\":\\\"Partial payment — Term 1\\\"}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"mutation RecordPayment($input: RecordPaymentInput!) { recordPayment(input: $input) { payment { id campusId studentId invoiceId academicYearId classId receiptNumber amount method status referenceNumber remarks paidAt collectedBy orders { orderId orderNo paidAmount } totalPaidAmount excessAmount refundAmount createdAt updatedAt } receiptNumber allocations { id paymentId invoiceId feeHeadId allocatedAmount } } }\",\n  \"variables\": {\n    \"input\": {\n      \"invoiceId\": \"{{invoice_id}}\",\n      \"studentId\": \"{{student_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"amount\": 10000,\n      \"method\": \"CASH\",\n      \"remarks\": \"Partial payment — Term 1\",\n      \"orderIds\": [\"{{student_fee_order_id}}\"]\n    }\n  }\n}"
                 }
               },
               "event": [
@@ -3508,7 +3649,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query { listPayments(studentId: \\\"{{student_id}}\\\") }\"\n}"
+                  "raw": "{\n  \"query\": \"query ListPayments($invoiceId: ID, $studentId: ID, $campusId: ID, $academicYearId: ID, $from: String, $to: String, $limit: Int, $nextToken: String) { listPayments(invoiceId: $invoiceId, studentId: $studentId, campusId: $campusId, academicYearId: $academicYearId, from: $from, to: $to, limit: $limit, nextToken: $nextToken) { id campusId studentId invoiceId academicYearId classId receiptNumber amount method status referenceNumber remarks paidAt collectedBy razorpayOrderId razorpayPaymentId orders { orderId orderNo paidAmount } totalPaidAmount excessAmount refundAmount createdAt updatedAt } }\",\n  \"variables\": {\n    \"studentId\": \"{{student_id}}\",\n    \"campusId\": \"{{campus_id}}\",\n    \"academicYearId\": \"{{academic_year_id}}\",\n    \"from\": \"2026-04-01\",\n    \"to\": \"2026-04-30\",\n    \"limit\": 50,\n    \"nextToken\": null\n  }\n}"
                 }
               },
               "event": [
@@ -3545,7 +3686,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query GetPayment($id: ID!) { getPayment(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{payment_id}}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"query GetPayment($id: ID!) { getPayment(id: $id) { id campusId studentId invoiceId academicYearId classId receiptNumber amount method status referenceNumber remarks paidAt collectedBy razorpayOrderId razorpayPaymentId orders { orderId orderNo paidAmount } totalPaidAmount excessAmount refundAmount createdAt updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{payment_id}}\"\n  }\n}"
                 }
               },
               "event": [
@@ -3584,7 +3725,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query { listReceipts(studentId: \\\"{{student_id}}\\\") }\"\n}"
+                  "raw": "{\n  \"query\": \"query ListReceipts($studentId: ID, $invoiceId: ID, $campusId: ID, $academicYearId: ID, $from: String, $to: String, $limit: Int, $nextToken: String) { listReceipts(studentId: $studentId, invoiceId: $invoiceId, campusId: $campusId, academicYearId: $academicYearId, from: $from, to: $to, limit: $limit, nextToken: $nextToken) { id campusId studentId invoiceId academicYearId classId receiptNumber amount method status referenceNumber remarks paidAt collectedBy razorpayOrderId razorpayPaymentId orders { orderId orderNo paidAmount } totalPaidAmount excessAmount refundAmount createdAt updatedAt } }\",\n  \"variables\": {\n    \"studentId\": \"{{student_id}}\",\n    \"campusId\": \"{{campus_id}}\",\n    \"academicYearId\": \"{{academic_year_id}}\",\n    \"from\": \"2026-04-01\",\n    \"to\": \"2026-04-30\",\n    \"limit\": 50,\n    \"nextToken\": null\n  }\n}"
                 }
               },
               "event": [
@@ -3628,7 +3769,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query GetReceipt($id: ID!) { getReceipt(id: $id) }\",\n  \"variables\": {\n    \"id\": \"{{receipt_id}}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"query GetReceipt($id: ID!) { getReceipt(id: $id) { id campusId studentId invoiceId academicYearId classId receiptNumber amount method status referenceNumber remarks paidAt collectedBy razorpayOrderId razorpayPaymentId orders { orderId orderNo paidAmount } totalPaidAmount excessAmount refundAmount createdAt updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{receipt_id}}\"\n  }\n}"
                 }
               },
               "event": [
@@ -3745,7 +3886,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query GetFeeRevisions($invoiceId: ID!) { getFeeRevisions(invoiceId: $invoiceId) }\",\n  \"variables\": {\n    \"invoiceId\": \"{{invoice_id}}\"\n  }\n}"
+                  "raw": "{\n  \"query\": \"query GetFeeRevisions($invoiceId: ID!) { getFeeRevisions(invoiceId: $invoiceId) { id studentId invoiceId feeAssignmentId revisedBy previousAmount newAmount difference reason createdAt updatedAt } }\",\n  \"variables\": {\n    \"invoiceId\": \"{{invoice_id}}\"\n  }\n}"
                 }
               },
               "event": [
@@ -3760,6 +3901,91 @@
                   }
                 }
               ]
+            }
+          ]
+        },
+        {
+          "name": "Fee Structure Class Mappings",
+          "item": [
+            {
+              "name": "Create Mapping",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation CreateFeeStructureClassMapping($input: CreateFeeStructureClassMappingInput!) { createFeeStructureClassMapping(input: $input) { id campusId academicYearId classId feeScheduleId feeStructureId priority effectiveFrom effectiveTo status createdAt updatedAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"classId\": \"{{class_id}}\",\n      \"feeScheduleId\": \"{{fee_schedule_id}}\",\n      \"feeStructureId\": \"{{fee_structure_id}}\",\n      \"priority\": 1,\n      \"effectiveFrom\": \"2026-04-01\",\n      \"effectiveTo\": \"2027-03-31\"\n    }\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "const r = pm.response.json(); if (r.errors) console.warn(r.errors[0].message); const d = r.data && r.data.createFeeStructureClassMapping; if (d && d.id) { pm.environment.set('mapping_id', d.id); console.log('mapping_id:', d.id); } pm.test('No crash', () => pm.expect(r.data || r.errors).to.exist);"] } }]
+            },
+            {
+              "name": "Bulk Create Mappings",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation BulkCreateFeeStructureClassMappings($input: [CreateFeeStructureClassMappingInput!]!) { bulkCreateFeeStructureClassMappings(input: $input) { id campusId academicYearId classId feeScheduleId feeStructureId priority status createdAt } }\",\n  \"variables\": {\n    \"input\": [{\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"classId\": \"{{class_id}}\",\n      \"feeScheduleId\": \"{{fee_schedule_id}}\",\n      \"feeStructureId\": \"{{fee_structure_id}}\",\n      \"priority\": 1,\n      \"effectiveFrom\": \"2026-04-01\",\n      \"effectiveTo\": \"2027-03-31\"\n    }]\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"] } }]
+            },
+            {
+              "name": "List Mappings",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"query ListFeeStructureClassMappings($campusId: ID, $academicYearId: ID, $classId: ID, $status: String) { listFeeStructureClassMappings(campusId: $campusId, academicYearId: $academicYearId, classId: $classId, status: $status) { id campusId academicYearId classId feeScheduleId feeStructureId priority effectiveFrom effectiveTo status createdAt updatedAt } }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\",\n    \"academicYearId\": \"{{academic_year_id}}\",\n    \"classId\": \"{{class_id}}\",\n    \"status\": \"ACTIVE\"\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "const r = pm.response.json(); if (r.errors) console.warn(r.errors[0].message); const list = r.data && r.data.listFeeStructureClassMappings; if (Array.isArray(list) && list.length > 0) pm.environment.set('mapping_id', list[0].id); pm.test('No crash', () => pm.expect(r.data).to.exist);"] } }]
+            },
+            {
+              "name": "Get Mapping",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"query GetFeeStructureClassMapping($id: ID!) { getFeeStructureClassMapping(id: $id) { id campusId academicYearId classId feeScheduleId feeStructureId priority effectiveFrom effectiveTo status createdAt updatedAt } }\",\n  \"variables\": { \"id\": \"{{mapping_id}}\" }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"] } }]
+            },
+            {
+              "name": "Update Mapping",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation UpdateFeeStructureClassMapping($id: ID!, $input: UpdateFeeStructureClassMappingInput!) { updateFeeStructureClassMapping(id: $id, input: $input) { id priority status updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{mapping_id}}\",\n    \"input\": { \"priority\": 2, \"status\": \"ACTIVE\" }\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"] } }]
+            },
+            {
+              "name": "Delete Mapping",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation DeleteFeeStructureClassMapping($id: ID!) { deleteFeeStructureClassMapping(id: $id) }\",\n  \"variables\": { \"id\": \"{{mapping_id}}\" }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"] } }]
+            }
+          ]
+        },
+        {
+          "name": "Student Fee Orders",
+          "item": [
+            {
+              "name": "Generate Student Fee Orders",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation GenerateStudentFeeOrders($assignmentId: ID!) { generateStudentFeeOrders(assignmentId: $assignmentId) { id studentId orderNo installmentNo installmentTitle dueDate grossAmount payableAmount paidAmount balanceAmount status paymentStatus feeHeads { feeHeadId feeHeadName amount finalAmount status } generatedAt createdAt } }\",\n  \"variables\": { \"assignmentId\": \"{{fee_assignment_id}}\" }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "const r = pm.response.json(); if (r.errors) console.warn(r.errors[0].message); const list = r.data && r.data.generateStudentFeeOrders; if (Array.isArray(list) && list.length > 0) { pm.environment.set('student_fee_order_id', list[0].id); console.log('student_fee_order_id:', list[0].id); } pm.test('No crash', () => pm.expect(r.data || r.errors).to.exist);"] } }]
+            },
+            {
+              "name": "List Student Fee Orders",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"query ListStudentFeeOrders($studentId: ID, $academicYearId: ID, $campusId: ID, $classId: ID, $status: String) { listStudentFeeOrders(studentId: $studentId, academicYearId: $academicYearId, campusId: $campusId, classId: $classId, status: $status) { id campusId academicYearId studentId classId sectionId feeScheduleId feeStructureId orderNo installmentNo installmentTitle dueDate feeHeads { feeHeadId feeHeadName amount concessionAmount lateFeeAmount paidAmount balanceAmount finalAmount status } grossAmount concessionAmount lateFeeAmount payableAmount paidAmount balanceAmount paymentCompletionPercentage status paymentStatus generatedAt remarks createdAt updatedAt } }\",\n  \"variables\": {\n    \"studentId\": \"{{student_id}}\",\n    \"academicYearId\": \"{{academic_year_id}}\",\n    \"campusId\": \"{{campus_id}}\",\n    \"status\": \"PENDING\"\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "const r = pm.response.json(); if (r.errors) console.warn(r.errors[0].message); const list = r.data && r.data.listStudentFeeOrders; if (Array.isArray(list) && list.length > 0 && !pm.environment.get('student_fee_order_id')) pm.environment.set('student_fee_order_id', list[0].id); pm.test('No crash', () => pm.expect(r.data).to.exist);"] } }]
+            },
+            {
+              "name": "Get Student Fee Order",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"query GetStudentFeeOrder($id: ID!) { getStudentFeeOrder(id: $id) { id campusId academicYearId studentId classId sectionId feeScheduleId feeStructureId orderNo installmentNo installmentTitle dueDate feeHeads { feeHeadId feeHeadName amount concessionAmount lateFeeAmount paidAmount balanceAmount finalAmount status } grossAmount concessionAmount lateFeeAmount payableAmount paidAmount balanceAmount paymentCompletionPercentage status paymentStatus generatedAt remarks createdAt updatedAt } }\",\n  \"variables\": { \"id\": \"{{student_fee_order_id}}\" }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"] } }]
+            },
+            {
+              "name": "Update Student Fee Order",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation UpdateStudentFeeOrder($id: ID!, $input: UpdateStudentFeeOrderInput!) { updateStudentFeeOrder(id: $id, input: $input) { id orderNo dueDate status paymentStatus remarks updatedAt } }\",\n  \"variables\": {\n    \"id\": \"{{student_fee_order_id}}\",\n    \"input\": {\n      \"dueDate\": \"2026-06-30\",\n      \"remarks\": \"Updated in Postman\",\n      \"status\": \"PENDING\"\n    }\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"] } }]
+            },
+            {
+              "name": "Cancel Student Fee Order",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation CancelStudentFeeOrder($id: ID!) { cancelStudentFeeOrder(id: $id) }\",\n  \"variables\": { \"id\": \"{{student_fee_order_id}}\" }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json()).to.exist);"] } }]
+            }
+          ]
+        },
+        {
+          "name": "Student Transactions",
+          "item": [
+            {
+              "name": "List Student Transactions",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"query ListStudentTransactions($studentId: ID!, $academicYearId: ID) { listStudentTransactions(studentId: $studentId, academicYearId: $academicYearId) { id campusId academicYearId studentId classId sectionId feeOrderId invoiceId paymentId transactionType status amount balanceBefore balanceAfter referenceNumber remarks createdAt updatedAt } }\",\n  \"variables\": {\n    \"studentId\": \"{{student_id}}\",\n    \"academicYearId\": \"{{academic_year_id}}\"\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "const r = pm.response.json(); if (r.errors) console.warn(r.errors[0].message); const list = r.data && r.data.listStudentTransactions; if (Array.isArray(list) && list.length > 0) pm.environment.set('transaction_id', list[0].id); pm.test('No crash', () => pm.expect(r.data).to.exist);"] } }]
+            },
+            {
+              "name": "Get Student Transaction",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"query GetStudentTransaction($id: ID!) { getStudentTransaction(id: $id) { id campusId academicYearId studentId classId sectionId feeOrderId invoiceId paymentId transactionType status amount balanceBefore balanceAfter referenceNumber remarks createdAt updatedAt } }\",\n  \"variables\": { \"id\": \"{{transaction_id}}\" }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"] } }]
+            },
+            {
+              "name": "Create Student Transaction",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation CreateStudentTransaction($input: CreateStudentTransactionInput!) { createStudentTransaction(input: $input) { id transactionType status amount balanceBefore balanceAfter referenceNumber createdAt } }\",\n  \"variables\": {\n    \"input\": {\n      \"campusId\": \"{{campus_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"studentId\": \"{{student_id}}\",\n      \"classId\": \"{{class_id}}\",\n      \"feeOrderId\": \"{{student_fee_order_id}}\",\n      \"invoiceId\": \"{{invoice_id}}\",\n      \"paymentId\": \"{{payment_id}}\",\n      \"transactionType\": \"PAYMENT\",\n      \"status\": \"SUCCESS\",\n      \"amount\": 1000,\n      \"balanceBefore\": 5000,\n      \"balanceAfter\": 4000,\n      \"referenceNumber\": \"TXN-001\",\n      \"remarks\": \"Manual test\"\n    }\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"] } }]
             }
           ]
         },
@@ -3787,7 +4013,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query { dayBookReport(date: \\\"2025-12-01\\\", campusId: \\\"{{campus_id}}\\\") }\"\n}"
+                  "raw": "{\n  \"query\": \"query DayBookReport($from: String, $to: String, $campusId: ID, $academicYearId: ID) { dayBookReport(from: $from, to: $to, campusId: $campusId, academicYearId: $academicYearId) { date totalAmount entries { paymentId receiptNumber studentId studentName amount method collectedBy paidAt } } }\",\n  \"variables\": {\n    \"from\": \"2026-04-01\",\n    \"to\": \"2026-04-30\",\n    \"campusId\": \"{{campus_id}}\",\n    \"academicYearId\": \"{{academic_year_id}}\"\n  }\n}"
                 }
               },
               "event": [
@@ -3825,7 +4051,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query { feeCollectionAnalytics(campusId: \\\"{{campus_id}}\\\", from: \\\"2025-06-01\\\", to: \\\"2025-12-31\\\") }\"\n}"
+                  "raw": "{\n  \"query\": \"query FeeCollectionAnalytics($campusId: ID, $academicYearId: ID, $from: String, $to: String) { feeCollectionAnalytics(campusId: $campusId, academicYearId: $academicYearId, from: $from, to: $to) { totalCollected totalDue collectionRate collectedToday collectedThisMonth outstandingDue openInvoices receiptsToday pendingFeeAssignments byMethod { method amount count } monthly { month amount count } } }\",\n  \"variables\": {\n    \"campusId\": \"{{campus_id}}\",\n    \"academicYearId\": \"{{academic_year_id}}\",\n    \"from\": \"2026-04-01\",\n    \"to\": \"2026-04-30\"\n  }\n}"
                 }
               },
               "event": [
@@ -3841,6 +4067,31 @@
                   }
                 }
               ]
+            },
+            {
+              "name": "Class Fee Stats",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"query ClassFeeStats($classId: ID!, $academicYearId: ID) { classFeeStats(classId: $classId, academicYearId: $academicYearId) { classId className totalStudents paidStudents pendingStudents totalAmount collectedAmount pendingAmount } }\",\n  \"variables\": {\n    \"classId\": \"{{class_id}}\",\n    \"academicYearId\": \"{{academic_year_id}}\"\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "const r = pm.response.json(); if (r.errors) console.warn(r.errors[0].message); pm.test('No crash', () => pm.expect(r.data).to.exist);"] } }]
+            },
+            {
+              "name": "Student Financial Summary",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"query StudentFinancialSummary($studentId: ID!) { studentFinancialSummary(studentId: $studentId) { studentId totalCharged totalPaid totalDue totalConcession invoiceCount paymentCount } }\",\n  \"variables\": { \"studentId\": \"{{student_id}}\" }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data).to.exist);"] } }]
+            },
+            {
+              "name": "Get Student Dues",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"query GetStudentDues($studentId: ID!) { getStudentDues(studentId: $studentId) { studentId totalDue invoices { id invoiceNumber dueAmount netAmount status dueDate } } }\",\n  \"variables\": { \"studentId\": \"{{student_id}}\" }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data).to.exist);"] } }]
+            },
+            {
+              "name": "Generate Payment Link",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation GeneratePaymentLink($invoiceId: ID!) { generatePaymentLink(invoiceId: $invoiceId) { link expiresAt } }\",\n  \"variables\": { \"invoiceId\": \"{{invoice_id}}\" }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"] } }]
+            },
+            {
+              "name": "Bulk Create Charge",
+              "request": { "method": "POST", "url": "{{appsync_url}}", "header": [{ "key": "Authorization", "value": "{{id_token}}" }, { "key": "Content-Type", "value": "application/json" }, { "key": "x-tenant-id", "value": "{{tenant_id}}" }], "body": { "mode": "raw", "raw": "{\n  \"query\": \"mutation BulkCreateCharge($studentIds: [ID!]!, $input: CreateOneOffChargeInput!) { bulkCreateCharge(studentIds: $studentIds, input: $input) { id invoiceNumber status totalAmount paidAmount dueAmount createdAt } }\",\n  \"variables\": {\n    \"studentIds\": [\"{{student_id}}\"],\n    \"input\": {\n      \"studentId\": \"{{student_id}}\",\n      \"academicYearId\": \"{{academic_year_id}}\",\n      \"campusId\": \"{{campus_id}}\",\n      \"classId\": \"{{class_id}}\",\n      \"feeHeadId\": \"{{fee_head_id}}\",\n      \"amount\": 500,\n      \"description\": \"Bulk charge\"\n    }\n  }\n}" } },
+              "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('No crash', () => pm.expect(pm.response.json().data || pm.response.json().errors).to.exist);"] } }]
             }
           ]
         }
@@ -3935,7 +4186,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"query\": \"query { listClasses(campusId: \\\"{{campus_id}}\\\") }\"\n}"
+                  "raw": "{\n  \"query\": \"query { listClasses(campusId: \\\"{{campus_id}}\\\") { id name code campusId programId academicYearId year isActive createdAt } }\"\n}"
                 }
               },
               "event": [
