@@ -20,11 +20,13 @@ export async function resolveStudentOrders(
   switch (operation) {
     case 'listStudentFeeOrders': {
       authorize(ctx, 'finance.invoice.read');
+      const { Types: MongoTypes } = require('mongoose');
+      const safeOid = (id: string) => { try { return new MongoTypes.ObjectId(id); } catch { return null; } };
       const filter: Record<string, unknown> = { tenant_id: tenantId };
-      if (args.studentId) filter.student_id = args.studentId;
-      if (args.academicYearId) filter.academic_year_id = args.academicYearId;
-      if (args.campusId) filter.campus_id = args.campusId;
-      if (args.classId) filter.class_id = args.classId;
+      if (args.studentId) { const oid = safeOid(args.studentId as string); if (oid) filter.student_id = oid; }
+      if (args.academicYearId) { const oid = safeOid(args.academicYearId as string); if (oid) filter.academic_year_id = oid; }
+      if (args.campusId) { const oid = safeOid(args.campusId as string); if (oid) filter.campus_id = oid; }
+      if (args.classId) { const oid = safeOid(args.classId as string); if (oid) filter.class_id = oid; }
       if (args.status) filter.status = args.status;
       const docs = await FinanceRepo.listStudentOrders(filter);
       return (docs as unknown[]).map(d => toGql(d));

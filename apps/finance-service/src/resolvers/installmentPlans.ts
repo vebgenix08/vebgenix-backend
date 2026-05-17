@@ -26,13 +26,15 @@ export async function resolveInstallmentPlans(
     case 'createInstallmentPlan':
     case 'POST:/api/admin/finance/installment-plans': {
       authorize(ctx, 'finance.installment_plan.create');
-      return toGql(await FinanceRepo.createInstallmentPlan(tenantId, { ...args as object, createdBy: ctx.membership!.profileId }));
+      const planInput = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
+      return toGql(await FinanceRepo.createInstallmentPlan(tenantId, { ...planInput, createdBy: ctx.membership?.profileId ?? ctx.userId }));
     }
 
     case 'updateInstallmentPlan':
     case 'PATCH:/api/admin/finance/installment-plans/:id': {
       authorize(ctx, 'finance.installment_plan.update');
-      const { id, ...update } = args as Record<string, unknown>;
+      const { id, input: planUpdateInput, ...restUpdate } = args as Record<string, unknown>;
+      const update = (planUpdateInput as Record<string, unknown>) ?? restUpdate;
       return toGql(await FinanceRepo.updateInstallmentPlan(tenantId, id as string, update));
     }
 

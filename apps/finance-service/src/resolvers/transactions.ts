@@ -52,9 +52,24 @@ export async function resolveTransactions(
         to: args.to as string | undefined,
       });
 
-    case 'classFeeStats':
+    case 'classFeeStats': {
       authorize(ctx, 'finance.reports.read');
-      return TransactionService.classFeeStats(tenantId, args.classId as string, args.academicYearId as string | undefined);
+      const classId = args.classId as string | undefined;
+      const results = await TransactionService.classFeeStats(tenantId, classId, args.academicYearId as string | undefined);
+      if (!results || (Array.isArray(results) && results.length === 0)) {
+        return {
+          classId: classId ?? null,
+          className: null,
+          totalStudents: 0,
+          paidStudents: 0,
+          pendingStudents: 0,
+          totalAmount: 0,
+          collectedAmount: 0,
+          pendingAmount: 0,
+        };
+      }
+      return Array.isArray(results) ? results[0] : results;
+    }
 
     case 'studentFinancialSummary':
       authorize(ctx, 'finance.reports.read');

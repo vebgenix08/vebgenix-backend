@@ -44,7 +44,20 @@ export async function resolveReports(
       authorize(ctx, 'finance.reports.read');
       const classId        = args.classId        as string | undefined;
       const academicYearId = args.academicYearId as string | undefined;
-      return FinanceRepo.classFeeStats(tenantId, classId, academicYearId);
+      const results = await FinanceRepo.classFeeStats(tenantId, classId, academicYearId);
+      if (!results || (Array.isArray(results) && results.length === 0)) {
+        return {
+          classId: classId ?? null,
+          className: null,
+          totalStudents: 0,
+          paidStudents: 0,
+          pendingStudents: 0,
+          totalAmount: 0,
+          collectedAmount: 0,
+          pendingAmount: 0,
+        };
+      }
+      return Array.isArray(results) ? results[0] : results;
     }
 
     case 'studentFinancialSummary':

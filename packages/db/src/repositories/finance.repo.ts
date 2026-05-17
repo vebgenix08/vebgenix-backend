@@ -16,6 +16,10 @@ import { IStudentTransaction } from '../models/finance/StudentTransaction.model'
 import StudentTransaction from '../models/finance/StudentTransaction.model';
 
 const toObjectId = (id: string) => new Types.ObjectId(id);
+const safeObjectId = (id: string | undefined): Types.ObjectId | string | undefined => {
+  if (!id) return undefined;
+  try { return new Types.ObjectId(id); } catch { return id; }
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const FinanceRepo: any = {
@@ -302,7 +306,7 @@ export const FinanceRepo: any = {
   },
 
   async getStudentTransactions(tenantId: string, studentId: string) {
-    return StudentTransaction.find({ tenantId, studentId: toObjectId(studentId) }).sort({ createdAt: -1 });
+    return StudentTransaction.find({ tenantId, studentId: safeObjectId(studentId) }).sort({ createdAt: -1 });
   },
 
   async getTransactionById(tenantId: string, id: string) {
@@ -535,33 +539,64 @@ export const FinanceRepo: any = {
 
   async classFeeStats(tenantId: string, classId?: string, academicYearId?: string) {
     const matchStage: Record<string, unknown> = { tenantId };
-    if (classId) matchStage.classId = toObjectId(classId);
-    if (academicYearId) matchStage.academicYearId = toObjectId(academicYearId);
-    return Invoice.aggregate([
+    if (classId && Types.ObjectId.isValid(classId)) matchStage.classId = new Types.ObjectId(classId);
+    if (academicYearId && Types.ObjectId.isValid(academicYearId)) matchStage.academicYearId = new Types.ObjectId(academicYearId);
+    const rows = await Invoice.aggregate([
       { $match: matchStage },
       {
         $group: {
           _id: '$classId',
-          totalBilled: { $sum: '$netAmount' },
-          totalPaid: { $sum: '$paidAmount' },
-          totalDue: { $sum: '$dueAmount' },
-          studentCount: { $addToSet: '$studentId' },
+          totalAmount: { $sum: '$netAmount' },
+          collectedAmount: { $sum: '$paidAmount' },
+          pendingAmount: { $sum: '$dueAmount' },
+          allStudents: { $addToSet: '$studentId' },
+          paidStudents: {
+            $addToSet: { $cond: [{ $lte: ['$dueAmount', 0] }, '$studentId', null] },
+          },
         },
       },
-      { $addFields: { studentCount: { $size: '$studentCount' } } },
-      { $sort: { totalDue: -1 } },
+      {
+        $addFields: {
+          totalStudents: { $size: '$allStudents' },
+          paidStudents: { $size: { $filter: { input: '$paidStudents', as: 'x', cond: { $ne: ['$$x', null] } } } },
+        },
+      },
+      { $sort: { pendingAmount: -1 } },
     ]);
+    return rows.map((row: Record<string, unknown>) => ({
+      classId: row._id ? String(row._id) : null,
+      className: null,
+      totalStudents: Number(row.totalStudents ?? 0),
+      paidStudents: Number(row.paidStudents ?? 0),
+      pendingStudents: Number(row.totalStudents ?? 0) - Number(row.paidStudents ?? 0),
+      totalAmount: Number(row.totalAmount ?? 0),
+      collectedAmount: Number(row.collectedAmount ?? 0),
+      pendingAmount: Number(row.pendingAmount ?? 0),
+    }));
   },
 
   async studentFinancialSummary(tenantId: string, studentId: string) {
+    if (!studentId || !Types.ObjectId.isValid(studentId)) {
+      return { studentId, totalCharged: 0, totalPaid: 0, totalDue: 0, totalConcession: 0, invoiceCount: 0, paymentCount: 0 };
+    }
+    const sid = new Types.ObjectId(studentId);
     const [invoices, payments] = await Promise.all([
-      Invoice.find({ tenantId, studentId }).sort({ createdAt: -1 }).lean(),
-      Payment.find({ tenantId, studentId, status: 'SUCCESS' }).sort({ createdAt: -1 }).lean(),
+      Invoice.find({ tenantId, studentId: sid }).sort({ createdAt: -1 }).lean(),
+      Payment.find({ tenantId, studentId: sid, status: 'SUCCESS' }).sort({ createdAt: -1 }).lean(),
     ]);
-    const totalBilled = invoices.reduce((sum, invoice) => sum + invoice.netAmount, 0);
-    const totalPaid = invoices.reduce((sum, invoice) => sum + invoice.paidAmount, 0);
-    const totalDue = invoices.reduce((sum, invoice) => sum + invoice.dueAmount, 0);
-    return { invoices, payments, totalBilled, totalPaid, totalDue };
+    const totalCharged = invoices.reduce((sum, invoice) => sum + (invoice.netAmount ?? 0), 0);
+    const totalPaid = invoices.reduce((sum, invoice) => sum + (invoice.paidAmount ?? 0), 0);
+    const totalDue = invoices.reduce((sum, invoice) => sum + (invoice.dueAmount ?? 0), 0);
+    const totalConcession = invoices.reduce((sum, invoice) => sum + (invoice.concessionAmount ?? 0), 0);
+    return {
+      studentId,
+      totalCharged,
+      totalPaid,
+      totalDue,
+      totalConcession,
+      invoiceCount: invoices.length,
+      paymentCount: payments.length,
+    };
   },
 
   // =====================================================

@@ -53,15 +53,20 @@ export async function resolveFeeCategories(
         throw new AppError('CONFLICT', `Fee category "${name}" already exists`);
       }
 
+      const validModuleTypes = ['FEE', 'BILLING', 'OTHER'];
+      const resolvedModuleType = validModuleTypes.includes(moduleType as string)
+        ? (moduleType as 'FEE' | 'BILLING' | 'OTHER')
+        : 'FEE';
+      const createdById = ctx.membership?.profileId ?? ctx.userId;
       const category = await FinanceRepo.createFeeCategory(tenantId, {
         name,
-        moduleType: (moduleType as 'FEE' | 'BILLING' | 'OTHER') ?? 'FEE',
+        moduleType: resolvedModuleType,
         feeType: feeType as 'GENERAL' | 'EXAM' | 'ADMISSION' | 'MISC' | 'TRANSPORT' | 'HOSTEL' | 'OTHER',
         invoicePrefix: invoicePrefix.toUpperCase(),
         receiptPrefix: receiptPrefix.toUpperCase(),
         defaultAllocationMethod: (defaultAllocationMethod as 'PRO_RATA' | 'PRIORITY_WISE' | 'MANUAL') ?? 'PRO_RATA',
         isActive: true,
-        createdBy: new Types.ObjectId(ctx.membership!.profileId),
+        createdBy: new Types.ObjectId(createdById),
       });
 
       await AuditLogger.logTenantAction({

@@ -11,7 +11,18 @@ export class TransactionService {
   }
 
   static async list(tenantId: string, filters: Record<string, unknown> = {}) {
-    return FinanceRepo.listTransactions({ tenantId, ...filters });
+    const { Types } = require('mongoose');
+    const toValidOid = (id: unknown) => {
+      if (!id) return undefined;
+      const s = String(id);
+      return Types.ObjectId.isValid(s) ? new Types.ObjectId(s) : undefined;
+    };
+    const cleanFilters: Record<string, unknown> = {};
+    const studentOid = toValidOid(filters.studentId);
+    if (studentOid) cleanFilters.studentId = studentOid;
+    const yearOid = toValidOid(filters.academicYearId);
+    if (yearOid) cleanFilters.academicYearId = yearOid;
+    return FinanceRepo.listTransactions({ tenantId, ...cleanFilters });
   }
 
   static async getById(tenantId: string, id: string) {

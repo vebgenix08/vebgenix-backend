@@ -2,6 +2,7 @@ import { FinanceRepo } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
+import { Types } from 'mongoose';
 import { PaymentService } from '../services/payment.service';
 import { verifyRazorpaySignature } from '../razorpay';
 
@@ -141,8 +142,11 @@ export async function resolvePayments(
     case 'GET:/api/admin/finance/students/:studentId/dues': {
       authorize(ctx, 'finance.invoice.read');
       const studentId = (args.studentId ?? args.id) as string;
+      if (!studentId || !Types.ObjectId.isValid(studentId)) {
+        return { studentId: studentId ?? null, invoices: [], totalDue: 0 };
+      }
       const overdueInvoices = await FinanceRepo.listInvoices(tenantId, {
-        studentId,
+        studentId: new Types.ObjectId(studentId),
         status: { $in: ['PENDING', 'ISSUED', 'PARTIALLY_PAID', 'OVERDUE'] },
       });
       const totalDue = (overdueInvoices as { dueAmount: number }[]).reduce((s, i) => s + i.dueAmount, 0);

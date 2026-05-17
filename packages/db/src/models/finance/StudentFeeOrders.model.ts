@@ -3,8 +3,7 @@ import mongoose, { Schema } from "mongoose";
 const StudentFeeOrderSchema = new Schema(
   {
     tenant_id: {
-      type: Schema.Types.ObjectId,
-      ref: "tenants",
+      type: String,
       required: true,
       index: true,
     },
