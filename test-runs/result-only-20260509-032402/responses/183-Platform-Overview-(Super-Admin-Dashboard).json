@@ -1,8 +1,0 @@
-{
-  "errors": [
-    {
-      "errorType": "UnauthorizedException",
-      "message": "Valid authorization header not provided."
-    }
-  ]
-}

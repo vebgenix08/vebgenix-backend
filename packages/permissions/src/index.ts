@@ -95,7 +95,14 @@ export async function requireFeatureEnabled(ctx: AuthContext, feature: string): 
 /** Utility: throw AppError if ctx is missing a permission (for use inside use-cases) */
 export function authorize(ctx: AuthContext, ...permissions: string[]): void {
   if (ctx.isPlatformAdmin) return;
-  const missing = permissions.filter(p => !ctx.permissions.has(p));
+  // finance.manage grants all finance.* sub-permissions
+  const effective = new Set(ctx.permissions);
+  if (effective.has('finance.manage')) {
+    for (const p of permissions) {
+      if (p.startsWith('finance.')) effective.add(p);
+    }
+  }
+  const missing = permissions.filter(p => !effective.has(p));
   if (missing.length > 0) {
     throw new AppError('FORBIDDEN', `Missing permissions: ${missing.join(', ')}`);
   }

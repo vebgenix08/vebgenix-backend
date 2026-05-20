@@ -8,15 +8,15 @@ import { bootstrapDB, ensureDB } from '@vebgenix/db';
 import { resolveContext } from '@vebgenix/auth';
 import { AppError, isAppError } from '@vebgenix/errors';
 
-import { resolveTenants }      from './resolvers/tenants';
-import { resolveOnboarding }   from './resolvers/onboarding';
-import { resolveCampuses }     from './resolvers/campuses';
-import { resolvePrograms }     from './resolvers/programs';
-import { resolveAcademicYears } from './resolvers/academicYears';
-import { resolveTemplates }    from './resolvers/templates';
-import { resolveFeatures }     from './resolvers/features';
-import { resolveDashboard }    from './resolvers/dashboard';
-import { resolveAuditLogs }    from './resolvers/auditLogs';
+import { handleTenants }       from './operations/tenants';
+import { handleOnboarding }    from './operations/onboarding';
+import { handleCampuses }      from './operations/campuses';
+import { handlePrograms }      from './operations/programs';
+import { handleAcademicYears } from './operations/academicYears';
+import { handleTemplates }     from './operations/templates';
+import { handleFeatures }      from './operations/features';
+import { handleDashboard }     from './operations/dashboard';
+import { handleAuditLogs }     from './operations/auditLogs';
 
 
 function parseEvent(event: Record<string, unknown>) {
@@ -51,15 +51,15 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       ?? '';
 
     const resolvers = [
-      () => resolveTenants(operation, args, ctx, tenantId),
-      () => resolveOnboarding(operation, args, ctx, tenantId),
-      () => resolveCampuses(operation, args, ctx, tenantId),
-      () => resolvePrograms(operation, args, ctx, tenantId),
-      () => resolveAcademicYears(operation, args, ctx, tenantId),
-      () => resolveTemplates(operation, args, ctx, tenantId),
-      () => resolveFeatures(operation, args, ctx, tenantId),
-      () => resolveDashboard(operation, args, ctx, tenantId),
-      () => resolveAuditLogs(operation, args, ctx, tenantId),
+      () => handleTenants(operation, args, ctx, tenantId),
+      () => handleOnboarding(operation, args, ctx, tenantId),
+      () => handleCampuses(operation, args, ctx, tenantId),
+      () => handlePrograms(operation, args, ctx, tenantId),
+      () => handleAcademicYears(operation, args, ctx, tenantId),
+      () => handleTemplates(operation, args, ctx, tenantId),
+      () => handleFeatures(operation, args, ctx, tenantId),
+      () => handleDashboard(operation, args, ctx, tenantId),
+      () => handleAuditLogs(operation, args, ctx, tenantId),
     ];
 
     for (const fn of resolvers) {

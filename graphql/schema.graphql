@@ -675,6 +675,7 @@ input UpdateFeeScheduleInput {
   lateFeeEnabled: Boolean
   notificationEnabled: Boolean
   isActive: Boolean
+  slots: [FeeScheduleSlotInput!]
 }
 
 # ─── Finance — Fee Assignments ────────────────────────────────────────────────
@@ -1054,6 +1055,12 @@ type Payment {
   updatedAt: AWSDateTime
 }
 
+type ReceiptPdfResult {
+  fileName: String!
+  contentType: String!
+  pdfBase64: String!
+}
+
 type PaymentAllocation {
   id: ID
   paymentId: ID!
@@ -1413,6 +1420,8 @@ type Student {
   address: String
   classId: ID
   sectionId: ID
+  className: String
+  sectionName: String
   programId: ID
   status: String!
   authUserId: ID
@@ -2800,6 +2809,7 @@ type Mutation {
 
   # Finance — Payments & Receipts
   recordPayment(input: RecordPaymentInput!): RecordPaymentResult!
+  generateReceiptPdf(input: AWSJSON!): ReceiptPdfResult!
   createPaymentOrder(invoiceId: ID!, amount: Float): PaymentOrder!
   verifyPaymentSignature(input: VerifyPaymentInput!): PaymentVerifyResult!
   collectPaymentByStudent(studentId: ID!, input: CollectByStudentInput!): CollectByStudentResult!
@@ -2922,3 +2932,4 @@ type Mutation {
   enableStudentPortal(studentId: ID!, email: String!): PortalEnablementPayload!
   enableGuardianPortal(input: EnableGuardianPortalInput!): PortalEnablementPayload!
 }
+

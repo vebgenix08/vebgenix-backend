@@ -211,7 +211,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const doc = await LeaveRequest.create({
           ...input,
           tenantId,
-          profileId: input.profileId ?? ctx.membership!.profileId,
+          profileId: input.profileId ?? ctx.membership?.profileId,
           status:    'PENDING',
           appliedAt: new Date(),
         });

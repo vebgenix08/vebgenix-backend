@@ -23,7 +23,7 @@ export interface IAuthUser extends Document {
 
 const AuthUserSchema = new Schema<IAuthUser>(
   {
-    cognitoSub:      { type: String, required: false, sparse: true },
+    cognitoSub:      { type: String, required: false },
     email:           { type: String, required: true },
     phone:           { type: String },
     isActive:        { type: Boolean, default: true },

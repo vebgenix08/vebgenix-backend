@@ -51,7 +51,7 @@ export async function resolveAcademicYearCode(tenantId: string, academicYearId: 
   return `${currentYear.toString().padStart(2, '0')}-${((currentYear + 1) % 100).toString().padStart(2, '0')}`;
 }
 
-async function nextSequenceValue(tenantId: string, key: string): Promise<number> {
+export async function nextSequenceValue(tenantId: string, key: string): Promise<number> {
   const sequence = await FinanceSequence.findOneAndUpdate(
     { tenantId, scope: 'finance', key },
     { $inc: { value: 1 }, $setOnInsert: { tenantId, scope: 'finance', key } },
@@ -83,5 +83,7 @@ export async function generateFeeOrderId(
 
 export async function generateReceiptNumberForInvoice(tenantId: string, invoice: IInvoice): Promise<string> {
   const academicYearCode = await resolveAcademicYearCode(tenantId, invoice.academicYearId);
-  return generateFinanceNumber(tenantId, invoice.feeHeadPrefix, academicYearCode, 'RCP');
+  const key = `RCP:${academicYearCode}`;
+  const value = await nextSequenceValue(tenantId, key);
+  return `RCP/${academicYearCode}/${value.toString().padStart(5, '0')}`;
 }

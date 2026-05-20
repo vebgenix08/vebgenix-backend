@@ -48,13 +48,15 @@ import { FeeHead } from '../packages/db/src/models/finance/FeeHead.model';
 import { FeeStructure } from '../packages/db/src/models/finance/FeeStructure.model';
 import { FeeAssignment } from '../packages/db/src/models/finance/FeeAssignment.model';
 import { FeeSchedule } from '../packages/db/src/models/finance/FeeSchedule.model';
+import { FeeStructureClassMapping } from '../packages/db/src/models/finance/FeeStructureClassMapping.model';
 import { InstallmentPlan } from '../packages/db/src/models/finance/InstallmentPlan.model';
 import { FeeRevision } from '../packages/db/src/models/finance/FeeRevision.model';
 import { Invoice } from '../packages/db/src/models/finance/Invoice.model';
 import { Payment } from '../packages/db/src/models/finance/Payment.model';
 import { FinanceSequence } from '../packages/db/src/models/finance/FinanceSequence.model';
-import { FeeCategory } from '../packages/db/src/models/finance/FeeCategory.model';
 import { PaymentAllocation } from '../packages/db/src/models/finance/PaymentAllocation.model';
+import StudentFeeOrder from '../packages/db/src/models/finance/StudentFeeOrders.model';
+import { StudentTransaction } from '../packages/db/src/models/finance/StudentTransaction.model';
 import { Announcement } from '../packages/db/src/models/comms/Announcement.model';
 import { Event } from '../packages/db/src/models/comms/Event.model';
 import { LeaveRequest } from '../packages/db/src/models/comms/LeaveRequest.model';
@@ -90,6 +92,7 @@ const COLLECTIONS_TO_WIPE = [
   { model: PublishedResultBatch,     name: 'PublishedResultBatch' },
   { model: FeeHead,                  name: 'FeeHead' },
   { model: FeeStructure,             name: 'FeeStructure' },
+  { model: FeeStructureClassMapping, name: 'FeeStructureClassMapping' },
   { model: FeeAssignment,            name: 'FeeAssignment' },
   { model: FeeSchedule,              name: 'FeeSchedule' },
   { model: InstallmentPlan,          name: 'InstallmentPlan' },
@@ -97,8 +100,9 @@ const COLLECTIONS_TO_WIPE = [
   { model: Invoice,                  name: 'Invoice' },
   { model: Payment,                  name: 'Payment' },
   { model: FinanceSequence,          name: 'FinanceSequence' },
-  { model: FeeCategory,              name: 'FeeCategory' },
   { model: PaymentAllocation,        name: 'PaymentAllocation' },
+  { model: StudentFeeOrder,          name: 'StudentFeeOrder' },
+  { model: StudentTransaction,       name: 'StudentTransaction' },
   { model: Announcement,             name: 'Announcement' },
   { model: Event,                    name: 'Event' },
   { model: LeaveRequest,             name: 'LeaveRequest' },

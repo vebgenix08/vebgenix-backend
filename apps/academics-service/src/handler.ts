@@ -11,28 +11,28 @@ import { resolveContext } from '@vebgenix/auth';
 import { AppError, isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 
-import { resolveClasses }         from './resolvers/classes';
-import { resolveSections }        from './resolvers/sections';
-import { resolveSubjects }        from './resolvers/subjects';
-import { resolveStudents }        from './resolvers/students';
-import { resolveAttendance }      from './resolvers/attendance';
-import { resolveExams }           from './resolvers/exams';
-import { resolveTimetable }       from './resolvers/timetable';
-import { resolveCertificates }    from './resolvers/certificates';
-import { resolveAcademicNumbers } from './resolvers/academicNumbers';
-import { resolvePromotions }      from './resolvers/promotions';
+import { handleClasses }         from './operations/classes';
+import { handleSections }        from './operations/sections';
+import { handleSubjects }        from './operations/subjects';
+import { handleStudents }        from './operations/students';
+import { handleAttendance }      from './operations/attendance';
+import { handleExams }           from './operations/exams';
+import { handleTimetable }       from './operations/timetable';
+import { handleCertificates }    from './operations/certificates';
+import { handleAcademicNumbers } from './operations/academicNumbers';
+import { handlePromotions }      from './operations/promotions';
 
 const RESOLVERS = [
-  resolvePromotions,
-  resolveAcademicNumbers,
-  resolveClasses,
-  resolveSections,
-  resolveSubjects,
-  resolveStudents,
-  resolveAttendance,
-  resolveExams,
-  resolveTimetable,
-  resolveCertificates,
+  handlePromotions,
+  handleAcademicNumbers,
+  handleClasses,
+  handleSections,
+  handleSubjects,
+  handleStudents,
+  handleAttendance,
+  handleExams,
+  handleTimetable,
+  handleCertificates,
 ];
 
 function parseEvent(event: Record<string, unknown>) {

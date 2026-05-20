@@ -15,11 +15,17 @@ import { resolveContext } from '@vebgenix/auth';
 import { AppError, isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 import { authorize } from '@vebgenix/permissions';
-import { CreateUser } from './use-cases/CreateUser';
-import { UpdateUser } from './use-cases/UpdateUser';
-import { DeactivateUser } from './use-cases/DeactivateUser';
-import { InviteStaff } from './use-cases/InviteStaff';
+import { AuditLogger } from '@vebgenix/audit';
+import {
+  CognitoIdentityProviderClient,
+  AdminCreateUserCommand,
+  AdminCreateUserCommandInput,
+  UsernameExistsException,
+} from '@aws-sdk/client-cognito-identity-provider';
 import { Types } from 'mongoose';
+import type { AuthContext } from '@vebgenix/auth';
+
+const cognitoClient = new CognitoIdentityProviderClient({});
 
 function toGql(doc: unknown): Record<string, unknown> | null {
   if (!doc) return null;
@@ -28,14 +34,11 @@ function toGql(doc: unknown): Record<string, unknown> | null {
   return _id !== undefined ? { id: String(_id), ...rest } : rest;
 }
 
-
 function parseEvent(event: Record<string, unknown>) {
-  // AppSync: event.info.fieldName = 'listUsers', 'createUser', etc.
   if (event.info) {
     const info = event.info as Record<string, string>;
     return { operation: info.fieldName, args: (event.arguments ?? {}) as Record<string, unknown> };
   }
-  // API Gateway (REST)
   const method = event.httpMethod as string;
   const path   = event.path as string;
   const body   = typeof event.body === 'string'
@@ -67,6 +70,235 @@ function toGqlProfile(profile: unknown, fallback: { id?: string; email?: string 
   };
 }
 
+// ── Inlined use-case: createUser ─────────────────────────────────────────────
+async function createUser(ctx: AuthContext, input: {
+  email: string;
+  fullName: string;
+  phone?: string;
+  personaRole: string;
+  campusId: string;
+  roleIds?: string[];
+}) {
+  authorize(ctx, 'users.create');
+  const tenantId = getTenantId(ctx);
+
+  const existingAuthUser = await IdentityRepo.findAuthUserByEmail(input.email);
+  if (existingAuthUser) {
+    const authRecord = existingAuthUser as unknown as Record<string, unknown>;
+    if (authRecord.isPlatformAdmin === true) {
+      throw new AppError('FORBIDDEN', 'Cannot create a tenant profile for a platform super-admin account');
+    }
+    const existingProfile = await IdentityRepo.findProfileByAuthUserId(tenantId, existingAuthUser._id.toString());
+    if (existingProfile) {
+      throw new AppError('CONFLICT', 'User already exists in this tenant');
+    }
+  }
+
+  let authUser = existingAuthUser;
+  if (!authUser) {
+    authUser = await IdentityRepo.createAuthUser({ email: input.email });
+  }
+
+  const profile = await IdentityRepo.createProfile({
+    tenantId,
+    authUserId:     authUser._id as Types.ObjectId,
+    email:          input.email,
+    fullName:       input.fullName,
+    phone:          input.phone,
+    personaRole:    input.personaRole as 'TENANT_ADMIN' | 'STAFF' | 'STUDENT' | 'PARENT',
+    isActive:       true,
+    isAllCampuses:  false,
+    isPrimaryOwner: false,
+    campusAccess:   [{ campusId: new Types.ObjectId(input.campusId), campusName: '' }],
+    roles:          (input.roleIds ?? []).filter(id => /^[a-f0-9]{24}$/i.test(id)).map((id) => ({ roleId: new Types.ObjectId(id), roleName: '', permissions: [] })),
+  });
+
+  await AuditLogger.logTenantAction({
+    ctx, action: 'USER_CREATED',
+    entityType: 'Profile', entityId: profile._id.toString(), entityName: input.fullName,
+    after: { email: input.email, personaRole: input.personaRole },
+  });
+
+  return {
+    id:          profile._id.toString(),
+    email:       profile.email,
+    fullName:    profile.fullName,
+    personaRole: profile.personaRole,
+  };
+}
+
+// ── Inlined use-case: updateUser ─────────────────────────────────────────────
+async function updateUser(ctx: AuthContext, input: {
+  profileId: string;
+  fullName?: string;
+  phone?: string;
+  isActive?: boolean;
+  isAllCampuses?: boolean;
+}) {
+  authorize(ctx, 'users.update');
+  const tenantId = getTenantId(ctx);
+
+  const profile = await IdentityRepo.findProfileById(tenantId, input.profileId);
+  if (!profile) throw new AppError('NOT_FOUND', 'User not found');
+
+  const before = { fullName: profile.fullName, phone: profile.phone, isActive: profile.isActive };
+  const updated = await IdentityRepo.updateProfile(tenantId, input.profileId, {
+    ...(input.fullName !== undefined && { fullName: input.fullName }),
+    ...(input.phone !== undefined && { phone: input.phone }),
+    ...(input.isActive !== undefined && { isActive: input.isActive }),
+    ...(input.isAllCampuses !== undefined && { isAllCampuses: input.isAllCampuses }),
+  });
+
+  await AuditLogger.logTenantAction({
+    ctx, action: 'USER_UPDATED',
+    entityType: 'Profile', entityId: input.profileId, entityName: profile.fullName,
+    before, after: input as unknown as Record<string, unknown>,
+  });
+
+  return updated;
+}
+
+// ── Inlined use-case: deactivateUser ─────────────────────────────────────────
+async function deactivateUser(ctx: AuthContext, profileId: string) {
+  authorize(ctx, 'users.delete');
+  const tenantId = getTenantId(ctx);
+
+  const profile = await IdentityRepo.findProfileById(tenantId, profileId);
+  if (!profile) throw new AppError('NOT_FOUND', 'User not found');
+  if (profile.isPrimaryOwner) throw new AppError('FORBIDDEN', 'Cannot deactivate the primary owner');
+
+  await IdentityRepo.deactivateProfile(tenantId, profileId);
+
+  await AuditLogger.logTenantAction({
+    ctx, action: 'USER_DEACTIVATED',
+    entityType: 'Profile', entityId: profileId, entityName: profile.fullName,
+  });
+
+  return { success: true };
+}
+
+// ── Inlined use-case: inviteStaff ─────────────────────────────────────────────
+async function inviteStaff(ctx: AuthContext, input: {
+  email: string;
+  fullName: string;
+  phone?: string;
+  campusId?: string;
+  campusIds?: string[];
+  allCampuses?: boolean;
+  roleIds?: string[];
+  staffType?: string;
+  staffCategory?: 'TEACHING' | 'NON_TEACHING';
+  employmentType?: 'FULL_TIME' | 'PART_TIME' | 'CONTRACT' | 'VISITING';
+  designation?: string;
+  department?: string;
+  employeeCode?: string;
+  tenantId?: string;
+}) {
+  authorize(ctx, 'staff.invite');
+  const tenantId = (ctx.isPlatformAdmin && input.tenantId)
+    ? input.tenantId
+    : getTenantId(ctx);
+  const campusId = input.campusId ?? input.campusIds?.[0];
+  if (!campusId && !input.allCampuses) throw new AppError('BAD_REQUEST', 'campusId or campusIds[0] is required');
+  const staffType = input.staffType ?? 'TEACHER';
+  const staffCategory = input.staffCategory ?? (
+    staffType === 'TEACHER' || staffType === 'LECTURER' || staffType === 'LAB_FACULTY'
+      ? 'TEACHING'
+      : 'NON_TEACHING'
+  );
+
+  let authUser = await IdentityRepo.findAuthUserByEmail(input.email);
+  if (!authUser) {
+    authUser = await IdentityRepo.createAuthUser({ email: input.email });
+  }
+
+  const existing = await IdentityRepo.findProfileByAuthUserId(tenantId, authUser._id.toString());
+  if (existing) throw new AppError('CONFLICT', 'Staff member already exists in this tenant');
+
+  const profile = await IdentityRepo.createProfile({
+    tenantId,
+    authUserId:     authUser._id as Types.ObjectId,
+    email:          input.email,
+    fullName:       input.fullName,
+    phone:          input.phone,
+    personaRole:    'STAFF',
+    isActive:       true,
+    isAllCampuses:  input.allCampuses === true,
+    isPrimaryOwner: false,
+    campusAccess:   input.allCampuses === true
+      ? []
+      : (input.campusIds?.length ? input.campusIds : [campusId]).map(id => ({ campusId: new Types.ObjectId(id!), campusName: '' })),
+    roles:          (input.roleIds ?? []).filter(id => /^[a-f0-9]{24}$/i.test(id)).map(id => ({ roleId: new Types.ObjectId(id), roleName: '', permissions: [] })),
+  });
+
+  const employeeCode = input.employeeCode ?? `EMP${new Types.ObjectId().toString().slice(-8).toUpperCase()}`;
+  let employee: { _id: Types.ObjectId } | null = null;
+  if (campusId) {
+    employee = await Employee.create({
+      tenantId,
+      campusId:       new Types.ObjectId(campusId),
+      profileId:      profile._id,
+      authUserId:     authUser._id,
+      employeeCode,
+      fullName:       input.fullName,
+      email:          input.email,
+      phone:          input.phone,
+      designation:    input.designation,
+      department:     input.department,
+      staffType,
+      staffCategory,
+      employmentType: input.employmentType ?? 'FULL_TIME',
+      joiningDate:    new Date(),
+      isActive:       true,
+    });
+    await IdentityRepo.updateProfile(tenantId, profile._id.toString(), { employeeId: employee._id } as never);
+  }
+
+  const userPoolId = process.env.COGNITO_USER_POOL_ID;
+  if (!userPoolId) throw new AppError('INTERNAL', 'COGNITO_USER_POOL_ID not configured');
+
+  const params: AdminCreateUserCommandInput = {
+    UserPoolId:              userPoolId,
+    Username:                input.email,
+    UserAttributes: [
+      { Name: 'email',           Value: input.email },
+      { Name: 'email_verified',  Value: 'true' },
+      { Name: 'name',            Value: input.fullName },
+      { Name: 'custom:tenantId', Value: tenantId },
+    ],
+    DesiredDeliveryMediums: ['EMAIL'],
+    ForceAliasCreation:     false,
+  };
+
+  try {
+    await cognitoClient.send(new AdminCreateUserCommand(params));
+  } catch (err) {
+    if (err instanceof UsernameExistsException) {
+      console.log(`[identity-service] Cognito user already exists for ${input.email}`);
+    } else {
+      throw err;
+    }
+  }
+
+  await AuditLogger.logTenantAction({
+    ctx,
+    action:     'STAFF_INVITED',
+    entityType: 'Profile',
+    entityId:   profile._id.toString(),
+    entityName: input.fullName,
+    after:      { email: input.email, staffType, staffCategory, employeeCode },
+  });
+
+  return {
+    success:      true,
+    membershipId: profile._id.toString(),
+    id:           profile._id.toString(),
+    employeeId:   employee ? employee._id.toString() : null,
+    email:        profile.email,
+    fullName:     profile.fullName,
+  };
+}
+
 export const handler = async (event: Record<string, unknown>, context: Record<string, unknown>) => {
   bootstrapDB(context);
   try {
@@ -75,7 +307,6 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     const ctx                  = await resolveContext(event);
     const { operation, args } = parseEvent(event);
 
-    // Platform admins pass x-tenant-id header; membership is null for them
     const headerTenantId = (event.request as Record<string, Record<string, string>> | undefined)
       ?.headers?.['x-tenant-id'] ?? '';
     const resolveTenantId = (): string =>
@@ -142,18 +373,18 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'createUser':
       case 'POST:/api/admin/users':
-        return CreateUser.execute(ctx, args as Parameters<typeof CreateUser.execute>[1]);
+        return createUser(ctx, args as Parameters<typeof createUser>[1]);
 
       case 'updateUser':
       case 'PATCH:/api/admin/users/:id':
-        return UpdateUser.execute(ctx, {
+        return updateUser(ctx, {
           profileId: args.id as string,
           ...(args.input ?? args) as object,
-        } as Parameters<typeof UpdateUser.execute>[1]);
+        } as Parameters<typeof updateUser>[1]);
 
       case 'deactivateUser':
       case 'DELETE:/api/admin/users/:id':
-        return DeactivateUser.execute(ctx, args.id as string);
+        return deactivateUser(ctx, args.id as string);
 
       case 'reactivateUser':
       case 'POST:/api/admin/users/:id/reactivate': {
@@ -167,12 +398,12 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       // ── Staff ─────────────────────────────────────────────────────────────
       case 'inviteStaff':
       case 'POST:/api/admin/staff': {
-        const input = { ...(args as Parameters<typeof InviteStaff.execute>[1]) };
+        const input = { ...((args.input ?? args) as Parameters<typeof inviteStaff>[1]) };
         if (ctx.isPlatformAdmin && !ctx.membership) {
           input.tenantId = (event.request as Record<string, Record<string, string>> | undefined)
             ?.headers?.['x-tenant-id'] ?? '';
         }
-        return InviteStaff.execute(ctx, input);
+        return inviteStaff(ctx, input);
       }
 
       case 'listStaff':
@@ -273,7 +504,6 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       // ── Roles ──────────────────────────────────────────────────────────────
       case 'listRoles': {
-        // Returns predefined role types available for staff invitation
         return [
           { id: 'TENANT_ADMIN', roleName: 'Tenant Admin', permissions: ['*'], description: 'Full access to all tenant features' },
           { id: 'PRINCIPAL',    roleName: 'Principal',    permissions: ['academics.*', 'admissions.*', 'finance.read'], description: 'School principal' },
@@ -324,9 +554,6 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'POST:/api/platform/impersonate': {
         if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
         const targetUserId = args.userId as string;
-        // Return a limited context token info — actual Cognito impersonation
-        // is done via AdminInitiateAuth with ALLOW_USER_PASSWORD_AUTH for super admin
-        // This endpoint logs the action and returns target user profile
         const targetProfile = await Profile.findOne({ _id: targetUserId }).lean() as unknown as Record<string, unknown> | null;
         if (!targetProfile) throw new AppError('NOT_FOUND', 'Target user not found');
         console.warn(`[IMPERSONATION] Platform admin ${ctx.userId} impersonating ${targetUserId}`);
@@ -373,9 +600,10 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         const profileId = (args.staffId ?? args.id) as string;
         const profile  = await IdentityRepo.findProfileById(tenantId, profileId);
         if (!profile) throw new AppError('NOT_FOUND', 'Staff member not found');
-        const { AdminCreateUserCommand, CognitoIdentityProviderClient } = await import('@aws-sdk/client-cognito-identity-provider');
-        const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
-        await cognitoClient.send(new AdminCreateUserCommand({
+        const { AdminCreateUserCommand: AdminCreateUserCmd, CognitoIdentityProviderClient: CognitoClient } =
+          await import('@aws-sdk/client-cognito-identity-provider');
+        const cognitoResend = new CognitoClient({ region: process.env.COGNITO_REGION });
+        await cognitoResend.send(new AdminCreateUserCmd({
           UserPoolId:    process.env.COGNITO_USER_POOL_ID,
           Username:      profile.email,
           MessageAction: 'RESEND',
@@ -383,19 +611,12 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         return true;
       }
 
-      // ── Accept invite ─────────────────────────────────────────────────────
-      // Called when a staff member clicks their invite link before setting
-      // a password. The `token` is their email address (or a profile lookup key).
-      // The actual Cognito password-set happens client-side via confirmSignIn;
-      // this endpoint validates the invite is still open and returns pre-fill info.
       case 'acceptInvite':
       case 'POST:/api/auth/accept-invite': {
         const token = args.token as string;
         if (!token) throw new AppError('BAD_REQUEST', 'token is required');
-        // Lookup by email (the token sent in the Cognito invitation email)
         const authUser = await IdentityRepo.findAuthUserByEmail(token);
         if (!authUser) {
-          // Try treating token as a profileId
           const profileById = await Profile.findById(token).lean() as unknown as Record<string, unknown> | null;
           if (!profileById) throw new AppError('NOT_FOUND', 'Invalid or expired invite token');
           return {

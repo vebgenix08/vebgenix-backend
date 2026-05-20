@@ -94,13 +94,17 @@ export { Payment } from './models/finance/Payment.model';
 export type { IPayment, PaymentMethod, PaymentStatus } from './models/finance/Payment.model';
 export { FinanceSequence } from './models/finance/FinanceSequence.model';
 export type { IFinanceSequence } from './models/finance/FinanceSequence.model';
-export { FeeCategory } from './models/finance/FeeCategory.model';
-export type { IFeeCategory, AllocationMethod, FeeCategoryFeeType, FeeCategoryModuleType } from './models/finance/FeeCategory.model';
 export { PaymentAllocation } from './models/finance/PaymentAllocation.model';
 export type { IPaymentAllocation } from './models/finance/PaymentAllocation.model';
 export { StudentTransaction } from './models/finance/StudentTransaction.model';
 export type { IStudentTransaction, StudentTransactionType, StudentTransactionStatus } from './models/finance/StudentTransaction.model';
 export { default as StudentFeeOrder } from './models/finance/StudentFeeOrders.model';
+export { ManualStudentFeeAccount } from './models/finance/ManualStudentFeeAccount.model';
+export type { IManualStudentFeeAccount, ManualFeeAccountStatus } from './models/finance/ManualStudentFeeAccount.model';
+export { ManualFeeCollection } from './models/finance/ManualFeeCollection.model';
+export type { IManualFeeCollection, ManualReceiptStatus, ManualPaymentMode } from './models/finance/ManualFeeCollection.model';
+export { ManualFeeCollectionParticular } from './models/finance/ManualFeeCollectionParticular.model';
+export type { IManualFeeCollectionParticular } from './models/finance/ManualFeeCollectionParticular.model';
 
 // ── Models: Comms ─────────────────────────────────────────────────────────────
 export { Announcement } from './models/comms/Announcement.model';

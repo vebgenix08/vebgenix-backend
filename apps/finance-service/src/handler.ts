@@ -1,7 +1,7 @@
 /**
  * Finance Service Lambda — thin router
  *
- * Handles: fee categories, fee heads, fee structures, fee assignments,
+ * Handles: fee heads, fee structures, fee assignments,
  *          fee schedules, installment plans, fee revisions, invoices,
  *          payments, Razorpay, receipts, day book report, financial analytics.
  *
@@ -15,19 +15,17 @@ import { resolveContext } from '@vebgenix/auth';
 import { AppError, isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 import { verifyRazorpaySignature } from './razorpay';
-import { resolveFeeCategories } from './resolvers/feeCategories';
-import { resolveFeeHeads } from './resolvers/feeHeads';
-import { resolveFeeStructures } from './resolvers/feeStructures';
-import { resolveFeeStructureMappings } from './resolvers/feeStructureMappings';
-import { resolveFeeAssignments } from './resolvers/feeAssignments';
-import { resolveFeeSchedules } from './resolvers/feeSchedules';
-import { resolveInstallmentPlans } from './resolvers/installmentPlans';
-import { resolveInvoices } from './resolvers/invoices';
-import { resolvePayments } from './resolvers/payments';
-import { resolveStudentOrders } from './resolvers/studentOrders';
-import { resolveTransactions } from './resolvers/transactions';
-import { resolveReports } from './resolvers/reports';
-import { PaymentService } from './services/payment.service';
+import { handleFeeHead } from './operations/feeHead';
+import { handleFeeSchedule } from './operations/feeSchedule';
+import { handleFeeStructure } from './operations/feeStructure';
+import { handleFeeStructureMapping } from './operations/feeStructureMapping';
+import { handleFeeAssignment } from './operations/feeAssignment';
+import { handleInstallmentPlan } from './operations/installmentPlan';
+import { handleInvoice } from './operations/invoice';
+import { handlePayment, applyOnlineSuccess } from './operations/payment';
+import { handleStudentOrder } from './operations/studentOrder';
+import { handleTransaction } from './operations/transaction';
+import { handleManualCollection } from './operations/manualCollection';
 
 function parseEvent(event: Record<string, unknown>) {
   if (event.info) {
@@ -65,7 +63,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
           const orderId = paymentEntity.order_id as string;
           const payment = await FinanceRepo.findPaymentByRazorpayOrderId(orderId);
           if (payment) {
-            await PaymentService.applyOnlineSuccess(
+            await applyOnlineSuccess(
               payment.tenantId.toString(),
               payment._id.toString(),
               paymentEntity.id as string,
@@ -81,43 +79,40 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     const ctx      = await resolveContext(event);
     const tenantId = getTenantId(ctx);
 
-    // Delegate to resolver groups (first non-undefined wins)
+    // Delegate to operation groups (first non-undefined wins)
     let result: unknown;
 
-    result = await resolveFeeCategories(operation, args, ctx, tenantId);
+    result = await handleFeeHead(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolveFeeHeads(operation, args, ctx, tenantId);
+    result = await handleFeeStructure(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolveFeeStructures(operation, args, ctx, tenantId);
+    result = await handleFeeStructureMapping(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolveFeeStructureMappings(operation, args, ctx, tenantId);
+    result = await handleFeeAssignment(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolveFeeAssignments(operation, args, ctx, tenantId);
+    result = await handleFeeSchedule(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolveFeeSchedules(operation, args, ctx, tenantId);
+    result = await handleInstallmentPlan(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolveInstallmentPlans(operation, args, ctx, tenantId);
+    result = await handleInvoice(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolveInvoices(operation, args, ctx, tenantId);
+    result = await handlePayment(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolvePayments(operation, args, ctx, tenantId);
+    result = await handleStudentOrder(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolveStudentOrders(operation, args, ctx, tenantId);
+    result = await handleTransaction(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
-    result = await resolveTransactions(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await resolveReports(operation, args, ctx, tenantId);
+    result = await handleManualCollection(operation, args, ctx, tenantId);
     if (result !== undefined) return result;
 
     throw new AppError('NOT_FOUND', `Unknown operation: ${operation}`);
@@ -125,7 +120,8 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     if (isAppError(err)) {
       throw err;
     }
-    console.error('[finance-service] unhandled error:', err);
-    throw new Error('Internal server error');
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[finance-service] unhandled error:', msg, err instanceof Error ? err.stack : '');
+    throw new Error(`Internal server error: ${msg}`);
   }
 };

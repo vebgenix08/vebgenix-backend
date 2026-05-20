@@ -64,10 +64,15 @@ input CreateTenantInput {
 }
 
 input UpdateTenantInput {
-  id:      ID!
-  name:    String
-  slug:    String
-  logoUrl: String
+  id:            ID!
+  name:          String
+  slug:          String
+  logoUrl:       String
+  email:         String
+  phone:         String
+  address:       String
+  affiliation:   String
+  accreditation: String
 }
 
 # ── Queries & Mutations ───────────────────────────────────────────────────────

@@ -9,11 +9,12 @@ import { InstallmentPlan, IInstallmentPlan } from '../models/finance/Installment
 import { FeeRevision, IFeeRevision } from '../models/finance/FeeRevision.model';
 import { Invoice, IInvoice, InvoiceStatus } from '../models/finance/Invoice.model';
 import { Payment, IPayment } from '../models/finance/Payment.model';
-import { FeeCategory, IFeeCategory } from '../models/finance/FeeCategory.model';
 import { PaymentAllocation, IPaymentAllocation } from '../models/finance/PaymentAllocation.model';
 import StudentFeeOrder from '../models/finance/StudentFeeOrders.model';
 import { IStudentTransaction } from '../models/finance/StudentTransaction.model';
 import StudentTransaction from '../models/finance/StudentTransaction.model';
+import { FinanceSequence } from '../models/finance/FinanceSequence.model';
+import { AcademicYear } from '../models/settings/AcademicYear.model';
 
 const toObjectId = (id: string) => new Types.ObjectId(id);
 const safeObjectId = (id: string | undefined): Types.ObjectId | string | undefined => {
@@ -30,9 +31,8 @@ export const FinanceRepo: any = {
     return FeeHead.find({ tenantId, ...(activeOnly ? { isActive: true } : {}) }).sort({ name: 1 });
   },
 
-  async listFeeHeadsFiltered(tenantId: string, filters: { feeCategoryId?: string; activeOnly?: boolean } = {}) {
+  async listFeeHeadsFiltered(tenantId: string, filters: { activeOnly?: boolean } = {}) {
     const q: Record<string, unknown> = { tenantId };
-    if (filters.feeCategoryId) q.feeCategoryId = toObjectId(filters.feeCategoryId);
     if (filters.activeOnly !== false) q.isActive = true;
     return FeeHead.find(q).sort({ priorityOrder: 1, name: 1 });
   },
@@ -117,7 +117,24 @@ export const FinanceRepo: any = {
     tenantId: string,
     docs: Array<Partial<IFeeStructureClassMapping>>,
   ) {
-    return FeeStructureClassMapping.insertMany(docs.map(doc => ({ ...doc, tenantId })));
+    // Use upsert per doc to avoid E11000 on re-mapping the same class
+    const results = await Promise.all(
+      docs.map(doc =>
+        FeeStructureClassMapping.findOneAndUpdate(
+          {
+            tenantId,
+            campusId:       doc.campusId,
+            academicYearId: doc.academicYearId,
+            classId:        doc.classId,
+            feeScheduleId:  doc.feeScheduleId,
+            feeStructureId: doc.feeStructureId,
+          },
+          { $set: { ...doc, tenantId, status: doc.status ?? 'ACTIVE' } },
+          { upsert: true, new: true },
+        ),
+      ),
+    );
+    return results;
   },
 
   async listFeeStructureClassMappings(tenantId: string, filters: Record<string, unknown> = {}) {
@@ -315,33 +332,6 @@ export const FinanceRepo: any = {
 
   async listTransactions(filters: Record<string, unknown> = {}) {
     return StudentTransaction.find(filters).sort({ createdAt: -1 });
-  },
-
-  // =====================================================
-  // FEE CATEGORY FUNCTIONS
-  // =====================================================
-  async listFeeCategories(tenantId: string, activeOnly = true) {
-    return FeeCategory.find({ tenantId, ...(activeOnly ? { isActive: true } : {}) }).sort({ name: 1 });
-  },
-
-  async findFeeCategoryById(tenantId: string, id: string): Promise<IFeeCategory | null> {
-    return FeeCategory.findOne({ tenantId, _id: toObjectId(id) });
-  },
-
-  async createFeeCategory(tenantId: string, data: Partial<IFeeCategory>) {
-    return FeeCategory.create({ ...data, tenantId });
-  },
-
-  async updateFeeCategory(tenantId: string, id: string, update: Partial<IFeeCategory>) {
-    return FeeCategory.findOneAndUpdate({ tenantId, _id: toObjectId(id) }, { $set: update }, { new: true });
-  },
-
-  async deleteFeeCategoryById(tenantId: string, id: string) {
-    return FeeCategory.findOneAndUpdate(
-      { tenantId, _id: toObjectId(id) },
-      { $set: { isActive: false } },
-      { new: true },
-    );
   },
 
   // =====================================================
@@ -650,6 +640,147 @@ export const FinanceRepo: any = {
       { $set: { status: 'CANCELLED' } },
       { new: true },
     );
+  },
+
+  // =====================================================
+  // SEQUENCE / NUMBERING
+  // =====================================================
+  async nextSequenceValue(tenantId: string, key: string): Promise<number> {
+    const seq = await FinanceSequence.findOneAndUpdate(
+      { tenantId, scope: 'finance', key },
+      { $inc: { value: 1 }, $setOnInsert: { tenantId, scope: 'finance', key } },
+      { upsert: true, new: true },
+    );
+    return seq.value;
+  },
+
+  async nextFeeOrderNo(tenantId: string, academicYearId: string): Promise<string> {
+    const oid = new Types.ObjectId(academicYearId);
+    const ay = await AcademicYear.findOne({ tenantId, _id: oid }).lean();
+    let yearCode: string;
+    if (ay?.startDate && ay?.endDate) {
+      const s = (ay.startDate as Date).getFullYear() % 100;
+      const e = (ay.endDate as Date).getFullYear() % 100;
+      yearCode = `${s.toString().padStart(2, '0')}-${e.toString().padStart(2, '0')}`;
+    } else {
+      const y = new Date().getFullYear() % 100;
+      yearCode = `${y.toString().padStart(2, '0')}-${((y + 1) % 100).toString().padStart(2, '0')}`;
+    }
+    const key = `ORD:FEE:${yearCode}`;
+    const value = await (this as any).nextSequenceValue(tenantId, key);
+    return `FEE_${yearCode}_ORD_${value.toString().padStart(6, '0')}`;
+  },
+
+  // =====================================================
+  // AUTO-GENERATE FEE ORDERS FOR NEW STUDENT (TC-021)
+  // =====================================================
+  async autoGenerateFeeOrdersForStudent({
+    tenantId, studentId, classId, sectionId, academicYearId, campusId,
+  }: {
+    tenantId: string; studentId: string; classId: string;
+    sectionId?: string; academicYearId: string; campusId: string;
+  }): Promise<number> {
+    const mappings = await FeeStructureClassMapping.find({
+      tenantId,
+      classId:        new Types.ObjectId(classId),
+      academicYearId: new Types.ObjectId(academicYearId),
+      campusId:       new Types.ObjectId(campusId),
+      status:         'ACTIVE',
+    }).lean();
+
+    if (mappings.length === 0) return 0;
+
+    let created = 0;
+    for (const mapping of mappings) {
+      const feeScheduleId  = mapping.feeScheduleId.toString();
+      const feeStructureId = mapping.feeStructureId.toString();
+      const mappingId      = mapping._id.toString();
+
+      // Skip if orders already exist for this student + schedule + structure
+      const existing = await StudentFeeOrder.findOne({
+        tenant_id:        tenantId,
+        student_id:       new Types.ObjectId(studentId),
+        fee_schedule_id:  new Types.ObjectId(feeScheduleId),
+        fee_structure_id: new Types.ObjectId(feeStructureId),
+      }).lean();
+      if (existing) continue;
+
+      const structure = await FeeStructure.findOne({ tenantId, _id: new Types.ObjectId(feeStructureId) }).lean();
+      const schedule  = await FeeSchedule.findOne({ tenantId, _id: new Types.ObjectId(feeScheduleId) }).lean();
+      if (!structure || !schedule) continue;
+      if (!structure.isActive || structure.totalAmount <= 0 || !structure.components?.length) continue;
+      if (!schedule.isActive) continue;
+
+      const slots: Array<{ name: string; dueDate: Date; percentOfTotal?: number; fixedAmount?: number }> =
+        (schedule.slots ?? []).length > 0 ? schedule.slots : [{ name: 'Full Payment', dueDate: new Date(), percentOfTotal: 100 }];
+
+      const totalNet = Math.round(structure.totalAmount * 100) / 100;
+      const docs: any[] = [];
+
+      for (let i = 0; i < slots.length; i++) {
+        const slot = slots[i];
+        let payable: number;
+        if (slot.percentOfTotal != null) payable = Math.round(totalNet * (slot.percentOfTotal / 100) * 100) / 100;
+        else if (slot.fixedAmount != null) payable = Math.round(slot.fixedAmount * 100) / 100;
+        else payable = Math.round((totalNet / slots.length) * 100) / 100;
+
+        const ratioSum = structure.components.reduce((s: number, c: any) => s + c.amount, 0);
+        const feeHeads = structure.components.map((c: any) => {
+          const ratio = ratioSum > 0 ? c.amount / ratioSum : 1 / structure.components.length;
+          const orig  = Math.round(c.amount * 100) / 100;
+          const final = Math.round(payable * ratio * 100) / 100;
+          return {
+            fee_head_id:       c.feeHeadId,
+            fee_head_name:     c.feeHeadName,
+            original_amount:   orig,
+            concession_amount: Math.round((orig - final) * 100) / 100,
+            late_fee_amount:   0,
+            paid_amount:       0,
+            balance_amount:    final,
+            final_amount:      final,
+            status:            'PENDING',
+          };
+        });
+
+        const gross = Math.round(feeHeads.reduce((s: number, h: any) => s + h.original_amount, 0) * 100) / 100;
+        const orderNo = await (this as any).nextFeeOrderNo(tenantId, academicYearId);
+
+        docs.push({
+          tenant_id:                      tenantId,
+          campus_id:                      new Types.ObjectId(campusId),
+          academic_year_id:               new Types.ObjectId(academicYearId),
+          student_id:                     new Types.ObjectId(studentId),
+          class_id:                       new Types.ObjectId(classId),
+          section_id:                     sectionId ? new Types.ObjectId(sectionId) : undefined,
+          fee_schedule_id:                new Types.ObjectId(feeScheduleId),
+          fee_structure_id:               new Types.ObjectId(feeStructureId),
+          fee_structure_class_mapping_id: new Types.ObjectId(mappingId),
+          order_no:                       orderNo,
+          installment_no:                 i + 1,
+          installment_title:              slot.name,
+          due_date:                       new Date(slot.dueDate),
+          fee_heads:                      feeHeads,
+          gross_amount:                   gross,
+          concession_amount:              0,
+          late_fee_amount:                0,
+          payable_amount:                 payable,
+          paid_amount:                    0,
+          balance_amount:                 payable,
+          payment_completion_percentage:  0,
+          status:                         'PENDING',
+          payment_status:                 'UNPAID',
+          generated_at:                   new Date(),
+          remarks:                        null,
+          metadata:                       { source: 'auto_enrollment' },
+        });
+      }
+
+      if (docs.length > 0) {
+        await StudentFeeOrder.insertMany(docs);
+        created += docs.length;
+      }
+    }
+    return created;
   },
 };
 

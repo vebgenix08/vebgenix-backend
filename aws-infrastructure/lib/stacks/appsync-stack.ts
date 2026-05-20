@@ -364,6 +364,16 @@ export class AppSyncStack extends cdk.Stack {
     finance('Query',    'getAssignableFeeStructures');
     finance('Query',    'getStudentDues');
     finance('Query',    'outstandingReport');
+
+    // Manual Fee Collection queries
+    finance('Query',    'generateManualAdmissionNo');
+    finance('Query',    'getManualFeeStructure');
+    finance('Query',    'listManualStudentFeeAccounts');
+    finance('Query',    'getManualStudentFeeAccount');
+    finance('Query',    'listManualFeeCollections');
+    finance('Query',    'getManualFeeCollection');
+    finance('Query',    'listManualFeeCollectionParticulars');
+
     // Fee Category mutations
     finance('Mutation', 'createFeeCategory');
     finance('Mutation', 'updateFeeCategory');
@@ -404,9 +414,19 @@ export class AppSyncStack extends cdk.Stack {
     finance('Mutation', 'collectPaymentByStudent');
     finance('Mutation', 'generatePaymentLink');
     finance('Mutation', 'generateStudentFeeOrders');
+    finance('Mutation', 'bulkMapAndGenerateOrders');
     finance('Mutation', 'updateStudentFeeOrder');
     finance('Mutation', 'cancelStudentFeeOrder');
+    finance('Mutation', 'assignMiscFee');
+    finance('Mutation', 'deactivateFeeStructureClassMapping');
+    finance('Mutation', 'applyFeeStructureRevision');
+    finance('Mutation', 'transferStudentClass');
     finance('Mutation', 'createStudentTransaction');
+
+    // Manual Fee Collection mutations
+    finance('Mutation', 'createManualFeeCollection');
+    finance('Mutation', 'cancelManualFeeCollection');
+    finance('Mutation', 'linkManualFeeToStudent');
 
     // ── Academics resolvers ─────────────────────────────────────────────────
     const academics = R(academicsDs);

@@ -1,9 +1,0 @@
-{
-  "AuthenticationResult": {
-    "AccessToken": "[REDACTED]",
-    "ExpiresIn": 3600,
-    "IdToken": "[REDACTED]",
-    "TokenType": "[REDACTED]"
-  },
-  "ChallengeParameters": {}
-}

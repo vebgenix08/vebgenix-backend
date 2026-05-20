@@ -69,10 +69,10 @@ export class StorageStack extends cdk.Stack {
       removalPolicy: config.stage === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: config.stage !== 'prod',
 
-      // CORS — only for presigned URL direct uploads
+      // CORS — presigned uploads (PUT/POST) and presigned downloads (GET/HEAD)
       cors: [
         {
-          allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.POST],
+          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.HEAD, s3.HttpMethods.PUT, s3.HttpMethods.POST],
           allowedOrigins: ['*'], // Restrict to your domain in prod
           allowedHeaders: ['*'],
           maxAge: 300,

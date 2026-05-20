@@ -105,7 +105,11 @@ FeeHeadSchema.index({ tenantId: 1, name: 1 }, { unique: true });
 FeeHeadSchema.index({ tenantId: 1, prefix: 1 }, { unique: true, sparse: true });
 FeeHeadSchema.index({ tenantId: 1, isActive: 1 });
 FeeHeadSchema.index({ tenantId: 1, feeCategoryId: 1 });
-FeeHeadSchema.index({ tenantId: 1, feeCategoryId: 1, code: 1 }, { unique: true, sparse: true });
+// Unique per (tenant, category, code) only when both are set — partial filter avoids null collision
+FeeHeadSchema.index(
+  { tenantId: 1, feeCategoryId: 1, code: 1 },
+  { unique: true, partialFilterExpression: { feeCategoryId: { $exists: true }, code: { $exists: true, $type: 'string' } } },
+);
 
 export const FeeHead = model<IFeeHead>('FeeHead', FeeHeadSchema, 'fee_heads');
 export default FeeHead;

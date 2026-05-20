@@ -9,24 +9,21 @@
  *   - API Gateway REST — Authorization: Bearer <Cognito Access Token>
  *   - API Gateway REST (public route) — no auth for public enquiry submission
  */
-import { bootstrapDB, ensureDB, AdmissionsRepo } from '@vebgenix/db';
+import { bootstrapDB, ensureDB, AdmissionsRepo, AcademicYear, AcademicSequence, Application } from '@vebgenix/db';
 import { resolveContext } from '@vebgenix/auth';
 import { AppError, isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 import { authorize } from '@vebgenix/permissions';
-import { CreateEnquiry } from './use-cases/CreateEnquiry';
-import { CreateApplication } from './use-cases/CreateApplication';
-import { ReviewApplication } from './use-cases/ReviewApplication';
+import { AuditLogger } from '@vebgenix/audit';
 import { Types } from 'mongoose';
+import type { AuthContext } from '@vebgenix/auth';
 
-/** Convert a Mongoose document or lean POJO to a plain GQL-safe object with `id`. */
 function toGql(doc: unknown): Record<string, unknown> | null {
   if (!doc) return null;
   const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
   const { _id, __v, ...rest } = plain;
   return _id !== undefined ? { id: String(_id), ...rest } : rest;
 }
-
 
 function parseEvent(event: Record<string, unknown>) {
   if (event.info) {
@@ -39,6 +36,199 @@ function parseEvent(event: Record<string, unknown>) {
   const params  = (event.pathParameters ?? {}) as Record<string, string>;
   const qs      = (event.queryStringParameters ?? {}) as Record<string, string>;
   return { operation: `${method}:${path}`, args: { ...body, ...params, ...qs } };
+}
+
+// ── Inlined: academicNumbering ────────────────────────────────────────────────
+async function resolveAcademicYearCode(tenantId: string, academicYearId: string | Types.ObjectId): Promise<string> {
+  const id = typeof academicYearId === 'string' ? new Types.ObjectId(academicYearId) : academicYearId;
+  const academicYear = await AcademicYear.findOne({ tenantId, _id: id }).lean();
+
+  if (academicYear?.startDate && academicYear?.endDate) {
+    const start = academicYear.startDate.getFullYear() % 100;
+    const end   = academicYear.endDate.getFullYear()   % 100;
+    return `${start.toString().padStart(2, '0')}-${end.toString().padStart(2, '0')}`;
+  }
+  if (academicYear?.name) {
+    const match = academicYear.name.match(/(\d{2,4})\D+(\d{2,4})/);
+    if (match) {
+      const start = Number(match[1]) % 100;
+      const end   = Number(match[2]) % 100;
+      return `${start.toString().padStart(2, '0')}-${end.toString().padStart(2, '0')}`;
+    }
+    if (/^\d{2}-\d{2}$/.test(academicYear.name)) return academicYear.name;
+  }
+  const y = new Date().getFullYear() % 100;
+  return `${y.toString().padStart(2, '0')}-${((y + 1) % 100).toString().padStart(2, '0')}`;
+}
+
+async function generateApplicationNo(tenantId: string, academicYearId: string | Types.ObjectId): Promise<string> {
+  const yearCode = await resolveAcademicYearCode(tenantId, academicYearId);
+  const doc = await AcademicSequence.findOneAndUpdate(
+    { tenantId, scope: 'APPLICATION', key: yearCode },
+    { $inc: { value: 1 }, $setOnInsert: { tenantId, scope: 'APPLICATION', key: yearCode } },
+    { upsert: true, new: true },
+  );
+  return `APP/${yearCode}/${doc.value.toString().padStart(4, '0')}`;
+}
+
+// ── Inlined use-case: createEnquiry ──────────────────────────────────────────
+async function createEnquiry(ctx: AuthContext, input: {
+  campusId: string;
+  academicYearId?: string;
+  studentName: string;
+  phone: string;
+  email?: string;
+  programId?: string;
+  programName?: string;
+  source?: string;
+  notes?: string;
+}) {
+  authorize(ctx, 'admissions.enquiry.create');
+  const tenantId = getTenantId(ctx);
+
+  const dup = await AdmissionsRepo.findDuplicateEnquiry(tenantId, input.phone, input.email);
+  if (dup) {
+    const dup2 = dup as unknown as Record<string, unknown>;
+    throw new AppError('CONFLICT', `An enquiry already exists for this contact (phone: ${input.phone}). Existing ID: ${String(dup2._id ?? dup2.id)}`);
+  }
+
+  const enquiry = await AdmissionsRepo.createEnquiry(tenantId, {
+    campusId:       new Types.ObjectId(input.campusId),
+    academicYearId: input.academicYearId ? new Types.ObjectId(input.academicYearId) : undefined,
+    studentName:    input.studentName,
+    phone:          input.phone,
+    email:          input.email,
+    programId:      input.programId ? new Types.ObjectId(input.programId) : undefined,
+    programName:    input.programName,
+    source:         input.source,
+    notes:          input.notes,
+    status:         'NEW',
+    createdBy:      new Types.ObjectId(ctx.membership!.profileId),
+  });
+
+  await AuditLogger.logTenantAction({
+    ctx, action: 'ENQUIRY_CREATED',
+    entityType: 'Enquiry', entityId: enquiry._id.toString(), entityName: input.studentName,
+    after: input as unknown as Record<string, unknown>,
+  });
+
+  return enquiry;
+}
+
+// ── Inlined use-case: createApplication ──────────────────────────────────────
+async function createApplication(ctx: AuthContext, input: {
+  campusId: string;
+  academicYearId: string;
+  enquiryId?: string;
+  programId?: string;
+  studentName?: string;
+  phone?: string;
+  email?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  address?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  guardianRelation?: string;
+  customFields?: Record<string, unknown>;
+}) {
+  authorize(ctx, 'admissions.application.create');
+  const tenantId = getTenantId(ctx);
+
+  let resolvedName  = input.studentName ?? '';
+  let resolvedPhone = input.phone       ?? '';
+  let resolvedEmail = input.email;
+
+  if (input.enquiryId) {
+    const enquiry = await AdmissionsRepo.findEnquiryById(tenantId, input.enquiryId);
+    if (enquiry) {
+      const eq = enquiry as unknown as Record<string, unknown>;
+      resolvedName  = resolvedName  || (eq.studentName as string) || '';
+      resolvedPhone = resolvedPhone || (eq.phone       as string) || '';
+      resolvedEmail = resolvedEmail ?? (eq.email       as string | undefined);
+    }
+  }
+
+  if (!resolvedName)  throw new AppError('BAD_REQUEST', 'studentName is required');
+  if (!resolvedPhone) throw new AppError('BAD_REQUEST', 'phone is required');
+
+  const dupApp = await (Application as unknown as { findOne: (q: Record<string, unknown>) => Promise<unknown> }).findOne({
+    tenantId,
+    academicYearId: new Types.ObjectId(input.academicYearId),
+    phone: resolvedPhone,
+    status: { $nin: ['REJECTED', 'WITHDRAWN'] },
+  });
+  if (dupApp) {
+    const d = dupApp as unknown as Record<string, unknown>;
+    throw new AppError('CONFLICT', `An application already exists for this phone number (status: ${d.status}). Application #: ${d.applicationNumber}`);
+  }
+
+  const applicationNumber = await generateApplicationNo(tenantId, input.academicYearId);
+
+  const application = await AdmissionsRepo.createApplication(tenantId, {
+    campusId:          new Types.ObjectId(input.campusId),
+    academicYearId:    new Types.ObjectId(input.academicYearId),
+    enquiryId:         input.enquiryId ? new Types.ObjectId(input.enquiryId) : undefined,
+    programId:         input.programId ? new Types.ObjectId(input.programId) : undefined,
+    applicationNumber,
+    status:            'DRAFT',
+    studentName:       resolvedName,
+    phone:             resolvedPhone,
+    email:             resolvedEmail,
+    dateOfBirth:       input.dateOfBirth ? new Date(input.dateOfBirth) : undefined,
+    gender:            input.gender,
+    address:           input.address,
+    guardianName:      input.guardianName,
+    guardianPhone:     input.guardianPhone,
+    guardianRelation:  input.guardianRelation,
+    customFields:      input.customFields,
+    documents:         [],
+    reviews:           [],
+    stageHistory:      [{ stage: 'DRAFT', at: new Date() }],
+    createdBy:         new Types.ObjectId(ctx.membership!.profileId),
+  });
+
+  await AuditLogger.logTenantAction({
+    ctx, action: 'APPLICATION_CREATED',
+    entityType: 'Application', entityId: application._id.toString(), entityName: resolvedName,
+  });
+
+  return application;
+}
+
+// ── Inlined use-case: reviewApplication ──────────────────────────────────────
+async function reviewApplication(ctx: AuthContext, input: {
+  applicationId: string;
+  decision: 'APPROVED' | 'REJECTED';
+  remarks?: string;
+}) {
+  authorize(ctx, 'admissions.application.review');
+  const tenantId = getTenantId(ctx);
+
+  const application = await AdmissionsRepo.findApplicationById(tenantId, input.applicationId);
+  if (!application) throw new AppError('NOT_FOUND', 'Application not found');
+  if (application.status !== 'SUBMITTED' && application.status !== 'UNDER_REVIEW') {
+    throw new AppError('CONFLICT', 'Application is not in a reviewable state');
+  }
+
+  const newStatus = input.decision === 'APPROVED' ? 'APPROVED' : 'REJECTED';
+
+  const updated = await AdmissionsRepo.updateApplication(tenantId, input.applicationId, { status: newStatus });
+  await AdmissionsRepo.addReview(tenantId, input.applicationId, {
+    reviewedBy: new Types.ObjectId(ctx.membership!.profileId),
+    reviewedAt: new Date(),
+    decision:   input.decision,
+    remarks:    input.remarks,
+  });
+
+  await AuditLogger.logTenantAction({
+    ctx, action: `APPLICATION_${input.decision}`,
+    entityType: 'Application', entityId: input.applicationId, entityName: application.studentName,
+    before: { status: application.status },
+    after:  { status: newStatus, remarks: input.remarks },
+  });
+
+  return updated;
 }
 
 export const handler = async (event: Record<string, unknown>, context: Record<string, unknown>) => {
@@ -106,7 +296,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'createEnquiry':
       case 'POST:/api/admissions/enquiries':
-        return toGql(await CreateEnquiry.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateEnquiry.execute>[1]));
+        return toGql(await createEnquiry(ctx, ((args.input as Record<string, unknown>) ?? args) as Parameters<typeof createEnquiry>[1]));
 
       case 'updateEnquiry':
       case 'PATCH:/api/admissions/enquiries/:id': {
@@ -125,8 +315,6 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'checkDuplicate':
       case 'POST:/api/admissions/duplicate-check': {
         authorize(ctx, 'admissions.enquiry.read');
-        // AppSync typed input: args.input = { studentName, phone, email, campusId }
-        // REST path: args.phone / args.email directly
         const dupInput = (args.input ?? args) as Record<string, unknown>;
         return toGql(await AdmissionsRepo.findDuplicateEnquiry(tenantId, dupInput.phone as string, dupInput.email as string | undefined));
       }
@@ -161,7 +349,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'createApplication':
       case 'POST:/api/admissions/applications':
-        return toGql(await CreateApplication.execute(ctx, ((args.input as Record<string, unknown>) ?? args) as unknown as Parameters<typeof CreateApplication.execute>[1]));
+        return toGql(await createApplication(ctx, ((args.input as Record<string, unknown>) ?? args) as Parameters<typeof createApplication>[1]));
 
       case 'updateApplication':
       case 'PATCH:/api/admissions/applications/:id': {
@@ -200,12 +388,10 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'reviewApplication':
       case 'POST:/api/admissions/applications/:id/review':
-        // AppSync typed input: args.input = { decision, remarks }
-        // REST path: decision/remarks directly on args
-        return toGql(await ReviewApplication.execute(ctx, {
+        return toGql(await reviewApplication(ctx, {
           applicationId: args.id as string,
           ...((args.input as object) ?? args),
-        } as Parameters<typeof ReviewApplication.execute>[1]));
+        } as Parameters<typeof reviewApplication>[1]));
 
       case 'getApplicationReviews':
       case 'GET:/api/admissions/applications/:id/reviews': {
@@ -247,9 +433,9 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'POST:/api/admissions/applications/:id/reject': {
         authorize(ctx, 'admissions.application.approve');
         return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, {
-          status:     'REJECTED',
-          rejectedAt: new Date(),
-          rejectedBy: new Types.ObjectId(ctx.membership!.profileId),
+          status:          'REJECTED',
+          rejectedAt:      new Date(),
+          rejectedBy:      new Types.ObjectId(ctx.membership!.profileId),
           rejectionReason: args.reason as string | undefined,
         }));
       }
@@ -272,8 +458,6 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       case 'getUploadUrl':
       case 'POST:/api/admissions/applications/:id/upload-url': {
         authorize(ctx, 'admissions.application.update');
-        // Delegates to storage-service — return the storage operation info
-        // The client calls storage-service directly for presigned URL generation
         const key = `${tenantId}/admissions/applications/${args.id}/${args.fileName}`;
         return {
           storageOperation: 'getUploadUrl',
@@ -302,9 +486,6 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
       }
 
       // ── Legacy admission aliases ──────────────────────────────────────────
-      // These map the Admission type (id, studentName, status, createdAt, updatedAt)
-      // onto the existing Application workflow.
-
       case 'listAdmissions': {
         authorize(ctx, 'admissions.application.read');
         const filter: Record<string, unknown> = {};
@@ -333,10 +514,10 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
         authorize(ctx, 'admissions.application.create');
         const input = (args.input ?? args) as Record<string, unknown>;
         const app = await AdmissionsRepo.createApplication(tenantId, {
-          studentName:   input.studentName as string,
-          phone:         input.phone        as string,
-          status:        'DRAFT',
-          source:        'ADMIN',
+          studentName: input.studentName as string,
+          phone:       input.phone        as string,
+          status:      'DRAFT',
+          source:      'ADMIN',
         } as never);
         const a = app as unknown as Record<string, unknown>;
         return { id: String(a._id), studentName: a.studentName ?? '', status: a.status, createdAt: a.createdAt, updatedAt: a.updatedAt };
@@ -363,7 +544,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
 
       case 'reviewAdmission': {
         const input = (args.input ?? args) as Record<string, unknown>;
-        const reviewed = await ReviewApplication.execute(ctx, {
+        const reviewed = await reviewApplication(ctx, {
           applicationId: args.id as string,
           decision:      input.decision as 'APPROVED' | 'REJECTED',
           remarks:       (input.remarks ?? input.comments) as string | undefined,

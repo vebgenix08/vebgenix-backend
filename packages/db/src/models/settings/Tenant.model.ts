@@ -9,13 +9,18 @@ import { Schema, model, Document } from 'mongoose';
  *            The MongoDB _id (ObjectId) is intentionally kept as internal DB key only.
  */
 export interface ITenant extends Document {
-  tenantId:  string;   // e.g. inst_a3f9k2xb — the propagated tenant identifier
-  name:      string;
-  slug:      string;
-  type?:     string;   // 'school' | 'college' | 'university' | 'institute' | 'org'
-  logoUrl?:  string;
-  domain?:   string;
-  isActive:  boolean;
+  tenantId:      string;   // e.g. inst_a3f9k2xb — the propagated tenant identifier
+  name:          string;
+  slug:          string;
+  type?:         string;   // 'school' | 'college' | 'university' | 'institute' | 'org'
+  logoUrl?:      string;
+  domain?:       string;
+  email?:        string;
+  phone?:        string;
+  address?:      string;
+  affiliation?:  string;
+  accreditation?: string;
+  isActive:      boolean;
   onboardingComplete?: boolean;
   finalizedAt?:        Date;
   finalizedBy?:        string;
@@ -30,13 +35,18 @@ export interface ITenant extends Document {
 
 const TenantSchema = new Schema<ITenant>(
   {
-    tenantId:  { type: String, required: true },
-    name:      { type: String, required: true },
-    slug:      { type: String, required: true },
-    type:      { type: String },
-    logoUrl:   { type: String },
-    domain:    { type: String },
-    isActive:  { type: Boolean, default: true },
+    tenantId:      { type: String, required: true },
+    name:          { type: String, required: true },
+    slug:          { type: String, required: true },
+    type:          { type: String },
+    logoUrl:       { type: String },
+    domain:        { type: String },
+    email:         { type: String },
+    phone:         { type: String },
+    address:       { type: String },
+    affiliation:   { type: String },
+    accreditation: { type: String },
+    isActive:      { type: Boolean, default: true },
     onboardingComplete:    { type: Boolean, default: false },
     finalizedAt:           { type: Date },
     finalizedBy:           { type: String },

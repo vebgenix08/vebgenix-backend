@@ -189,6 +189,11 @@ type Tenant {
   name:               String!
   slug:               String
   logoUrl:            String
+  email:              String
+  phone:              String
+  address:            String
+  affiliation:        String
+  accreditation:      String
   fullDomain:         String
   isActive:           Boolean!
   onboardingComplete: Boolean!
@@ -215,10 +220,15 @@ input CreateTenantInput {
 }
 
 input UpdateTenantInput {
-  id:      ID!
-  name:    String
-  slug:    String
-  logoUrl: String
+  id:            ID!
+  name:          String
+  slug:          String
+  logoUrl:       String
+  email:         String
+  phone:         String
+  address:       String
+  affiliation:   String
+  accreditation: String
 }
 
 type AvailableFeature {
@@ -444,41 +454,6 @@ input PublishTemplateVersionInput {
   content: String!
 }
 
-# ─── Finance — Fee Categories ─────────────────────────────────────────────────
-
-type FeeCategory {
-  id: ID!
-  tenantId: String
-  name: String!
-  moduleType: String!
-  feeType: String!
-  invoicePrefix: String!
-  receiptPrefix: String!
-  defaultAllocationMethod: String!
-  isActive: Boolean!
-  createdAt: AWSDateTime
-  updatedAt: AWSDateTime
-}
-
-input CreateFeeCategoryInput {
-  name: String!
-  feeType: String!
-  moduleType: String
-  invoicePrefix: String!
-  receiptPrefix: String!
-  defaultAllocationMethod: String
-}
-
-input UpdateFeeCategoryInput {
-  name: String
-  feeType: String
-  moduleType: String
-  invoicePrefix: String
-  receiptPrefix: String
-  defaultAllocationMethod: String
-  isActive: Boolean
-}
-
 # ─── Finance — Fee Heads ──────────────────────────────────────────────────────
 
 type FeeHead {
@@ -490,7 +465,6 @@ type FeeHead {
   prefix: String
   code: String
   description: String
-  feeCategoryId: ID
   isRefundable: Boolean!
   isMandatory: Boolean!
   allowConcession: Boolean!
@@ -505,7 +479,6 @@ input CreateFeeHeadInput {
   name: String!
   type: String!
   category: String
-  feeCategoryId: ID
   code: String
   prefix: String
   description: String
@@ -520,7 +493,6 @@ input UpdateFeeHeadInput {
   name: String
   type: String
   category: String
-  feeCategoryId: ID
   code: String
   prefix: String
   description: String
@@ -563,7 +535,6 @@ type FeeStructure {
   components: [FeeComponent!]!
   totalAmount: Float!
   isActive: Boolean!
-  feeCategoryId: ID
   feeScheduleId: ID
   allocationMethod: String!
   studentCategoryId: ID
@@ -579,7 +550,6 @@ input CreateFeeStructureInput {
   classId: ID
   classFrom: Int
   classTo: Int
-  feeCategoryId: ID
   feeScheduleId: ID
   allocationMethod: String
   components: [FeeComponentInput!]
@@ -593,7 +563,6 @@ input UpdateFeeStructureInput {
   classId: ID
   classFrom: Int
   classTo: Int
-  feeCategoryId: ID
   feeScheduleId: ID
   allocationMethod: String
   components: [FeeComponentInput!]
@@ -633,7 +602,6 @@ type FeeSchedule {
   tenantId: String
   name: String!
   academicYearId: String!
-  feeCategoryId: ID
   campusId: ID
   slots: [FeeScheduleSlot!]!
   isActive: Boolean!
@@ -651,7 +619,6 @@ type FeeSchedule {
 input CreateFeeScheduleInput {
   name: String!
   academicYearId: ID!
-  feeCategoryId: ID
   campusId: ID
   collectionType: String
   minimumAmount: Float
@@ -665,7 +632,6 @@ input CreateFeeScheduleInput {
 
 input UpdateFeeScheduleInput {
   name: String
-  feeCategoryId: ID
   campusId: ID
   collectionType: String
   minimumAmount: Float
@@ -675,6 +641,7 @@ input UpdateFeeScheduleInput {
   lateFeeEnabled: Boolean
   notificationEnabled: Boolean
   isActive: Boolean
+  slots: [FeeScheduleSlotInput!]
 }
 
 # ─── Finance — Fee Assignments ────────────────────────────────────────────────
@@ -785,6 +752,52 @@ input UpdateStudentFeeOrderInput {
   remarks: String
   status: String
   paymentStatus: String
+}
+
+# ── Misc Fee ──────────────────────────────────────────────────────────────────
+input AssignMiscFeeInput {
+  feeHeadId: ID!
+  feeHeadName: String!
+  amount: Float!
+  academicYearId: ID!
+  campusId: ID!
+  dueDate: String
+  description: String
+  studentId: ID
+  classId: ID
+}
+
+type AssignMiscFeeResult {
+  generatedCount: Int!
+  skippedCount: Int!
+}
+
+# ── Mapping Deactivation ──────────────────────────────────────────────────────
+type DeactivateMappingResult {
+  success: Boolean!
+  cancelledOrders: Int!
+  keptOrders: Int!
+}
+
+# ── Fee Structure Revision (TC-028/TC-029/TC-030) ─────────────────────────────
+type FeeStructureRevisionResult {
+  updatedOrders: Int!
+  adjustmentOrders: Int!
+}
+
+# ── Class Transfer (TC-031/TC-032/TC-033) ─────────────────────────────────────
+input TransferStudentClassInput {
+  newClassId: ID!
+  newSectionId: ID
+  academicYearId: ID!
+  campusId: ID!
+  reason: String
+}
+
+type TransferStudentClassResult {
+  cancelledOrders: Int!
+  generatedOrders: Int!
+  adjustmentOrders: Int!
 }
 
 type PaymentOrderLine {
@@ -965,7 +978,6 @@ type Invoice {
   installmentLabel: String
   cancelledAt: String
   cancelReason: String
-  feeCategoryId: ID
   feeStructureId: ID
   allocationMethod: String!
   collectionType: String!
@@ -1114,6 +1126,129 @@ type CollectByStudentResult {
   payments: [Payment!]!
   totalCollected: Float!
   remainingAmount: Float!
+}
+
+input BulkMapAndGenerateInput {
+  feeStructureId: ID!
+  feeScheduleId:  ID!
+  academicYearId: ID!
+  campusId:       ID!
+  classIds:       [ID!]!
+}
+
+type BulkMapAndGenerateResult {
+  mappingCount:   Int!
+  generatedCount: Int!
+  skippedCount:   Int!
+}
+
+# ─── Finance — Manual Fee Collection ─────────────────────────────────────────
+
+type ManualFeeStructureComponent {
+  feeHeadId:   ID!
+  feeHeadName: String!
+  amount:      Float!
+  isOptional:  Boolean
+  priority:    Int
+}
+
+type ManualFeeStructureResult {
+  feeStructure: ManualFeeStructureInfo!
+  components:   [ManualFeeStructureComponent!]!
+}
+
+type ManualFeeStructureInfo {
+  id:          ID!
+  name:        String!
+  totalAmount: Float!
+}
+
+type ManualAdmissionNoResult {
+  admissionNo: String!
+}
+
+type ManualStudentFeeAccount {
+  id:             ID!
+  tenantId:       String!
+  campusId:       ID!
+  academicYearId: ID!
+  admissionNo:    String!
+  registrationNo: String
+  studentName:    String!
+  gradeId:        ID!
+  sectionId:      ID
+  feeScheduleId:  ID!
+  feeStructureId: ID!
+  totalAmount:    Float!
+  paidAmount:     Float!
+  balanceAmount:  Float!
+  status:         String!
+  linkedStudentId: ID
+  linkedAt:       AWSDateTime
+  createdBy:      ID!
+  createdAt:      AWSDateTime
+  updatedAt:      AWSDateTime
+}
+
+type ManualFeeCollection {
+  id:                       ID!
+  tenantId:                 String!
+  manualStudentFeeAccountId: ID!
+  academicYearId:           ID!
+  feeScheduleId:            ID!
+  feeStructureId:           ID!
+  studentName:              String!
+  studentDob:               AWSDateTime
+  admissionNo:              String!
+  registrationNo:           String
+  campusId:                 ID!
+  gradeId:                  ID!
+  sectionId:                ID
+  totalFeeAmount:           Float!
+  paidAmount:               Float!
+  balanceAmount:            Float!
+  paymentMode:              String!
+  referenceNo:              String
+  paymentDate:              AWSDateTime!
+  remarks:                  String
+  receiptNo:                String!
+  receiptStatus:            String!
+  linkedStudentId:          ID
+  linkedAt:                 AWSDateTime
+  createdBy:                ID!
+  createdAt:                AWSDateTime
+  updatedAt:                AWSDateTime
+}
+
+type ManualFeeCollectionParticular {
+  id:                    ID!
+  tenantId:              String!
+  manualFeeCollectionId: ID!
+  feeHeadId:             ID!
+  feeHeadName:           String!
+  priority:              Int
+  amount:                Float!
+  paidAmount:            Float!
+  balanceAmount:         Float!
+}
+
+input CreateManualFeeCollectionInput {
+  academicYearId: ID!
+  campusId:       ID!
+  gradeId:        ID!
+  sectionId:      ID
+  studentName:    String!
+  studentDob:     String
+  paidAmount:     Float!
+  paymentMode:    String!
+  referenceNo:    String
+  paymentDate:    String!
+  remarks:        String
+  receivedBy:     ID
+}
+
+type ManualLinkResult {
+  linked: Int!
 }
 
 # ─── Finance — Reports ────────────────────────────────────────────────────────
@@ -1372,8 +1507,6 @@ input GetUploadUrlInput {
   folder: String
 }
 
-# ─── Finance — Fee Category ─────────────────────── (FeeCategory already above)
-
 # ─── Students ─────────────────────────────────────────────────────────────────
 
 type StudentGuardian {
@@ -1413,6 +1546,8 @@ type Student {
   address: String
   classId: ID
   sectionId: ID
+  className: String
+  sectionName: String
   programId: ID
   status: String!
   authUserId: ID
@@ -2572,19 +2707,15 @@ type Query {
   getApplicationReviews(applicationId: ID!): [ApplicationReview!]!
   admissionsStats(campusId: ID, academicYearId: ID): AdmissionsStats!
 
-  # Finance — Fee Categories
-  listFeeCategories(activeOnly: Boolean): [FeeCategory!]!
-  getFeeCategory(id: ID!): FeeCategory
-
   # Finance — Fee Heads, Structures, Schedules
-  listFeeHeads(feeCategoryId: ID, isActive: Boolean): [FeeHead!]!
+  listFeeHeads(isActive: Boolean): [FeeHead!]!
   getFeeHead(id: ID!): FeeHead
-  listFeeStructures(campusId: ID, academicYearId: ID, feeCategoryId: ID): [FeeStructure!]!
+  listFeeStructures(campusId: ID, academicYearId: ID, feeScheduleId: ID): [FeeStructure!]!
   getFeeStructure(id: ID!): FeeStructure
   listFeeAssignments(studentId: ID, academicYearId: ID, limit: Int, nextToken: String): [FeeAssignment!]!
   getFeeAssignment(id: ID!): FeeAssignment
   getStudentFeeAssignment(studentId: ID!, academicYearId: ID): FeeAssignment
-  listFeeSchedules(academicYearId: ID, feeCategoryId: ID): [FeeSchedule!]!
+  listFeeSchedules(academicYearId: ID): [FeeSchedule!]!
   listInstallmentPlans(isActive: Boolean): [InstallmentPlan!]!
   listFeeStructureClassMappings(campusId: ID, academicYearId: ID, classId: ID, status: String): [FeeStructureClassMapping!]!
   getFeeStructureClassMapping(id: ID!): FeeStructureClassMapping
@@ -2612,6 +2743,15 @@ type Query {
   getFeeAssignmentQueue(campusId: ID, academicYearId: ID): [FeeAssignmentQueueItem!]!
   getAssignableFeeStructures(studentId: ID!, academicYearId: ID): [FeeStructure!]!
   getStudentDues(studentId: ID!): StudentDues!
+
+  # Finance — Manual Fee Collections
+  generateManualAdmissionNo(academicYearId: ID!): ManualAdmissionNoResult!
+  getManualFeeStructure(academicYearId: ID!, gradeId: ID!): ManualFeeStructureResult!
+  listManualStudentFeeAccounts(academicYearId: ID, campusId: ID, status: String): [ManualStudentFeeAccount!]!
+  getManualStudentFeeAccount(id: ID!): ManualStudentFeeAccount
+  listManualFeeCollections(academicYearId: ID, campusId: ID, receiptStatus: String, admissionNo: String): [ManualFeeCollection!]!
+  getManualFeeCollection(id: ID!): ManualFeeCollection
+  listManualFeeCollectionParticulars(collectionId: ID!): [ManualFeeCollectionParticular!]!
 
   # Academics — Classes, Sections, Subjects
   listClasses(campusId: ID, programId: ID): [GradeClass!]!
@@ -2761,11 +2901,6 @@ type Mutation {
   verifyDocument(applicationId: ID!, documentId: ID!, input: VerifyDocumentInput!): Application!
   getUploadUrl(input: GetUploadUrlInput!): GetUploadUrlResult!
 
-  # Finance — Fee Categories
-  createFeeCategory(input: CreateFeeCategoryInput!): FeeCategory!
-  updateFeeCategory(id: ID!, input: UpdateFeeCategoryInput!): FeeCategory!
-  deleteFeeCategory(id: ID!): Boolean
-
   # Finance — Fee Heads
   createFeeHead(input: CreateFeeHeadInput!): FeeHead!
   updateFeeHead(id: ID!, input: UpdateFeeHeadInput!): FeeHead!
@@ -2805,9 +2940,19 @@ type Mutation {
   collectPaymentByStudent(studentId: ID!, input: CollectByStudentInput!): CollectByStudentResult!
   generatePaymentLink(invoiceId: ID!): PaymentLink!
   generateStudentFeeOrders(assignmentId: ID!): [StudentFeeOrder!]!
+  bulkMapAndGenerateOrders(input: BulkMapAndGenerateInput!): BulkMapAndGenerateResult!
   updateStudentFeeOrder(id: ID!, input: UpdateStudentFeeOrderInput!): StudentFeeOrder!
   cancelStudentFeeOrder(id: ID!): Boolean
+  assignMiscFee(input: AssignMiscFeeInput!): AssignMiscFeeResult!
+  deactivateFeeStructureClassMapping(mappingId: ID!, cancelUnpaidOrders: Boolean): DeactivateMappingResult!
+  applyFeeStructureRevision(feeStructureId: ID!): FeeStructureRevisionResult!
+  transferStudentClass(studentId: ID!, input: TransferStudentClassInput!): TransferStudentClassResult!
   createStudentTransaction(input: CreateStudentTransactionInput!): StudentTransaction!
+
+  # Finance — Manual Fee Collections
+  createManualFeeCollection(input: CreateManualFeeCollectionInput!): ManualFeeCollection!
+  cancelManualFeeCollection(id: ID!, reason: String): ManualFeeCollection!
+  linkManualFeeToStudent(admissionNo: String!, studentId: ID!, academicYearId: ID): ManualLinkResult!
 
   # Academics — Classes & Sections
   createClass(input: CreateClassInput!): GradeClass!
@@ -2922,3 +3067,4 @@ type Mutation {
   enableStudentPortal(studentId: ID!, email: String!): PortalEnablementPayload!
   enableGuardianPortal(input: EnableGuardianPortalInput!): PortalEnablementPayload!
 }
+
