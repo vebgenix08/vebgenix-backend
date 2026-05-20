@@ -6,7 +6,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
+scripts 
 node_modules
 dist
 dist-ssr
@@ -52,3 +52,5 @@ apps/*/dist/
 
 postman/reports/
 postman/newman-results*.txt
+ 
+postman
