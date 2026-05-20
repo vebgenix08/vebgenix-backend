@@ -1034,6 +1034,64 @@ type LinkManualFeeResult {
   linked: Int!
 }
 
+# ─── Finance — Fee Order bulk / misc / revision / transfer types ─────────────
+
+input BulkMapAndGenerateOrdersInput {
+  feeStructureId: ID!
+  feeScheduleId: ID!
+  academicYearId: ID!
+  campusId: ID!
+  classIds: [ID!]!
+}
+
+type BulkMapResult {
+  mappingCount: Int!
+  generatedCount: Int!
+  skippedCount: Int!
+}
+
+input AssignMiscFeeInput {
+  feeHeadId: ID!
+  feeHeadName: String!
+  amount: Float!
+  academicYearId: ID!
+  campusId: ID!
+  dueDate: String
+  description: String
+  studentId: ID
+  classId: ID
+}
+
+type GenerateOrdersResult {
+  generatedCount: Int!
+  skippedCount: Int!
+}
+
+type DeactivateMappingResult {
+  success: Boolean!
+  cancelledOrders: Int!
+  keptOrders: Int!
+}
+
+type FeeRevisionResult {
+  updatedOrders: Int!
+  adjustmentOrders: Int!
+}
+
+input TransferStudentClassInput {
+  newClassId: ID!
+  newSectionId: ID
+  academicYearId: ID!
+  campusId: ID!
+  reason: String
+}
+
+type TransferStudentClassResult {
+  cancelledOrders: Int!
+  adjustmentOrders: Int!
+  generatedOrders: Int
+}
+
 # ─── Finance — Invoices ───────────────────────────────────────────────────────
 
 type InvoiceItem {
@@ -3042,6 +3100,13 @@ type Mutation {
   createManualFeeCollection(input: CreateManualFeeCollectionInput!): ManualFeeCollection!
   cancelManualFeeCollection(id: ID!, reason: String): ManualFeeCollection!
   linkManualFeeToStudent(admissionNo: String!, studentId: ID!, academicYearId: ID): LinkManualFeeResult!
+
+  # Finance — Fee Order mutations (bulk/misc/revision/transfer)
+  bulkMapAndGenerateOrders(input: BulkMapAndGenerateOrdersInput!): BulkMapResult!
+  assignMiscFee(input: AssignMiscFeeInput!): GenerateOrdersResult!
+  deactivateFeeStructureClassMapping(mappingId: ID!, cancelUnpaidOrders: Boolean): DeactivateMappingResult!
+  applyFeeStructureRevision(feeStructureId: ID!): FeeRevisionResult!
+  transferStudentClass(studentId: ID!, input: TransferStudentClassInput!): TransferStudentClassResult!
 
   # Invites
   acceptInvite(token: String!, password: String): AcceptInvitePayload!
