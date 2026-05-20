@@ -1,5 +1,7 @@
 import { SQSEvent, SQSRecord } from 'aws-lambda';
-import * as nodemailer from 'nodemailer';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+
+const ses = new SESClient({ region: process.env.AWS_REGION ?? 'ap-south-1' });
 
 interface EmailJob {
   type: 'INVITE' | 'WELCOME' | 'ENQUIRY_ACK' | 'ADMISSION_APPROVED' | 'ADMISSION_REJECTED' | 'GENERIC';
@@ -7,18 +9,6 @@ interface EmailJob {
   subject?: string;
   body?: string;
   templateData?: Record<string, string>;
-}
-
-function createTransport() {
-  return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST ?? 'smtp.gmail.com',
-    port:   Number(process.env.SMTP_PORT ?? 587),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD ?? process.env.SMTP_PASS,
-    },
-  });
 }
 
 function buildEmailContent(job: EmailJob): { subject: string; html: string } {
@@ -59,7 +49,7 @@ function buildEmailContent(job: EmailJob): { subject: string; html: string } {
     default:
       return {
         subject: job.subject ?? `Message from ${appName}`,
-        html: job.body ?? '',
+        html:    job.body ?? '',
       };
   }
 }
@@ -67,14 +57,16 @@ function buildEmailContent(job: EmailJob): { subject: string; html: string } {
 async function processRecord(record: SQSRecord): Promise<void> {
   const job: EmailJob = JSON.parse(record.body);
   const { subject, html } = buildEmailContent(job);
-  const transport = createTransport();
+  const from = process.env.SES_FROM_ADDRESS ?? `"${process.env.APP_NAME ?? 'Vebgenix'}" <noreply@vebgenix.com>`;
 
-  await transport.sendMail({
-    from: process.env.SMTP_FROM ?? `"${process.env.APP_NAME ?? 'Vebgenix'}" <noreply@vebgenix.com>`,
-    to:   job.to,
-    subject,
-    html,
-  });
+  await ses.send(new SendEmailCommand({
+    Source: from,
+    Destination: { ToAddresses: [job.to] },
+    Message: {
+      Subject: { Data: subject, Charset: 'UTF-8' },
+      Body:    { Html: { Data: html, Charset: 'UTF-8' } },
+    },
+  }));
 
   console.log(`[email-worker] Sent ${job.type} to ${job.to}`);
 }

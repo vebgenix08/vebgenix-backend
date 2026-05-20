@@ -132,13 +132,11 @@ export class AsyncStack extends cdk.Stack {
       ...vpcConfig,
       environment: {
         ...workerEnv,
-        SMTP_HOST:     `{{resolve:secretsmanager:vebgenix/${config.stage}/smtp:SecretString:host}}`,
-        SMTP_PORT:     `{{resolve:secretsmanager:vebgenix/${config.stage}/smtp:SecretString:port}}`,
-        SMTP_USER:     `{{resolve:secretsmanager:vebgenix/${config.stage}/smtp:SecretString:user}}`,
-        SMTP_PASSWORD: `{{resolve:secretsmanager:vebgenix/${config.stage}/smtp:SecretString:password}}`,
-        SMTP_FROM:     `{{resolve:secretsmanager:vebgenix/${config.stage}/smtp:SecretString:from}}`,
-        APP_NAME:      'Vebgenix',
-        APP_BASE_URL:  config.appBaseUrl ?? '',
+        // Email is sent via SES — no SMTP credentials needed.
+        // SES identity (contact@vebgenix.com) is configured out-of-band in the console.
+        SES_FROM_ADDRESS: `"Vebgenix" <contact@vebgenix.com>`,
+        APP_NAME:         'Vebgenix',
+        APP_BASE_URL:     config.appBaseUrl ?? '',
       },
       layers: [runtimeDepsLayer],
       tracing: lambda.Tracing.ACTIVE,
