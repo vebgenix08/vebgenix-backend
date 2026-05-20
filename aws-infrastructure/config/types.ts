@@ -11,6 +11,9 @@ export interface EnvConfig {
 
   // Cognito — filled from CDK context / SSM after first deploy
   cognitoClientId?: string;
+  /** When set, the AuthStack imports this existing User Pool instead of creating a new one.
+   *  Use this when an existing pool cannot be replaced (e.g. schema immutability constraint). */
+  existingUserPoolId?: string;
 
   // App
   appBaseUrl?: string;   // e.g. https://app.vebgenix.com

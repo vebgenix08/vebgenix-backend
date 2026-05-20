@@ -3,6 +3,8 @@ import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 import { EnvConfig } from '../../config/types';
 import * as path from 'path';
@@ -19,7 +21,7 @@ interface AuthStackProps extends cdk.StackProps {
 }
 
 export class AuthStack extends cdk.Stack {
-  public readonly userPool: cognito.UserPool;
+  public readonly userPool: cognito.IUserPool;
   public readonly userPoolClient: cognito.UserPoolClient;
   public readonly userPoolId: string;
   public readonly userPoolClientId: string;
@@ -58,60 +60,108 @@ export class AuthStack extends cdk.Stack {
       },
     });
 
-    // ── Cognito User Pool ─────────────────────────────────────────────────
-    this.userPool = new cognito.UserPool(this, 'UserPool', {
-      userPoolName:    `vebgenix-${config.stage}`,
-      selfSignUpEnabled: false,          // Only platform provisions users via InviteStaff
-      signInAliases:   { email: true },
-      autoVerify:      { email: true },
-      // Email via SES — configured live on the user pool via CLI:
-      //   EmailSendingAccount=DEVELOPER, From=contact@vebgenix.com
-      //   SourceArn=arn:aws:ses:ap-south-1:278035644568:identity/vebgenix.com
-      // CDK withSES() requires an email-address identity (not domain), so we keep
-      // the CDK neutral here and manage the SES config out-of-band to avoid rollback.
-      standardAttributes: {
-        email:    { required: true, mutable: true },
-        fullname: { required: true, mutable: true },
-        phoneNumber: { required: false, mutable: true },
-      },
-      customAttributes: {
-        // Tenant the user belongs to (set by InviteStaff / AdminCreateUser)
-        tenantId: new cognito.StringAttribute({ mutable: false }),
-        // Coarse role — fine-grained RBAC enforced in Lambda from MongoDB Profile
-        role:     new cognito.StringAttribute({ mutable: true }),
-      },
-      passwordPolicy: {
-        minLength:         10,
-        requireLowercase:  true,
-        requireUppercase:  true,
-        requireDigits:     true,
-        requireSymbols:    false,
-        tempPasswordValidity: cdk.Duration.days(7),
-      },
-      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
-      mfa: config.stage === 'prod' ? cognito.Mfa.OPTIONAL : cognito.Mfa.OFF,
+    if (config.existingUserPoolId) {
+      // ── Import existing User Pool ────────────────────────────────────────
+      // Used when the pool already exists in AWS and cannot be recreated
+      // (e.g. Cognito schema attributes are immutable once set).
+      this.userPool = cognito.UserPool.fromUserPoolId(
+        this,
+        'UserPool',
+        config.existingUserPoolId,
+      );
 
-      // PostConfirmation trigger — syncs Cognito user to MongoDB
-      lambdaTriggers: {
-        postConfirmation: cognitoSyncFn,
-      },
-
-      removalPolicy: config.stage === 'prod'
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
-    });
-
-    // ── Cognito Groups (coarse authorization) ─────────────────────────────
-    const groups = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'STAFF', 'TEACHER', 'STUDENT'];
-    groups.forEach(group => {
-      new cognito.CfnUserPoolGroup(this, `Group${group}`, {
-        userPoolId:  this.userPool.userPoolId,
-        groupName:   group,
-        description: `${group} group`,
+      // Grant Cognito permission to invoke the sync Lambda
+      cognitoSyncFn.addPermission('CognitoInvokePermission', {
+        principal: new iam.ServicePrincipal('cognito-idp.amazonaws.com'),
+        action: 'lambda:InvokeFunction',
+        sourceArn: `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/${config.existingUserPoolId}`,
       });
-    });
 
-    // ── App Client ────────────────────────────────────────────────────────
+      // Attach PostConfirmation trigger to the existing pool via Cognito SDK call.
+      // AwsCustomResource calls UpdateUserPool on every deploy to keep the trigger in sync.
+      const triggerCr = new cr.AwsCustomResource(this, 'SetPostConfirmationTrigger', {
+        onCreate: {
+          service: 'CognitoIdentityServiceProvider',
+          action: 'updateUserPool',
+          parameters: {
+            UserPoolId: config.existingUserPoolId,
+            LambdaConfig: { PostConfirmation: cognitoSyncFn.functionArn },
+          },
+          physicalResourceId: cr.PhysicalResourceId.of('PostConfirmationTrigger'),
+        },
+        onUpdate: {
+          service: 'CognitoIdentityServiceProvider',
+          action: 'updateUserPool',
+          parameters: {
+            UserPoolId: config.existingUserPoolId,
+            LambdaConfig: { PostConfirmation: cognitoSyncFn.functionArn },
+          },
+          physicalResourceId: cr.PhysicalResourceId.of('PostConfirmationTrigger'),
+        },
+        policy: cr.AwsCustomResourcePolicy.fromStatements([
+          new iam.PolicyStatement({
+            actions: ['cognito-idp:UpdateUserPool'],
+            resources: [
+              `arn:aws:cognito-idp:${config.region}:${config.account}:userpool/${config.existingUserPoolId}`,
+            ],
+          }),
+        ]),
+      });
+      triggerCr.node.addDependency(cognitoSyncFn);
+
+    } else {
+      // ── Create new User Pool ─────────────────────────────────────────────
+      const pool = new cognito.UserPool(this, 'UserPool', {
+        userPoolName:    `vebgenix-${config.stage}`,
+        selfSignUpEnabled: false,          // Only platform provisions users via InviteStaff
+        signInAliases:   { email: true },
+        autoVerify:      { email: true },
+        standardAttributes: {
+          email:    { required: true, mutable: true },
+          fullname: { required: true, mutable: true },
+          phoneNumber: { required: false, mutable: true },
+        },
+        customAttributes: {
+          // Tenant the user belongs to (set by InviteStaff / AdminCreateUser)
+          tenantId: new cognito.StringAttribute({ mutable: false }),
+          // Coarse role — fine-grained RBAC enforced in Lambda from MongoDB Profile
+          role:     new cognito.StringAttribute({ mutable: true }),
+        },
+        passwordPolicy: {
+          minLength:         10,
+          requireLowercase:  true,
+          requireUppercase:  true,
+          requireDigits:     true,
+          requireSymbols:    false,
+          tempPasswordValidity: cdk.Duration.days(7),
+        },
+        accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+        mfa: config.stage === 'prod' ? cognito.Mfa.OPTIONAL : cognito.Mfa.OFF,
+
+        // PostConfirmation trigger — syncs Cognito user to MongoDB
+        lambdaTriggers: {
+          postConfirmation: cognitoSyncFn,
+        },
+
+        removalPolicy: config.stage === 'prod'
+          ? cdk.RemovalPolicy.RETAIN
+          : cdk.RemovalPolicy.DESTROY,
+      });
+
+      // ── Cognito Groups (coarse authorization) ─────────────────────────────
+      const groups = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'STAFF', 'TEACHER', 'STUDENT'];
+      groups.forEach(group => {
+        new cognito.CfnUserPoolGroup(this, `Group${group}`, {
+          userPoolId:  pool.userPoolId,
+          groupName:   group,
+          description: `${group} group`,
+        });
+      });
+
+      this.userPool = pool;
+    }
+
+    // ── App Client (works for both imported and new pool) ─────────────────
     this.userPoolClient = this.userPool.addClient('WebClient', {
       userPoolClientName: `vebgenix-web-${config.stage}`,
       generateSecret:     false,         // SPA + mobile compatible

@@ -26,6 +26,9 @@ export const prodConfig: EnvConfig = {
   // RDS: disabled — using MongoDB Atlas.
   enableDatabase: false,
 
+  // Cognito — reuse the pre-existing User Pool (schema immutability prevents recreating)
+  existingUserPoolId: 'ap-south-1_waAjEC9Nj',
+
   // AppSync
   enableWaf: true,
 
