@@ -2,7 +2,13 @@ import { AuthUser, Tenant, Profile } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
-import { createTenantAdminUser, generateTempPassword, sendInviteEmail, updateTenantAdminUserAttributes } from './cognitoTenantAdmin';
+import {
+  createTenantAdminUser,
+  generateTempPassword,
+  sendInviteEmail,
+  setTenantAdminTemporaryPassword,
+  updateTenantAdminUserAttributes,
+} from './cognitoTenantAdmin';
 
 function tenantToGql(doc: Record<string, unknown> | null) {
   if (!doc) return null;
@@ -184,14 +190,21 @@ export async function handleOnboarding(
     case 'POST:/api/platform/tenants/:id/resend-invite': {
       if (!ctx.isPlatformAdmin) throw new AppError('FORBIDDEN', 'Platform admin only');
       const tenantId = (args.tenantId ?? args.id) as string;
-      const adminProfile = await Profile.findOne({
-        tenantId,
-        isPrimaryOwner: true,
-        isActive: true,
-      }).lean();
+      const adminProfile =
+        await Profile.findOne({
+          tenantId,
+          isPrimaryOwner: true,
+          isActive: true,
+        }).lean() ??
+        await Profile.findOne({
+          tenantId,
+          isActive: true,
+          personaRole: 'TENANT_ADMIN',
+        }).sort({ createdAt: 1 }).lean();
       const email = (args.email as string | undefined) ?? adminProfile?.email;
       if (!email) throw new AppError('BAD_REQUEST', 'No primary admin email found for this tenant');
       const {
+        AdminGetUserCommand,
         AdminCreateUserCommand,
         AdminSetUserPasswordCommand,
         AdminUpdateUserAttributesCommand,
@@ -200,27 +213,23 @@ export async function handleOnboarding(
       const cognito  = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
       const fullName = (adminProfile?.fullName as string | undefined) ?? email;
       const tempPwd  = generateTempPassword();
-      try {
-        await cognito.send(new AdminSetUserPasswordCommand({
-          UserPoolId: process.env.COGNITO_USER_POOL_ID,
-          Username:   email,
-          Password:   tempPwd,
-          Permanent:  false,
-        }));
-      } catch (err: unknown) {
-        const e = err as { name?: string };
-        if (e.name === 'UserNotFoundException') {
-          await createTenantAdminUser(cognito, AdminCreateUserCommand, {
-            userPoolId: process.env.COGNITO_USER_POOL_ID!,
-            email,
-            fullName,
-            tenantId,
-            tempPassword: tempPwd,
-            suppressMessage: true,
-          });
-        } else {
-          throw err;
-        }
+      const passwordReset = await setTenantAdminTemporaryPassword(
+        cognito,
+        AdminSetUserPasswordCommand,
+        AdminGetUserCommand,
+        process.env.COGNITO_USER_POOL_ID!,
+        email,
+        tempPwd,
+      );
+      if (!passwordReset.existed) {
+        await createTenantAdminUser(cognito, AdminCreateUserCommand, {
+          userPoolId: process.env.COGNITO_USER_POOL_ID!,
+          email,
+          fullName,
+          tenantId,
+          tempPassword: tempPwd,
+          suppressMessage: true,
+        });
       }
       await updateTenantAdminUserAttributes(cognito, AdminUpdateUserAttributesCommand, {
         userPoolId: process.env.COGNITO_USER_POOL_ID!,

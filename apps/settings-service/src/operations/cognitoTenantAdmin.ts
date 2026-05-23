@@ -211,3 +211,42 @@ export async function addUserToGroupIfAvailable(
     throw error;
   }
 }
+
+export async function setTenantAdminTemporaryPassword(
+  cognito: CognitoLikeClient,
+  AdminSetUserPasswordCommand: CognitoCommandCtor,
+  AdminGetUserCommand: CognitoCommandCtor,
+  userPoolId: string,
+  email: string,
+  tempPassword: string,
+) {
+  const apply = async (username: string) => cognito.send(new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: username,
+    Password: tempPassword,
+    Permanent: false,
+  }));
+
+  try {
+    await apply(email);
+    return { username: email, existed: true };
+  } catch (error) {
+    if (cognitoErrorName(error) !== 'UserNotFoundException') throw error;
+  }
+
+  try {
+    const user = await cognito.send(new AdminGetUserCommand({
+      UserPoolId: userPoolId,
+      Username: email,
+    }));
+    const resolvedUsername = String(user?.Username ?? '').trim();
+    if (resolvedUsername) {
+      await apply(resolvedUsername);
+      return { username: resolvedUsername, existed: true };
+    }
+  } catch (error) {
+    if (cognitoErrorName(error) !== 'UserNotFoundException') throw error;
+  }
+
+  return { username: email, existed: false };
+}
