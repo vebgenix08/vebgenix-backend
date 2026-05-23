@@ -20,6 +20,7 @@ type CreateUserOptions = AdminUserInput & {
 
 type UpdateUserOptions = AdminUserInput & {
   userPoolId: string;
+  username?: string;
 };
 
 export function generateTempPassword(): string {
@@ -178,7 +179,7 @@ export async function updateTenantAdminUserAttributes(
 ) {
   const baseInput = {
     UserPoolId: options.userPoolId,
-    Username: options.email,
+    Username: options.username ?? options.email,
     UserAttributes: buildAttributes(options, true),
   };
 

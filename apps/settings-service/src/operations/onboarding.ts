@@ -203,6 +203,9 @@ export async function handleOnboarding(
         }).sort({ createdAt: 1 }).lean();
       const email = (args.email as string | undefined) ?? adminProfile?.email;
       if (!email) throw new AppError('BAD_REQUEST', 'No primary admin email found for this tenant');
+      const authUser = adminProfile?.authUserId
+        ? await AuthUser.findById(adminProfile.authUserId).lean()
+        : await AuthUser.findOne({ email }).lean();
       const {
         AdminGetUserCommand,
         AdminCreateUserCommand,
@@ -213,12 +216,13 @@ export async function handleOnboarding(
       const cognito  = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
       const fullName = (adminProfile?.fullName as string | undefined) ?? email;
       const tempPwd  = generateTempPassword();
+      const preferredUsername = String(authUser?.cognitoSub ?? email).trim() || email;
       const passwordReset = await setTenantAdminTemporaryPassword(
         cognito,
         AdminSetUserPasswordCommand,
         AdminGetUserCommand,
         process.env.COGNITO_USER_POOL_ID!,
-        email,
+        preferredUsername,
         tempPwd,
       );
       if (!passwordReset.existed) {
@@ -233,6 +237,7 @@ export async function handleOnboarding(
       }
       await updateTenantAdminUserAttributes(cognito, AdminUpdateUserAttributesCommand, {
         userPoolId: process.env.COGNITO_USER_POOL_ID!,
+        username: passwordReset.existed ? passwordReset.username : email,
         email,
         fullName,
         tenantId,
