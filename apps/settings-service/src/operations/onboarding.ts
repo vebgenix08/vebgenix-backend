@@ -2,6 +2,7 @@ import { AuthUser, Tenant, Profile } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
+import { createTenantAdminUser, updateTenantAdminUserAttributes } from './cognitoTenantAdmin';
 
 function generateTempPassword(): string {
   const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -130,29 +131,23 @@ export async function handleOnboarding(
       const cognito  = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
       const tempPwd  = generateTempPassword();
       try {
-        await cognito.send(new AdminCreateUserCommand({
-          UserPoolId:       process.env.COGNITO_USER_POOL_ID,
-          Username:         email,
-          TemporaryPassword: tempPwd,
-          MessageAction:    'SUPPRESS',
-          UserAttributes: [
-            { Name: 'email',           Value: email },
-            { Name: 'name',            Value: fullName },
-            { Name: 'custom:tenantId', Value: tid },
-            { Name: 'email_verified',  Value: 'true' },
-          ],
-        }));
+        await createTenantAdminUser(cognito, AdminCreateUserCommand, {
+          userPoolId: process.env.COGNITO_USER_POOL_ID!,
+          email,
+          fullName,
+          tenantId: tid,
+          tempPassword: tempPwd,
+          suppressMessage: true,
+        });
       } catch (err: unknown) {
         const cognitoErr = err as { name?: string };
         if (cognitoErr.name !== 'UsernameExistsException') throw err;
-        await cognito.send(new AdminUpdateUserAttributesCommand({
-          UserPoolId:     process.env.COGNITO_USER_POOL_ID,
-          Username:       email,
-          UserAttributes: [
-            { Name: 'custom:tenantId', Value: tid },
-            { Name: 'name',            Value: fullName },
-          ],
-        }));
+        await updateTenantAdminUserAttributes(cognito, AdminUpdateUserAttributesCommand, {
+          userPoolId: process.env.COGNITO_USER_POOL_ID!,
+          email,
+          fullName,
+          tenantId: tid,
+        });
         await cognito.send(new AdminSetUserPasswordCommand({
           UserPoolId: process.env.COGNITO_USER_POOL_ID,
           Username:   email,
@@ -211,19 +206,14 @@ export async function handleOnboarding(
       const email   = args.email as string;
       const role    = (args.role as string) ?? 'STAFF';
       const name    = ((args.fullName ?? args.name) as string) ?? email;
-      const createResp = await cognito.send(new AdminCreateUserCommand({
-        UserPoolId:             process.env.COGNITO_USER_POOL_ID,
-        Username:               email,
-        DesiredDeliveryMediums: ['EMAIL'],
-        UserAttributes: [
-          { Name: 'email',           Value: email },
-          { Name: 'name',            Value: name  },
-          { Name: 'custom:tenantId', Value: tid   },
-          { Name: 'custom:role',     Value: role  },
-          { Name: 'email_verified',  Value: 'true' },
-        ],
-      }));
-      const cognitoSub = createResp.User?.Attributes?.find(a => a.Name === 'sub')?.Value;
+      const createResp = await createTenantAdminUser(cognito, AdminCreateUserCommand, {
+        userPoolId: process.env.COGNITO_USER_POOL_ID!,
+        email,
+        fullName: name,
+        tenantId: tid,
+        role,
+      });
+      const cognitoSub = createResp.User?.Attributes?.find((a: { Name?: string; Value?: string }) => a.Name === 'sub')?.Value;
       if (!cognitoSub) throw new AppError('BAD_REQUEST', 'Cognito did not return a user id');
       const authUser = await AuthUser.create({
         cognitoSub,
@@ -286,27 +276,24 @@ export async function handleOnboarding(
       } catch (err: unknown) {
         const e = err as { name?: string };
         if (e.name === 'UserNotFoundException') {
-          await cognito.send(new AdminCreateUserCommand({
-            UserPoolId:        process.env.COGNITO_USER_POOL_ID,
-            Username:          email,
-            TemporaryPassword: tempPwd,
-            MessageAction:     'SUPPRESS',
-            UserAttributes: [
-              { Name: 'email',           Value: email },
-              { Name: 'name',            Value: fullName },
-              { Name: 'custom:tenantId', Value: tenantId },
-              { Name: 'email_verified',  Value: 'true' },
-            ],
-          }));
+          await createTenantAdminUser(cognito, AdminCreateUserCommand, {
+            userPoolId: process.env.COGNITO_USER_POOL_ID!,
+            email,
+            fullName,
+            tenantId,
+            tempPassword: tempPwd,
+            suppressMessage: true,
+          });
         } else {
           throw err;
         }
       }
-      await cognito.send(new AdminUpdateUserAttributesCommand({
-        UserPoolId:     process.env.COGNITO_USER_POOL_ID,
-        Username:       email,
-        UserAttributes: [{ Name: 'custom:tenantId', Value: tenantId }],
-      })).catch(() => { /* ignore if user state prevents it */ });
+      await updateTenantAdminUserAttributes(cognito, AdminUpdateUserAttributesCommand, {
+        userPoolId: process.env.COGNITO_USER_POOL_ID!,
+        email,
+        fullName,
+        tenantId,
+      }).catch(() => { /* ignore if user state prevents it */ });
       await sendInviteEmail(email, fullName, tempPwd);
       return true;
     }

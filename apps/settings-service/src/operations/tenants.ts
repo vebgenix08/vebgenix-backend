@@ -10,6 +10,7 @@ import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 import mongoose, { Types } from 'mongoose';
+import { addUserToGroupIfAvailable, createTenantAdminUser } from './cognitoTenantAdmin';
 
 type FeatureFlags = Record<string, boolean>;
 type PlainDoc = Record<string, unknown>;
@@ -452,29 +453,26 @@ export async function handleTenants(
           CognitoIdentityProviderClient,
         } = await import('@aws-sdk/client-cognito-identity-provider');
         const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
-        const createResp = await cognito.send(new AdminCreateUserCommand({
-          UserPoolId: process.env.COGNITO_USER_POOL_ID,
-          Username: adminEmail,
-          DesiredDeliveryMediums: ['EMAIL'],
-          UserAttributes: [
-            { Name: 'email', Value: adminEmail },
-            { Name: 'name', Value: adminName },
-            { Name: 'custom:tenantId', Value: newTenantId },
-            { Name: 'custom:role', Value: 'SCHOOL_ADMIN' },
-            { Name: 'email_verified', Value: 'true' },
-            ...(adminPhone ? [{ Name: 'phone_number', Value: adminPhone }] : []),
-          ],
-        }));
+        const createResp = await createTenantAdminUser(cognito, AdminCreateUserCommand, {
+          userPoolId: process.env.COGNITO_USER_POOL_ID,
+          email: adminEmail,
+          fullName: adminName,
+          tenantId: newTenantId,
+          role: 'SCHOOL_ADMIN',
+          phone: adminPhone,
+        });
         cognitoUsername = adminEmail;
-        const cognitoSub = createResp.User?.Attributes?.find(attr => attr.Name === 'sub')?.Value;
+        const cognitoSub = createResp.User?.Attributes?.find((attr: { Name?: string; Value?: string }) => attr.Name === 'sub')?.Value;
         if (!cognitoSub) {
           throw new AppError('BAD_REQUEST', 'Cognito did not return a user id');
         }
-        await cognito.send(new AdminAddUserToGroupCommand({
-          UserPoolId: process.env.COGNITO_USER_POOL_ID,
-          Username: adminEmail,
-          GroupName: 'SCHOOL_ADMIN',
-        }));
+        await addUserToGroupIfAvailable(
+          cognito,
+          AdminAddUserToGroupCommand,
+          process.env.COGNITO_USER_POOL_ID,
+          adminEmail,
+          'SCHOOL_ADMIN',
+        );
 
         let tenantDoc: PlainDoc | null = null;
         let campusDoc: PlainDoc | null = null;
