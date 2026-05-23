@@ -2,73 +2,7 @@ import { AuthUser, Tenant, Profile } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
-import { createTenantAdminUser, updateTenantAdminUserAttributes } from './cognitoTenantAdmin';
-
-function generateTempPassword(): string {
-  const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const lower   = 'abcdefghijkmnpqrstuvwxyz';
-  const digits  = '23456789';
-  const all     = upper + lower + digits;
-  let pwd = upper[Math.floor(Math.random() * upper.length)]
-          + lower[Math.floor(Math.random() * lower.length)]
-          + digits[Math.floor(Math.random() * digits.length)];
-  for (let i = 0; i < 9; i++) pwd += all[Math.floor(Math.random() * all.length)];
-  return pwd.split('').sort(() => Math.random() - 0.5).join('');
-}
-
-async function sendInviteEmail(toEmail: string, fullName: string, tempPassword: string): Promise<void> {
-  const { SESClient, SendEmailCommand } = await import('@aws-sdk/client-ses');
-  const ses        = new SESClient({ region: process.env.COGNITO_REGION ?? 'ap-south-1' });
-  const appBaseUrl = (process.env.APP_BASE_URL ?? 'http://localhost:5001').replace(/\/$/, '');
-  const link       = `${appBaseUrl}/invite/accept?email=${encodeURIComponent(toEmail)}&token=${encodeURIComponent(tempPassword)}`;
-  const fromEmail  = process.env.INVITE_FROM_EMAIL ?? 'contact@vebgenix.com';
-  const firstName  = fullName.split(' ')[0] || fullName;
-
-  await ses.send(new SendEmailCommand({
-    Source:      fromEmail,
-    Destination: { ToAddresses: [toEmail] },
-    Message: {
-      Subject: { Data: 'You\'ve been invited to Vebgenix — Activate your account' },
-      Body: {
-        Html: {
-          Data: `<!DOCTYPE html>
-<html>
-<body style="font-family:Arial,sans-serif;background:#f4f6f9;margin:0;padding:40px 0">
-  <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
-  <table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-    <tr><td style="background:#1a56db;padding:32px 40px;text-align:center">
-      <h1 style="color:#fff;margin:0;font-size:24px;font-weight:700">Vebgenix</h1>
-    </td></tr>
-    <tr><td style="padding:40px">
-      <h2 style="color:#111827;margin:0 0 12px">Hello ${firstName},</h2>
-      <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px">
-        You've been invited to join <strong>Vebgenix</strong> as a tenant administrator.<br>
-        Click the button below to activate your account and set your password.
-      </p>
-      <div style="text-align:center;margin:32px 0">
-        <a href="${link}" style="background:#1a56db;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;display:inline-block">
-          Activate My Account
-        </a>
-      </div>
-      <p style="color:#6b7280;font-size:13px;line-height:1.5;margin:24px 0 0">
-        This link is valid for 7 days. If you didn't expect this invitation, you can safely ignore this email.
-      </p>
-    </td></tr>
-    <tr><td style="background:#f9fafb;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb">
-      <p style="color:#9ca3af;font-size:12px;margin:0">© 2025 Vebgenix. All rights reserved.</p>
-    </td></tr>
-  </table>
-  </td></tr></table>
-</body>
-</html>`,
-        },
-        Text: {
-          Data: `Hello ${firstName},\n\nYou've been invited to Vebgenix as a tenant administrator.\n\nActivate your account here:\n${link}\n\nThis link is valid for 7 days.\n\nVebgenix Team`,
-        },
-      },
-    },
-  }));
-}
+import { createTenantAdminUser, generateTempPassword, sendInviteEmail, updateTenantAdminUserAttributes } from './cognitoTenantAdmin';
 
 function tenantToGql(doc: Record<string, unknown> | null) {
   if (!doc) return null;

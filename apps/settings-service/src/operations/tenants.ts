@@ -10,7 +10,7 @@ import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 import mongoose, { Types } from 'mongoose';
-import { addUserToGroupIfAvailable, createTenantAdminUser } from './cognitoTenantAdmin';
+import { addUserToGroupIfAvailable, createTenantAdminUser, generateTempPassword, sendInviteEmail } from './cognitoTenantAdmin';
 
 type FeatureFlags = Record<string, boolean>;
 type PlainDoc = Record<string, unknown>;
@@ -445,6 +445,7 @@ export async function handleTenants(
       const newTenantId = generateTenantId('org');
       let cognitoUsername: string | undefined;
       let mongoCommitted = false;
+      const tempPassword = generateTempPassword();
 
       try {
         const {
@@ -460,6 +461,8 @@ export async function handleTenants(
           tenantId: newTenantId,
           role: 'SCHOOL_ADMIN',
           phone: adminPhone,
+          tempPassword,
+          suppressMessage: true,
         });
         cognitoUsername = adminEmail;
         const cognitoSub = createResp.User?.Attributes?.find((attr: { Name?: string; Value?: string }) => attr.Name === 'sub')?.Value;
@@ -543,6 +546,8 @@ export async function handleTenants(
         } finally {
           await session.endSession();
         }
+
+        await sendInviteEmail(adminEmail, adminName, tempPassword);
 
         return {
           tenant: toGql(tenantDoc, featureFlags),
