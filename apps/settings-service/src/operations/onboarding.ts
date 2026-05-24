@@ -5,6 +5,7 @@ import type { AuthContext } from '@vebgenix/auth';
 import {
   createTenantAdminUser,
   generateTempPassword,
+  resolveTenantAdminUsername,
   sendInviteEmail,
   setTenantAdminTemporaryPassword,
   updateTenantAdminUserAttributes,
@@ -208,6 +209,7 @@ export async function handleOnboarding(
         : await AuthUser.findOne({ email }).lean();
       const {
         AdminGetUserCommand,
+        ListUsersCommand,
         AdminCreateUserCommand,
         AdminSetUserPasswordCommand,
         AdminUpdateUserAttributesCommand,
@@ -217,15 +219,36 @@ export async function handleOnboarding(
       const fullName = (adminProfile?.fullName as string | undefined) ?? email;
       const tempPwd  = generateTempPassword();
       const preferredUsername = String(authUser?.cognitoSub ?? email).trim() || email;
+      const resolvedUser = await resolveTenantAdminUsername(
+        cognito,
+        AdminGetUserCommand,
+        ListUsersCommand,
+        process.env.COGNITO_USER_POOL_ID!,
+        {
+          preferredUsername,
+          email,
+        },
+      );
+      console.info('[settings/resendTenantInvite] resolved Cognito user', {
+        tenantId,
+        email,
+        preferredUsername,
+        resolvedUsername: resolvedUser?.username ?? null,
+        source: resolvedUser?.source ?? null,
+      });
       const passwordReset = await setTenantAdminTemporaryPassword(
         cognito,
         AdminSetUserPasswordCommand,
         AdminGetUserCommand,
         process.env.COGNITO_USER_POOL_ID!,
-        preferredUsername,
+        resolvedUser?.username ?? preferredUsername,
         tempPwd,
       );
       if (!passwordReset.existed) {
+        console.info('[settings/resendTenantInvite] creating missing Cognito user', {
+          tenantId,
+          email,
+        });
         await createTenantAdminUser(cognito, AdminCreateUserCommand, {
           userPoolId: process.env.COGNITO_USER_POOL_ID!,
           email,
@@ -241,7 +264,14 @@ export async function handleOnboarding(
         email,
         fullName,
         tenantId,
-      }).catch(() => { /* ignore if user state prevents it */ });
+      }).catch((error: unknown) => {
+        console.warn('[settings/resendTenantInvite] failed to update Cognito attributes', {
+          tenantId,
+          email,
+          username: passwordReset.existed ? passwordReset.username : email,
+          error,
+        });
+      });
       await sendInviteEmail(email, fullName, tempPwd);
       return true;
     }

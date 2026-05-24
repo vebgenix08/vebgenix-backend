@@ -218,7 +218,7 @@ export async function setTenantAdminTemporaryPassword(
   AdminSetUserPasswordCommand: CognitoCommandCtor,
   AdminGetUserCommand: CognitoCommandCtor,
   userPoolId: string,
-  email: string,
+  usernameOrEmail: string,
   tempPassword: string,
 ) {
   const apply = async (username: string) => cognito.send(new AdminSetUserPasswordCommand({
@@ -229,8 +229,8 @@ export async function setTenantAdminTemporaryPassword(
   }));
 
   try {
-    await apply(email);
-    return { username: email, existed: true };
+    await apply(usernameOrEmail);
+    return { username: usernameOrEmail, existed: true };
   } catch (error) {
     if (cognitoErrorName(error) !== 'UserNotFoundException') throw error;
   }
@@ -238,7 +238,7 @@ export async function setTenantAdminTemporaryPassword(
   try {
     const user = await cognito.send(new AdminGetUserCommand({
       UserPoolId: userPoolId,
-      Username: email,
+      Username: usernameOrEmail,
     }));
     const resolvedUsername = String(user?.Username ?? '').trim();
     if (resolvedUsername) {
@@ -249,5 +249,56 @@ export async function setTenantAdminTemporaryPassword(
     if (cognitoErrorName(error) !== 'UserNotFoundException') throw error;
   }
 
-  return { username: email, existed: false };
+  return { username: usernameOrEmail, existed: false };
+}
+
+export async function resolveTenantAdminUsername(
+  cognito: CognitoLikeClient,
+  AdminGetUserCommand: CognitoCommandCtor,
+  ListUsersCommand: CognitoCommandCtor,
+  userPoolId: string,
+  options: {
+    preferredUsername?: string;
+    email: string;
+  },
+) {
+  const candidates = [
+    String(options.preferredUsername ?? '').trim(),
+    String(options.email ?? '').trim(),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const user = await cognito.send(new AdminGetUserCommand({
+        UserPoolId: userPoolId,
+        Username: candidate,
+      }));
+      const resolvedUsername = String(user?.Username ?? candidate).trim();
+      if (resolvedUsername) {
+        return {
+          username: resolvedUsername,
+          source: candidate === options.preferredUsername ? 'preferred' : 'email',
+        };
+      }
+    } catch (error) {
+      if (cognitoErrorName(error) !== 'UserNotFoundException') throw error;
+    }
+  }
+
+  const email = String(options.email ?? '').trim();
+  if (!email) return null;
+
+  const listResponse = await cognito.send(new ListUsersCommand({
+    UserPoolId: userPoolId,
+    Filter: `email = "${email.replace(/(["\\])/g, '\\$1')}"`,
+    Limit: 1,
+  }));
+  const matchedUser = Array.isArray(listResponse?.Users) ? listResponse.Users[0] : null;
+  const resolvedUsername = String(matchedUser?.Username ?? '').trim();
+  if (!resolvedUsername) return null;
+
+  return {
+    username: resolvedUsername,
+    source: 'list-users',
+  };
 }
