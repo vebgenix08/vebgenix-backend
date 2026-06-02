@@ -7,7 +7,7 @@ import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
 import type { ResolveTenantId } from '../identity-utils';
 import { toGql } from '../identity-utils';
-import { cognitoUserExists, ensureInvitedStaffCognitoUser } from './invites';
+import { ensureInvitedStaffCognitoUser } from './invites';
 
 async function inviteStaff(ctx: AuthContext, input: {
   email: string;
@@ -96,10 +96,6 @@ async function inviteStaff(ctx: AuthContext, input: {
       isActive:       true,
     });
     profile = await IdentityRepo.updateProfile(tenantId, profile._id.toString(), { employeeId: employee._id } as never) ?? profile;
-  }
-
-  if (existing && !(await cognitoUserExists(userPoolId, input.email))) {
-    throw new AppError('INTERNAL', 'Staff invite could not be completed in Cognito');
   }
 
   await AuditLogger.logTenantAction({
