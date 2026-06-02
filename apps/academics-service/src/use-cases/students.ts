@@ -246,12 +246,31 @@ async function enrollStudent(ctx: AuthContext, input: EnrollStudentInput) {
 
 // ── toGqlStudent helper ───────────────────────────────────────────────────────
 
+function resolveStudentRegistrationNumber(student: Record<string, unknown>): string {
+  const candidates = [
+    student.registrationNumber,
+    student.admissionNo,
+    student.applicationNo,
+    student.admissionNumber,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+
+  return String(student.id ?? student._id ?? '');
+}
+
 function toGqlStudent(student: unknown) {
   if (!student) return student;
   const doc = (student as { toObject?: () => Record<string, unknown> }).toObject?.()
     ?? (student as Record<string, unknown>);
   const { _id, ...rest } = doc;
-  return { ...rest, id: String(doc.id ?? _id) };
+  return {
+    ...rest,
+    id: String(doc.id ?? _id),
+    registrationNumber: resolveStudentRegistrationNumber({ ...doc, _id }),
+  };
 }
 
 // ── handleStudents ────────────────────────────────────────────────────────────
