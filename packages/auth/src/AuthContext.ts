@@ -12,6 +12,7 @@ export interface AuthMembership {
   isAllCampuses: boolean;
   isPrimaryOwner: boolean;
   campusIds: string[];
+  personaRole?: string;
   roles: AuthRole[];
 }
 
@@ -21,6 +22,7 @@ export interface AuthContext {
   fullName: string;
   isPlatformAdmin: boolean;
   membership?: AuthMembership;
+  memberships?: AuthMembership[];
   permissions: Set<string>;
   allowedCampusIds: Set<string>;
 }

@@ -84,8 +84,6 @@ export { FeeAssignment } from './models/finance/FeeAssignment.model';
 export type { IFeeAssignment, FeeAssignmentStatus } from './models/finance/FeeAssignment.model';
 export { FeeSchedule } from './models/finance/FeeSchedule.model';
 export type { IFeeSchedule, IFeeScheduleSlot } from './models/finance/FeeSchedule.model';
-export { InstallmentPlan } from './models/finance/InstallmentPlan.model';
-export type { IInstallmentPlan } from './models/finance/InstallmentPlan.model';
 export { FeeRevision } from './models/finance/FeeRevision.model';
 export type { IFeeRevision } from './models/finance/FeeRevision.model';
 export { Invoice } from './models/finance/Invoice.model';
@@ -99,12 +97,6 @@ export type { IPaymentAllocation } from './models/finance/PaymentAllocation.mode
 export { StudentTransaction } from './models/finance/StudentTransaction.model';
 export type { IStudentTransaction, StudentTransactionType, StudentTransactionStatus } from './models/finance/StudentTransaction.model';
 export { default as StudentFeeOrder } from './models/finance/StudentFeeOrders.model';
-export { ManualStudentFeeAccount } from './models/finance/ManualStudentFeeAccount.model';
-export type { IManualStudentFeeAccount, ManualFeeAccountStatus } from './models/finance/ManualStudentFeeAccount.model';
-export { ManualFeeCollection } from './models/finance/ManualFeeCollection.model';
-export type { IManualFeeCollection, ManualReceiptStatus, ManualPaymentMode } from './models/finance/ManualFeeCollection.model';
-export { ManualFeeCollectionParticular } from './models/finance/ManualFeeCollectionParticular.model';
-export type { IManualFeeCollectionParticular } from './models/finance/ManualFeeCollectionParticular.model';
 
 // ── Models: Comms ─────────────────────────────────────────────────────────────
 export { Announcement } from './models/comms/Announcement.model';

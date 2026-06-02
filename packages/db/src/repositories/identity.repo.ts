@@ -55,6 +55,13 @@ export const IdentityRepo = {
     return Profile.find({ tenantId, ...filters }).sort({ createdAt: -1 });
   },
 
+  async listProfilesByAuthUserId(authUserId: string, filters: Record<string, unknown> = {}) {
+    return Profile.find({
+      authUserId: new Types.ObjectId(authUserId),
+      ...filters,
+    }).sort({ createdAt: -1 });
+  },
+
   async createProfile(data: Partial<IProfile>) {
     return Profile.create(data);
   },

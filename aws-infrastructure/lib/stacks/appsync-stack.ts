@@ -327,9 +327,6 @@ export class AppSyncStack extends cdk.Stack {
 
     // ── Finance resolvers ───────────────────────────────────────────────────
     const finance = R(financeDs);
-    // Fee Categories
-    finance('Query',    'listFeeCategories');
-    finance('Query',    'getFeeCategory');
     // Fee Heads, Structures, Schedules
     finance('Query',    'listFeeHeads');
     finance('Query',    'getFeeHead');
@@ -339,7 +336,6 @@ export class AppSyncStack extends cdk.Stack {
     finance('Query',    'getFeeAssignment');
     finance('Query',    'getStudentFeeAssignment');
     finance('Query',    'listFeeSchedules');
-    finance('Query',    'listInstallmentPlans');
     finance('Query',    'listFeeStructureClassMappings');
     finance('Query',    'getFeeStructureClassMapping');
     finance('Query',    'listStudentFeeOrders');
@@ -365,19 +361,6 @@ export class AppSyncStack extends cdk.Stack {
     finance('Query',    'getStudentDues');
     finance('Query',    'outstandingReport');
 
-    // Manual Fee Collection queries
-    finance('Query',    'generateManualAdmissionNo');
-    finance('Query',    'getManualFeeStructure');
-    finance('Query',    'listManualStudentFeeAccounts');
-    finance('Query',    'getManualStudentFeeAccount');
-    finance('Query',    'listManualFeeCollections');
-    finance('Query',    'getManualFeeCollection');
-    finance('Query',    'listManualFeeCollectionParticulars');
-
-    // Fee Category mutations
-    finance('Mutation', 'createFeeCategory');
-    finance('Mutation', 'updateFeeCategory');
-    finance('Mutation', 'deleteFeeCategory');
     // Fee Head mutations
     finance('Mutation', 'createFeeHead');
     finance('Mutation', 'updateFeeHead');
@@ -393,15 +376,12 @@ export class AppSyncStack extends cdk.Stack {
     finance('Mutation', 'copyFeePatternToNextYear');
     finance('Mutation', 'createFeeAssignment');
     finance('Mutation', 'bulkAssignFeeStructure');
-    finance('Mutation', 'createFeeSchedule');
-    finance('Mutation', 'updateFeeSchedule');
-    finance('Mutation', 'deleteFeeSchedule');
-    finance('Mutation', 'addScheduleSlot');
-    finance('Mutation', 'deleteScheduleSlot');
-    finance('Mutation', 'createInstallmentPlan');
-    finance('Mutation', 'updateInstallmentPlan');
-    finance('Mutation', 'deleteInstallmentPlan');
-    // Invoice mutations
+  finance('Mutation', 'createFeeSchedule');
+  finance('Mutation', 'updateFeeSchedule');
+  finance('Mutation', 'deleteFeeSchedule');
+  finance('Mutation', 'addScheduleSlot');
+  finance('Mutation', 'deleteScheduleSlot');
+  // Invoice mutations
     finance('Mutation', 'updateInvoice');
     finance('Mutation', 'cancelInvoice');
     finance('Mutation', 'reviseInvoice');
@@ -422,11 +402,6 @@ export class AppSyncStack extends cdk.Stack {
     finance('Mutation', 'applyFeeStructureRevision');
     finance('Mutation', 'transferStudentClass');
     finance('Mutation', 'createStudentTransaction');
-
-    // Manual Fee Collection mutations
-    finance('Mutation', 'createManualFeeCollection');
-    finance('Mutation', 'cancelManualFeeCollection');
-    finance('Mutation', 'linkManualFeeToStudent');
 
     // ── Academics resolvers ─────────────────────────────────────────────────
     const academics = R(academicsDs);

@@ -1,0 +1,11 @@
+[
+    "VebgenixOidc-dev",
+    "VebgenixFrontend-dev",
+    "VebgenixAppSync-dev",
+    "VebgenixMonitoring-dev",
+    "VebgenixAsync-dev",
+    "VebgenixNetwork-dev",
+    "VebgenixStorage-dev",
+    "VebgenixAuth-dev",
+    "CDKToolkit"
+]

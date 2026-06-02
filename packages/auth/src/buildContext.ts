@@ -41,11 +41,6 @@ export async function buildAuthContext(
     throw new AppError('UNAUTHORIZED', 'User account is deactivated');
   }
 
-  // The tenantId can come from:
-  //   1. Caller-supplied (e.g. x-tenant-id header)
-  //   2. custom:tenantId Cognito attribute (set when a user is assigned to a tenant)
-  const resolvedTenantId = tenantId ?? claims['custom:tenantId'];
-
   const ctx: AuthContext = {
     userId:           authUser._id.toString(),
     email:            authUser.email ?? '',
@@ -55,26 +50,44 @@ export async function buildAuthContext(
     allowedCampusIds: new Set<string>(),
   };
 
-  if (resolvedTenantId) {
-    const profile = await IdentityRepo.findProfileByAuthUserId(resolvedTenantId, authUser._id.toString());
-    if (profile && profile.isActive) {
+  const profiles = await IdentityRepo.listProfilesByAuthUserId(authUser._id.toString(), {
+    isActive: true,
+  });
+
+  ctx.memberships = profiles.map((profile) => ({
+    tenantId:       profile.tenantId,
+    profileId:      profile._id.toString(),
+    isAllCampuses:  profile.isAllCampuses,
+    isPrimaryOwner: profile.isPrimaryOwner,
+    campusIds:      profile.campusAccess.map((c) => c.campusId.toString()),
+    personaRole:    profile.personaRole,
+    roles:          profile.roles.map((r) => ({
+      roleId:      r.roleId,
+      roleName:    r.roleName,
+      permissions: r.permissions,
+    })),
+  }));
+
+  // The tenantId can come from:
+  //   1. Caller-supplied (e.g. x-tenant-id header)
+  //   2. custom:tenantId Cognito attribute
+  //   3. implicit single active membership for tenant users
+  const claimedTenantId = tenantId ?? claims['custom:tenantId'];
+  const resolvedMembership = claimedTenantId
+    ? ctx.memberships.find((membership) => membership.tenantId === claimedTenantId)
+    : ctx.memberships.length === 1
+      ? ctx.memberships[0]
+      : undefined;
+
+  if (resolvedMembership) {
+    const profile = profiles.find((item) => item.tenantId === resolvedMembership.tenantId);
+    if (profile) {
       ctx.fullName         = profile.fullName;
       const allPerms: string[] = [];
       for (const role of profile.roles) allPerms.push(...role.permissions);
       ctx.permissions      = new Set(allPerms);
       ctx.allowedCampusIds = new Set(profile.campusAccess.map(c => c.campusId.toString()));
-      ctx.membership = {
-        tenantId:       resolvedTenantId,
-        profileId:      profile._id.toString(),
-        isAllCampuses:  profile.isAllCampuses,
-        isPrimaryOwner: profile.isPrimaryOwner,
-        campusIds:      profile.campusAccess.map(c => c.campusId.toString()),
-        roles:          profile.roles.map(r => ({
-          roleId:      r.roleId,
-          roleName:    r.roleName,
-          permissions: r.permissions,
-        })),
-      };
+      ctx.membership = resolvedMembership;
     }
   }
 

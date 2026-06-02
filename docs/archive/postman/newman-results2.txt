@@ -1,0 +1,1515 @@
+Vebgenix API
+
+□ 🔐 Auth (Cognito)
+└ Get Token — User+Password
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [200 OK, 4.48kB, 1082ms]
+  √  Status 200
+  ┌
+  │ '✅ Tokens saved. IdToken prefix:', 'eyJraWQiOiJaZlJhVC
+  │ tYSzA4ZmRyR1Npb3hYREF2'
+  └
+
+└ Forgot Password — Send Code
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [200 OK, 299B, 307ms]
+  √  Status 200
+  √  Code delivery returned
+
+└ Confirm Forgot Password — Reset
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [400 Bad Request, 1.07kB, 130ms]
+  1. Status 200
+
+└ Change Password — Logged In
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [400 Bad Request, 876B, 143ms]
+  2. Status 200
+
+└ Refresh Token
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [200 OK, 2.68kB, 378ms]
+  √  Status 200
+  ┌
+  │ '✅ Tokens refreshed.'
+  └
+
+□ ⚙️ Settings
+└ Create Academic Year
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 719B, 3s]
+  √  Status 200
+  ┌
+  │ 'Academic year already exists, fetching existing...'
+  └
+  √  createAcademicYear or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 795B, 805ms]
+  ┌
+  │ 'academic_year_id (from list):', '69fb5e883633f68d4d31
+  │ a50f', '2027-28'
+  └
+
+└ Set Active Academic Year
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 577B, 325ms]
+  √  Status 200
+  √  setActiveAcademicYear exists
+  √  isActive is true
+
+└ List Academic Years
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.1kB, 231ms]
+  √  Status 200
+  √  listAcademicYears exists
+  √  listAcademicYears is array
+  ┌
+  │ 'academic_year_id (from list):', '69fb5e883633f68d4d31
+  │ a50f', '2027-28'
+  └
+
+└ Create Campus
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 726B, 277ms]
+  √  Status 200
+  ┌
+  │ 'Campus already exists, fetching existing...'
+  └
+  √  createCampus or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 606B, 185ms]
+  ┌
+  │ 'campus_id (from list):', '69f9c29a690fae033907970c', 
+  │ 'Main Campus'
+  └
+
+└ List Campuses
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 622B, 188ms]
+  √  Status 200
+  √  listCampuses exists
+  √  listCampuses is array
+
+└ Create Program
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 869B, 234ms]
+  √  Status 200
+  √  createProgram exists
+  ┌
+  │ 'program_id:', '69fe45fd979b9ec0147004bb'
+  └
+  √  Has id
+
+└ List Programs
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 833B, 316ms]
+  √  Status 200
+  √  listPrograms exists
+  √  listPrograms is array
+
+└ Get Program
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 830B, 233ms]
+  √  Status 200
+  √  getProgram exists
+  ┌
+  │ 'Program:', 'School Program', '| code:', 'SCH'
+  └
+
+└ Update Program
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 832B, 167ms]
+  √  Status 200
+  √  No errors
+  ┌
+  │ 'Updated program:', 'School Program', '| durationYears
+  │ :', 13
+  └
+
+└ Delete Program
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 524B, 217ms]
+  √  Status 200
+  √  deleteProgram returned boolean
+
+└ Dashboard Overview
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 646B, 262ms]
+  √  Status 200
+  √  dashboardOverview exists
+
+└ Get Tenant Features
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 978B, 193ms]
+  √  Status 200
+  √  getTenantFeatures exists
+
+└ Update Tenant Features
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 981B, 243ms]
+  √  Status 200
+  √  No errors
+
+└ List Audit Logs
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 10.34kB, 292ms]
+  √  Status 200
+  √  listAuditLogs exists
+
+└ List Templates
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 522B, 250ms]
+  √  Status 200
+  √  listTemplates exists
+  ┌
+  │ 'Templates count:', 0
+  └
+
+□ 👤 Identity
+└ Me (current user)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 3.73kB, 2.8s]
+  √  Status 200
+  √  me exists
+  ┌
+  │ 'me id:', '69f9c29a690fae0339079710', 'email:', 'dhanu
+  │ shags08@gmail.com', 'tenantId:', 'org_vqr1dsp1'
+  └
+
+└ List Users
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 706B, 959ms]
+  √  Status 200
+  √  listUsers exists
+  ┌
+  │ 'Users count:', 1
+  └
+
+└ Invite Staff / Onboard Staff
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 707B, 406ms]
+  √  Status 200
+  ┌
+  │ 'Errors:', '[{"path":["inviteStaff"],"data":null,"erro
+  │ rType":"Lambda:Unhandled","errorInfo":null,"locations"
+  │ :[{"line":1,"column":51,"sourceName":null}],"message":
+  │ "campusId or campusIds[0] is required"}]'
+  └
+  √  inviteStaff or already exists
+
+└ List Staff
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 520B, 296ms]
+  √  Status 200
+  √  listStaff exists
+
+└ List Employees
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 465B, 222ms]
+  √  Status 200
+  √  listEmployees exists
+
+└ Get Employee
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 649B, 463ms]
+  √  Status 200
+  3. getEmployee exists
+
+└ Resend Staff Invite
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 710B, 245ms]
+  √  Status 200
+  4. resendInvite returned boolean
+
+└ Accept Invite
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 722B, 189ms]
+  √  Status 200
+  5. acceptInvite exists
+  6. acceptInvite succeeds
+
+└ List Roles
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 700B, 102ms]
+  √  Status 200
+  7. listRoles exists
+  8. listRoles is array
+
+□ 🎓 Admissions / Enquiries
+└ Create Enquiry
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 942B, 3.2s]
+  √  Status 200
+  √  createEnquiry exists
+  ┌
+  │ 'enquiry_id:', '69fe460b23dd87ca151fcac0'
+  └
+
+└ List Enquiries
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 3.21kB, 523ms]
+  √  Status 200
+  √  listEnquiries exists
+
+└ Get Enquiry
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 938B, 256ms]
+  √  Status 200
+  √  getEnquiry exists
+
+└ Update Enquiry
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 941B, 293ms]
+  √  Status 200
+  √  No errors
+
+└ Duplicate Check
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 525B, 177ms]
+  √  Status 200
+  √  checkDuplicate exists
+
+└ Admissions Stats
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 584B, 202ms]
+  √  Status 200
+  √  admissionsStats exists
+
+└ Delete Enquiry
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 465B, 186ms]
+  √  Status 200
+  √  No crash
+
+□ 🎓 Admissions / Applications
+└ Create Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 797B, 319ms]
+  √  Status 200
+  9. createApplication exists
+
+└ List Applications
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 7.58kB, 285ms]
+  √  Status 200
+  √  listApplications exists
+
+└ Get Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.59kB, 267ms]
+  √  Status 200
+  √  getApplication exists
+
+└ Get Approval Queue
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 527B, 184ms]
+  √  Status 200
+  √  getApprovalQueue exists
+
+└ Submit Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 736B, 232ms]
+  √  Status 200
+ 10. No errors
+
+└ Review Application (mark Under Review)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 739B, 183ms]
+  √  Status 200
+ 11. No errors
+
+└ Get Application Reviews
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 659B, 254ms]
+  √  Status 200
+  √  getApplicationReviews exists
+
+└ Approve Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.59kB, 286ms]
+  √  Status 200
+  √  No errors
+
+└ Reject Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 693B, 176ms]
+  √  Status 200
+  √  No crash
+
+└ Verify Document
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 753B, 321ms]
+  √  Status 200
+  √  No crash
+
+└ Withdraw Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.59kB, 257ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Categories
+└ Create Fee Category
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 744B, 2.8s]
+  √  Status 200
+  ┌
+  │ 'Fee category already exists, fetching existing...'
+  └
+  √  createFeeCategory or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 528B, 842ms]
+
+└ Get Fee Category
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 707B, 410ms]
+  √  Status 200
+ 12. getFeeCategory exists
+
+└ Update Fee Category
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 713B, 247ms]
+  √  Status 200
+ 13. No errors
+
+└ List Fee Categories
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 528B, 180ms]
+  √  Status 200
+  √  listFeeCategories exists
+
+└ Delete Fee Category
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 713B, 219ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Heads
+└ Create Fee Head
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 716B, 217ms]
+  √  Status 200
+ 14. createFeeHead exists
+  ┌
+  │ 'No createFeeHead in response:', '{"data":{"createFeeH
+  │ ead":null},"errors":[{"path":["createFeeHead"],"data":
+  │ null,"errorType":"Lambda:Unhandled","errorInfo":null,"
+  │ locations":[{"line":1,"column":44,"sourceName":null}],
+  │ "message":"feeCategoryId is required"}]}'
+  └
+
+└ Update Fee Head
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 705B, 302ms]
+  √  Status 200
+ 15. No errors
+
+└ List Fee Heads
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 523B, 234ms]
+  √  Status 200
+  √  listFeeHeads exists
+
+└ Delete Fee Head
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 646B, 206ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Schedules
+└ Create Fee Schedule
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 661B, 463ms]
+  √  Status 200
+ 16. createFeeSchedule exists
+  ┌
+  │ 'No createFeeSchedule in response:', '{"data":{"create
+  │ FeeSchedule":null},"errors":[{"path":["createFeeSchedu
+  │ le"],"data":null,"errorType":"Lambda:Unhandled","error
+  │ Info":null,"locations":[{"line":1,"column":48,"sourceN
+  │ ame":null}],"message":"Internal server error"}]}'
+  └
+
+└ Update Fee Schedule
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 713B, 187ms]
+  √  Status 200
+ 17. No errors
+
+└ List Fee Schedules
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 3.73kB, 201ms]
+  √  Status 200
+  √  listFeeSchedules exists
+
+└ Delete Fee Schedule
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 713B, 297ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Structures
+└ Create Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 667B, 191ms]
+  √  Status 200
+ 18. createFeeStructure exists
+  ┌
+  │ 'No createFeeStructure in response:', '{"data":{"creat
+  │ eFeeStructure":null},"errors":[{"path":["createFeeStru
+  │ cture"],"data":null,"errorType":"Lambda:Unhandled","er
+  │ rorInfo":null,"locations":[{"line":1,"column":49,"sour
+  │ ceName":null}],"message":"feeCategoryId is required"}]
+  │ }'
+  └
+
+└ Get Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 716B, 210ms]
+  √  Status 200
+ 19. getFeeStructure exists
+
+└ Update Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 715B, 176ms]
+  √  Status 200
+ 20. No errors
+
+└ List Fee Structures
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 469B, 205ms]
+  √  Status 200
+  √  listFeeStructures exists
+
+└ Copy Fee Pattern to Next Year
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 585B, 260ms]
+  √  Status 200
+  √  No crash
+
+└ Delete Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 722B, 392ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Assignments
+└ Get Fee Assignment Queue
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 2.85kB, 182ms]
+  √  Status 200
+  √  getFeeAssignmentQueue exists
+  ┌
+  │ 'Unassigned students count:', 12
+  └
+
+└ Assign Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 724B, 121ms]
+  √  Status 200
+ 21. createFeeAssignment exists
+  ┌
+  │ 'No createFeeAssignment in response:', '{"data":{"crea
+  │ teFeeAssignment":null},"errors":[{"path":["createFeeAs
+  │ signment"],"data":null,"errorType":"Lambda:Unhandled",
+  │ "errorInfo":null,"locations":[{"line":1,"column":50,"s
+  │ ourceName":null}],"message":"Internal server error"}]}
+  │ '
+  └
+
+└ Get Student Fee Assignment
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 475B, 293ms]
+  √  Status 200
+  √  getStudentFeeAssignment exists
+
+└ Bulk Assign Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 573B, 162ms]
+  √  Status 200
+  √  bulkAssignFeeStructure exists
+  ┌
+  │ 'Bulk assign — succeeded:', 0, 'failed:', 1, 'total:',
+  │  1
+  └
+
+└ List Fee Assignments
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 470B, 200ms]
+  √  Status 200
+  √  listFeeAssignments exists
+
+└ Get Fee Assignment
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 718B, 246ms]
+  √  Status 200
+ 22. getFeeAssignment exists
+
+□ 💰 Finance / Invoices
+└ Get Student Invoices
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 662B, 169ms]
+  √  Status 200
+  √  getStudentInvoices exists
+ 23. Returns array
+
+└ List Invoices
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 6.56kB, 186ms]
+  √  Status 200
+  √  listInvoices exists
+
+└ Get Invoice
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.88kB, 179ms]
+  √  Status 200
+  √  getInvoice exists
+
+└ Student Dues
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 654B, 166ms]
+  √  Status 200
+  √  getStudentDues exists
+
+└ Create One-off Charge
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 663B, 191ms]
+  √  Status 200
+  √  createOneOffCharge exists
+
+└ Revise Invoice
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.82kB, 223ms]
+  √  Status 200
+  √  No crash
+
+└ Cancel Invoice
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.82kB, 342ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Payments
+└ Record Payment (Cash / Cheque / UPI)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 652B, 132ms]
+  √  Status 200
+ 24. recordPayment exists
+ 25. Has payment
+
+└ Record Payment — Manual Allocation
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 711B, 205ms]
+  √  Status 200
+ 26. No errors
+
+└ Collect Payment By Student
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 732B, 195ms]
+  √  Status 200
+  √  collectPaymentByStudent exists
+
+└ List Payments
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 7.28kB, 239ms]
+  √  Status 200
+  √  listPayments exists
+
+└ Get Payment
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 706B, 218ms]
+  √  Status 200
+ 27. getPayment exists
+
+└ List Receipts
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 6.73kB, 295ms]
+  √  Status 200
+  √  listReceipts exists
+  ┌
+  │ 'receipt_id:', '69fae2b852a604ab48e898d3'
+  └
+
+└ Get Receipt
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.14kB, 185ms]
+  √  Status 200
+  √  getReceipt exists
+
+└ Create Razorpay Order
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 722B, 438ms]
+  √  Status 200
+  √  createPaymentOrder exists
+  ┌
+  │ 'Order error:', 'Internal server error'
+  └
+
+└ Verify Razorpay Signature
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 675B, 190ms]
+  √  Status 200
+  √  No crash
+  ┌
+  │ 'Response:', '{"data":{"verifyPaymentSignature":null},
+  │ "errors":[{"path":["verifyPaymentSignature"],"data":nu
+  │ ll,"errorType":"Lambda:Unhandled","errorInfo":null,"lo
+  │ cations":[{"line":1,"column":53,"sourceName":null}],'
+  └
+
+└ List Fee Revisions (by invoice)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 467B, 162ms]
+  √  Status 200
+  √  getFeeRevisions exists
+
+□ 💰 Finance / Reports
+└ Day Book Report
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 631B, 232ms]
+  √  Status 200
+  √  dayBookReport exists
+
+└ Fee Collection Analytics
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 847B, 215ms]
+  √  Status 200
+  √  feeCollectionAnalytics exists
+
+□ 📚 Academics / Classes
+└ Create Class
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 741B, 2.8s]
+  √  Status 200
+  ┌
+  │ 'Class already exists, fetching existing...'
+  └
+  √  createClass or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 3.7kB, 820ms]
+  ┌
+  │ 'class_id (from list):', '69fa25e7fc42e073eb5607f0', '
+  │ API Numbering SW40KD'
+  └
+
+└ List Classes
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 3.7kB, 304ms]
+  √  Status 200
+  √  listClasses exists
+  ┌
+  │ 'Classes count:', 12
+  └
+
+└ Create Section
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 844B, 200ms]
+  √  Status 200
+  ┌
+  │ 'section_id (created):', '69fe462f397957680cac7c27'
+  └
+  √  createSection or existing
+
+└ List Sections
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 907B, 238ms]
+  √  Status 200
+  √  listAllSections exists
+
+□ 📚 Academics / Subjects & Timetable Builder
+└ Create Subject
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 687B, 267ms]
+  √  Status 200
+  ┌
+  │ 'Subject already exists, fetching existing...'
+  └
+  √  createSubject or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.07kB, 129ms]
+  ┌
+  │ 'subject_id (from list):', '69fe3872ea526ebb5edfba57',
+  │  'Mathematics'
+  └
+
+└ List Subjects
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.07kB, 165ms]
+  √  Status 200
+  √  listSubjects exists
+
+└ Replace Section Timetable
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 895B, 225ms]
+  √  Status 200
+  √  replaceSectionTimetable exists
+
+└ Get Section Timetable
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 813B, 178ms]
+  √  Status 200
+  √  getSectionTimetable exists
+
+└ Get Teacher Timetable
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 933B, 220ms]
+  √  Status 200
+  √  getTeacherTimetable exists
+
+□ 📚 Academics / Students
+└ Enroll Student
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 765B, 291ms]
+  √  Status 200
+ 28. enrollStudent exists
+ 29. Has student result
+
+└ Get Student
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 663B, 326ms]
+  √  Status 200
+ 30. getStudent exists
+
+└ Update Student
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 669B, 202ms]
+  √  Status 200
+ 31. No errors
+
+└ Assign Student to Class
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 738B, 227ms]
+  √  Status 200
+ 32. No errors
+
+└ Update Student Status
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 681B, 143ms]
+  √  Status 200
+ 33. No errors
+
+└ List Students
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 2.42kB, 168ms]
+  √  Status 200
+  √  listStudents exists
+  ┌
+  │ 'Students count:', 12
+  └
+
+□ 📚 Academics / Registration Numbers
+└ Generate Registration Numbers
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 702B, 212ms]
+  √  Status 200
+  √  generateRegistrationNumbers exists
+
+└ Freeze Registration Numbers
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 710B, 165ms]
+  √  Status 200
+ 34. No errors
+
+└ List Registration Batches
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.41kB, 133ms]
+  √  Status 200
+  √  listRegistrationBatches exists
+  ┌
+  │ 'Registration batches:', 2
+  └
+
+□ 📚 Academics / Roll Numbers
+└ Generate Roll Numbers — Alphabetical
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 688B, 231ms]
+  √  Status 200
+  √  generateRollNumbers exists
+
+└ Generate Roll Numbers — Sequential
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 688B, 263ms]
+  √  Status 200
+  √  generateRollNumbers exists
+
+└ Freeze Roll Numbers
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 686B, 187ms]
+  √  Status 200
+ 35. No errors
+
+└ List Roll Number Batches
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 943B, 185ms]
+  √  Status 200
+  √  listRollNoBatches exists
+  ┌
+  │ 'Roll number batches:', 1
+  └
+
+□ 📚 Academics / Attendance
+└ Mark Section Attendance
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 659B, 191ms]
+  √  Status 200
+ 36. markSectionAttendance exists
+  ┌
+  │ 'Errors:', '[{"path":["markSectionAttendance"],"data":
+  │ null,"errorType":"Lambda:Unhandled","errorInfo":null,"
+  │ locations":[{"line":1,"column":64,"sourceName":null}],
+  │ "message":"Unexpected error in academics-service"}]'
+  └
+
+└ Get Section Attendance (by date)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 470B, 188ms]
+  √  Status 200
+  √  getSectionAttendance exists
+  ┌
+  │ 'Records:', 0
+  └
+
+└ Get Attendance Summary (date range)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 629B, 185ms]
+  √  Status 200
+  √  getSectionAttendanceSummary exists
+  ┌
+  │ 'Summary — totalDays:', 214, '| from:', '2025-06-01', 
+  │ '| to:', '2025-12-31'
+  └
+
+└ Get Student Attendance (date range)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 658B, 137ms]
+  √  Status 200
+ 37. getStudentAttendance exists
+
+□ 📚 Academics / Exams & Results
+└ Create Exam
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 998B, 221ms]
+  √  Status 200
+  √  createExam exists
+  ┌
+  │ 'exam_id:', '69fe4639397957680cac7cbf'
+  └
+  √  Has id
+
+└ List Exams
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 940B, 222ms]
+  √  Status 200
+  √  listExams exists
+
+└ Get Exam
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 936B, 203ms]
+  √  Status 200
+  √  getExam exists
+
+└ Enter Marks (single student)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 996B, 204ms]
+  √  Status 200
+  √  enterMarks response exists
+
+└ Get Exam Stats
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 587B, 220ms]
+  √  Status 200
+  √  getExamStats exists
+  ┌
+  │ 'Exam stats — avg:', 0, '| highest:', 0, '| pass:', 0,
+  │  '| fail:', 0
+  └
+
+└ Get Marks Status
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 638B, 225ms]
+  √  Status 200
+  √  getMarksStatus exists
+  ┌
+  │ 'Total entries:', 1, '| Submitted:', 0
+  └
+
+└ Get Exam Results
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1kB, 236ms]
+  √  Status 200
+  √  getExamResults exists
+
+└ Publish Results
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 466B, 266ms]
+  √  Status 200
+  √  No crash
+
+└ List Results (published)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 463B, 261ms]
+  √  Status 200
+  √  listResults exists
+
+└ Update Exam
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.07kB, 144ms]
+  √  Status 200
+  √  No errors
+
+└ Delete Exam
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 614B, 188ms]
+  √  Status 200
+  √  No crash
+
+□ 📚 Academics / Promotions
+└ Set Promotion Eligibility
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 703B, 167ms]
+  √  Status 200
+  √  setStudentPromotionEligibility exists
+
+└ Auto-Evaluate Promotion Eligibility
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 691B, 96ms]
+  √  Status 200
+  √  autoEvaluatePromotionEligibility response exists
+  ┌
+  │ 'Not deployed yet:', "Validation error of type FieldUn
+  │ defined: Field 'autoEvaluatePromotionEligibility' in t
+  │ ype 'Mutation' is undefined @ 'autoEvaluatePromotionEl
+  │ igibility'"
+  └
+
+└ Promote Students — SAME_SECTION / Skip fee
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 190ms]
+  √  Status 200
+ 38. promoteStudents (SAME_SECTION) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ Unexpected error in academics-service'
+  └
+
+└ Promote Students — MANUAL sections / Copy fee pattern
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 758B, 171ms]
+  √  Status 200
+ 39. promoteStudents (MANUAL) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ sectionAssignments is required for MANUAL/EXCEL_IMPORT
+  │  strategy'
+  └
+
+└ Promote Students — AUTO_SHUFFLE / Assign existing fee
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 723B, 172ms]
+  √  Status 200
+ 40. promoteStudents (AUTO_SHUFFLE) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ studentIds must not be empty'
+  └
+
+└ Promote Students — GENDER_BALANCE
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 664B, 181ms]
+  √  Status 200
+ 41. promoteStudents (GENDER_BALANCE) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ studentIds must not be empty'
+  └
+
+└ Promote Students — CAPACITY_LIMIT
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 723B, 342ms]
+  √  Status 200
+ 42. promoteStudents (CAPACITY_LIMIT) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ studentIds must not be empty'
+  └
+
+└ Promote Students — PERFORMANCE_RANK (by exam scores)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 664B, 179ms]
+  √  Status 200
+ 43. promoteStudents (PERFORMANCE_RANK) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ studentIds must not be empty'
+  └
+
+└ Promote Students — SUBJECT_GROUP
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 723B, 178ms]
+  √  Status 200
+ 44. promoteStudents (SUBJECT_GROUP) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ studentIds must not be empty'
+  └
+
+└ Promote Students — TRANSPORT_ROUTE
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 664B, 127ms]
+  √  Status 200
+ 45. promoteStudents (TRANSPORT_ROUTE) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ studentIds must not be empty'
+  └
+
+└ Promote Students — EXCEL_IMPORT (pre-uploaded file)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 723B, 213ms]
+  √  Status 200
+ 46. promoteStudents (EXCEL_IMPORT) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ studentIds must not be empty'
+  └
+
+└ List Promotion Batches
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 472B, 123ms]
+  √  Status 200
+  √  listPromotionBatches exists
+
+└ Get Promotion Batch
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 654B, 227ms]
+  √  Status 200
+ 47. getPromotionBatch exists
+
+└ List Promotion Batch Items
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 724B, 209ms]
+  √  Status 200
+  √  listPromotionBatchItems exists
+
+└ Rollback Promotion Batch
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 671B, 107ms]
+  √  Status 200
+  √  No crash
+  ┌
+  │ 'Rollback result:', `[{"path":null,"locations":[{"line
+  │ ":1,"column":45,"sourceName":null}],"message":"Validat
+  │ ion error of type FieldUndefined: Field 'rollbackPromo
+  │ tionBatch' in type 'Mutation' is undefined @ 'rollback
+  │ Promo`
+  └
+
+□ 📢 Comms
+└ Create Announcement
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 830B, 2.8s]
+  √  Status 200
+  √  createAnnouncement exists
+
+└ List Announcements
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 8.82kB, 867ms]
+  √  Status 200
+  √  listAnnouncements exists
+
+└ List Events
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 462B, 296ms]
+  √  Status 200
+  √  listEvents exists
+
+└ List Leave Requests
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 469B, 146ms]
+  √  Status 200
+  √  listLeaveRequests exists
+
+□ 📁 Storage
+└ Get Upload URL
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 2.3kB, 2.6s]
+  √  Status 200
+  √  generateUploadUrl exists
+  ┌
+  │ 'Upload URL ready:', 'https://vebgenix-documents-dev-2
+  │ 78035644568.s3.ap-south-1.amazonaws.com/org_vqr1'
+  └
+
+└ Get Download URL
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 674B, 885ms]
+  √  Status 200
+  √  generateDownloadUrl exists
+
+□ 📊 Results
+└ Create Result Batch
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 661B, 2.4s]
+  √  Status 200
+  √  createResultBatch exists
+
+└ List Result Batches
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 469B, 993ms]
+  √  Status 200
+  √  listResultBatches exists
+
+└ Get Public Result (no auth)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 640B, 152ms]
+ 48. Status 200
+  √  No crash
+
+□ 🔍 Audit & Cleanup
+└ List Audit Logs
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 10.28kB, 727ms]
+  √  Status 200
+  √  listAuditLogs exists
+
+└ Duplicate Student Report
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 957B, 2.9s]
+  √  Status 200
+  √  getDuplicateStudentReport exists
+
+└ Merge Students
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 577B, 587ms]
+  √  Status 200
+  √  No crash
+
+□ ❤️ Health
+└ Health Check
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 149ms]
+ 49. Status 200
+
+□ 🛡️ Platform Admin
+└ Get Platform Token
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [400 Bad Request, 291B, 302ms]
+ 50. Status 200
+
+└ List Tenants
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 640B, 149ms]
+ 51. Status 200
+  √  listTenants response
+
+└ Get Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 98ms]
+ 52. Status 200
+  √  getTenant response
+
+└ Create Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 640B, 147ms]
+ 53. Status 200
+  √  createTenant response
+
+└ Update Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 136ms]
+ 54. Status 200
+  √  No crash
+
+└ Suspend Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 97ms]
+ 55. Status 200
+  √  No crash
+
+└ Reactivate Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 143ms]
+ 56. Status 200
+  √  No crash
+
+└ Provision Tenant + Campus + Admin
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 640B, 149ms]
+ 57. Status 200
+  √  provisionTenant response
+
+└ List All Users (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 143ms]
+ 58. Status 200
+  √  listAllUsers response
+
+└ Get User (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 112ms]
+ 59. Status 200
+  √  getUser response
+
+└ Disable User (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 640B, 95ms]
+ 60. Status 200
+  √  No crash
+
+└ Enable User (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 640B, 120ms]
+ 61. Status 200
+  √  No crash
+
+└ Delete User (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 102ms]
+ 62. Status 200
+  √  No crash
+
+└ List Feature Flags
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 151ms]
+ 63. Status 200
+  √  listFeatureFlags response
+
+└ Set Feature Flag
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 139ms]
+ 64. Status 200
+  √  No crash
+
+└ Platform Overview (Super Admin Dashboard)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 102ms]
+ 65. Status 200
+  √  platformOverview response
+
+└ Platform Audit Logs
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 98ms]
+ 66. Status 200
+  √  platformAuditLogs response
+
+└ Get Tenant Usage Stats
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 640B, 102ms]
+ 67. Status 200
+  √  No crash
+
+└ Request Tenant Deletion (sends OTP)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 103ms]
+ 68. Status 200
+  √  No crash
+  ┌
+  │ 'Check email for deletion OTP, then set deletion_otp e
+  │ nv var'
+  └
+
+└ Confirm Tenant Deletion (with OTP)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 640B, 144ms]
+ 69. Status 200
+  √  No crash
+  ┌
+  │ 'Deletion result:', '[{"errorType":"UnauthorizedExcept
+  │ ion","message":"Valid authorization header not provide
+  │ d."}]'
+  └
+
+┌─────────────────────────┬────────────────────┬───────────────────┐
+│                         │           executed │            failed │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│              iterations │                  1 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│                requests │                181 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│            test-scripts │                176 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│      prerequest-scripts │                  0 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│              assertions │                366 │                69 │
+├─────────────────────────┴────────────────────┴───────────────────┤
+│ total run duration: 1m 45.3s                                     │
+├──────────────────────────────────────────────────────────────────┤
+│ total data received: 125.89kB (approx)                           │
+├──────────────────────────────────────────────────────────────────┤
+│ average response time: 381ms [min: 95ms, max: 3.2s, s.d.: 593ms] │
+└──────────────────────────────────────────────────────────────────┘
+
+[31m   # [39m[31m failure        [39m[31m detail                                                                                     [39m
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 01.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 400                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🔐 Auth (Cognito) / Confirm Forgot Password — Reset"                               
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 02.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 400                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🔐 Auth (Cognito) / Change Password — Logged In"                                   
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 03.  AssertionError  getEmployee exists                                                                         
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "👤 Identity / Get Employee"                                                        
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 04.  AssertionError  resendInvite returned boolean                                                              
+                      expected null to be a boolean                                                              
+                      at assertion:1 in test-script                                                              
+                      inside "👤 Identity / Resend Staff Invite"                                                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 05.  AssertionError  acceptInvite exists                                                                        
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "👤 Identity / Accept Invite"                                                       
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 06.  AssertionError  acceptInvite succeeds                                                                      
+                      expected null to be true                                                                   
+                      at assertion:2 in test-script                                                              
+                      inside "👤 Identity / Accept Invite"                                                       
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 07.  AssertionError  listRoles exists                                                                           
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "👤 Identity / List Roles"                                                          
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 08.  AssertionError  listRoles is array                                                                         
+                      expected null to be an array                                                               
+                      at assertion:2 in test-script                                                              
+                      inside "👤 Identity / List Roles"                                                          
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 09.  AssertionError  createApplication exists                                                                   
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "🎓 Admissions / Applications / Create Application"                                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 10.  AssertionError  No errors                                                                                  
+                      expected [ { …(6) } ] to be undefined                                                      
+                      at assertion:1 in test-script                                                              
+                      inside "🎓 Admissions / Applications / Submit Application"                                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 11.  AssertionError  No errors                                                                                  
+                      expected [ { …(6) } ] to be undefined                                                      
+                      at assertion:1 in test-script                                                              
+                      inside "🎓 Admissions / Applications / Review Application (mark Under Review)"             
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 12.  AssertionError  getFeeCategory exists                                                                      
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Categories / Get Fee Category"                                    
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 13.  AssertionError  No errors                                                                                  
+                      expected [ { …(6) } ] to be undefined                                                      
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Categories / Update Fee Category"                                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 14.  AssertionError  createFeeHead exists                                                                       
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Heads / Create Fee Head"                                          
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 15.  AssertionError  No errors                                                                                  
+                      expected [ { path: [ 'updateFeeHead' ], …(5) } ] to be undefined                           
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Heads / Update Fee Head"                                          
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 16.  AssertionError  createFeeSchedule exists                                                                   
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Schedules / Create Fee Schedule"                                  
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 17.  AssertionError  No errors                                                                                  
+                      expected [ { …(6) } ] to be undefined                                                      
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Schedules / Update Fee Schedule"                                  
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 18.  AssertionError  createFeeStructure exists                                                                  
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Structures / Create Fee Structure"                                
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 19.  AssertionError  getFeeStructure exists                                                                     
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Structures / Get Fee Structure"                                   
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 20.  AssertionError  No errors                                                                                  
+                      expected [ { …(6) } ] to be undefined                                                      
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Structures / Update Fee Structure"                                
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 21.  AssertionError  createFeeAssignment exists                                                                 
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Assignments / Assign Fee Structure"                               
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 22.  AssertionError  getFeeAssignment exists                                                                    
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Fee Assignments / Get Fee Assignment"                                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 23.  AssertionError  Returns array                                                                              
+                      expected null to be an array                                                               
+                      at assertion:2 in test-script                                                              
+                      inside "💰 Finance / Invoices / Get Student Invoices"                                      
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 24.  AssertionError  recordPayment exists                                                                       
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Payments / Record Payment (Cash / Cheque / UPI)"                      
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 25.  AssertionError  Has payment                                                                                
+                      expected null to exist                                                                     
+                      at assertion:2 in test-script                                                              
+                      inside "💰 Finance / Payments / Record Payment (Cash / Cheque / UPI)"                      
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 26.  AssertionError  No errors                                                                                  
+                      expected [ { path: [ 'recordPayment' ], …(5) } ] to be undefined                           
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Payments / Record Payment — Manual Allocation"                        
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 27.  AssertionError  getPayment exists                                                                          
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "💰 Finance / Payments / Get Payment"                                               
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 28.  AssertionError  enrollStudent exists                                                                       
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Students / Enroll Student"                                          
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 29.  AssertionError  Has student result                                                                         
+                      expected null to exist                                                                     
+                      at assertion:2 in test-script                                                              
+                      inside "📚 Academics / Students / Enroll Student"                                          
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 30.  AssertionError  getStudent exists                                                                          
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Students / Get Student"                                             
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 31.  AssertionError  No errors                                                                                  
+                      expected [ { path: [ 'updateStudent' ], …(5) } ] to be undefined                           
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Students / Update Student"                                          
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 32.  AssertionError  No errors                                                                                  
+                      expected [ { …(6) } ] to be undefined                                                      
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Students / Assign Student to Class"                                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 33.  AssertionError  No errors                                                                                  
+                      expected [ { …(6) } ] to be undefined                                                      
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Students / Update Student Status"                                   
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 34.  AssertionError  No errors                                                                                  
+                      expected [ { …(6) } ] to be undefined                                                      
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Registration Numbers / Freeze Registration Numbers"                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 35.  AssertionError  No errors                                                                                  
+                      expected [ { …(6) } ] to be undefined                                                      
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Roll Numbers / Freeze Roll Numbers"                                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 36.  AssertionError  markSectionAttendance exists                                                               
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Attendance / Mark Section Attendance"                               
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 37.  AssertionError  getStudentAttendance exists                                                                
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Attendance / Get Student Attendance (date range)"                   
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 38.  AssertionError  promoteStudents (SAME_SECTION) exists                                                      
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Promote Students — SAME_SECTION / Skip fee"            
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 39.  AssertionError  promoteStudents (MANUAL) exists                                                            
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Promote Students — MANUAL sections / Copy fee pattern" 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 40.  AssertionError  promoteStudents (AUTO_SHUFFLE) exists                                                      
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Promote Students — AUTO_SHUFFLE / Assign existing fee" 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 41.  AssertionError  promoteStudents (GENDER_BALANCE) exists                                                    
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Promote Students — GENDER_BALANCE"                     
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 42.  AssertionError  promoteStudents (CAPACITY_LIMIT) exists                                                    
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Promote Students — CAPACITY_LIMIT"                     
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 43.  AssertionError  promoteStudents (PERFORMANCE_RANK) exists                                                  
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Promote Students — PERFORMANCE_RANK (by exam scores)"  
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 44.  AssertionError  promoteStudents (SUBJECT_GROUP) exists                                                     
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Promote Students — SUBJECT_GROUP"                      
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 45.  AssertionError  promoteStudents (TRANSPORT_ROUTE) exists                                                   
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Promote Students — TRANSPORT_ROUTE"                    
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 46.  AssertionError  promoteStudents (EXCEL_IMPORT) exists                                                      
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Promote Students — EXCEL_IMPORT (pre-uploaded file)"   
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 47.  AssertionError  getPromotionBatch exists                                                                   
+                      expected null to exist                                                                     
+                      at assertion:1 in test-script                                                              
+                      inside "📚 Academics / Promotions / Get Promotion Batch"                                   
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 48.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "📊 Results / Get Public Result (no auth)"                                          
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 49.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "❤️ Health / Health Check"                                                          
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 50.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 400                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Get Platform Token"                                            
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 51.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / List Tenants"                                                  
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 52.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Get Tenant"                                                    
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 53.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Create Tenant"                                                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 54.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Update Tenant"                                                 
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 55.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Suspend Tenant"                                                
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 56.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Reactivate Tenant"                                             
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 57.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Provision Tenant + Campus + Admin"                             
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 58.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / List All Users (Platform)"                                     
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 59.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Get User (Platform)"                                           
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 60.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Disable User (Platform)"                                       
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 61.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Enable User (Platform)"                                        
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 62.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Delete User (Platform)"                                        
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 63.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / List Feature Flags"                                            
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 64.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Set Feature Flag"                                              
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 65.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Platform Overview (Super Admin Dashboard)"                     
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 66.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Platform Audit Logs"                                           
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 67.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Get Tenant Usage Stats"                                        
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 68.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Request Tenant Deletion (sends OTP)"                           
+[90m     [39m[90m                [39m[90m                                                                                            [39m
+ 69.  AssertionError  Status 200                                                                                 
+                      expected response to have status code 200 but got 401                                      
+                      at assertion:0 in test-script                                                              
+                      inside "🛡️ Platform Admin / Confirm Tenant Deletion (with OTP)"                            

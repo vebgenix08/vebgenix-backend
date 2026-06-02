@@ -25,7 +25,7 @@ export const devConfig: EnvConfig = {
   enableDatabase: false,
 
   // App
-  appBaseUrl: 'http://localhost:5173',
+  appBaseUrl: 'https://d3a3860ho28y9p.cloudfront.net',
 
   // AppSync
   enableWaf: false,

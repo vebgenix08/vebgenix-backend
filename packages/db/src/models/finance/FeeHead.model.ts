@@ -88,7 +88,7 @@ const FeeHeadSchema = new Schema<IFeeHead>(
     description:     { type: String },
     isActive:        { type: Boolean, default: true },
     createdBy:       { type: Schema.Types.ObjectId, required: true, ref: 'Profile' },
-    feeCategoryId:   { type: Schema.Types.ObjectId, ref: 'FeeCategory' },
+    feeCategoryId:   { type: Schema.Types.ObjectId },
     code:            { type: String, uppercase: true, trim: true },
     isRefundable:    { type: Boolean, default: false },
     isMandatory:     { type: Boolean, default: true },

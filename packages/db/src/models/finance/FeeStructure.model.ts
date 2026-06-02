@@ -122,7 +122,7 @@ const FeeStructureSchema = new Schema<IFeeStructure>(
     totalAmount:      { type: Number, required: true },
     isActive:         { type: Boolean, default: true },
     createdBy:        { type: Schema.Types.ObjectId, required: true, ref: 'Profile' },
-    feeCategoryId:    { type: Schema.Types.ObjectId, ref: 'FeeCategory' },
+    feeCategoryId:    { type: Schema.Types.ObjectId },
     feeScheduleId:    { type: Schema.Types.ObjectId, ref: 'FeeSchedule' },
     allocationMethod: { type: String, enum: ['PRO_RATA', 'PRIORITY_WISE', 'MANUAL'], default: 'PRO_RATA' },
     studentCategoryId:{ type: Schema.Types.ObjectId },

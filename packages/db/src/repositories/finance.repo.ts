@@ -5,7 +5,6 @@ import { FeeSchedule, IFeeSchedule } from '../models/finance/FeeSchedule.model';
 import { FeeStructure, IFeeStructure } from '../models/finance/FeeStructure.model';
 import { FeeStructureClassMapping, IFeeStructureClassMapping } from '../models/finance/FeeStructureClassMapping.model';
 import { FeeAssignment, IFeeAssignment } from '../models/finance/FeeAssignment.model';
-import { InstallmentPlan, IInstallmentPlan } from '../models/finance/InstallmentPlan.model';
 import { FeeRevision, IFeeRevision } from '../models/finance/FeeRevision.model';
 import { Invoice, IInvoice, InvoiceStatus } from '../models/finance/Invoice.model';
 import { Payment, IPayment } from '../models/finance/Payment.model';
@@ -198,25 +197,6 @@ export const FinanceRepo: any = {
 
   async updateFeeAssignment(tenantId: string, id: string, update: Partial<IFeeAssignment>) {
     return FeeAssignment.findOneAndUpdate({ tenantId, _id: toObjectId(id) }, { $set: update }, { new: true });
-  },
-
-  // =====================================================
-  // INSTALLMENT PLAN FUNCTIONS
-  // =====================================================
-  async listInstallmentPlans(tenantId: string) {
-    return InstallmentPlan.find({ tenantId }).sort({ name: 1 });
-  },
-
-  async createInstallmentPlan(tenantId: string, data: Partial<IInstallmentPlan>) {
-    return InstallmentPlan.create({ ...data, tenantId });
-  },
-
-  async updateInstallmentPlan(tenantId: string, id: string, update: Partial<IInstallmentPlan>) {
-    return InstallmentPlan.findOneAndUpdate({ tenantId, _id: toObjectId(id) }, { $set: update }, { new: true });
-  },
-
-  async deleteInstallmentPlan(tenantId: string, id: string) {
-    return InstallmentPlan.findOneAndDelete({ tenantId, _id: toObjectId(id) });
   },
 
   // =====================================================

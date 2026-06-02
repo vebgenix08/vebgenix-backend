@@ -92,7 +92,7 @@ const InvoiceSchema = new Schema<IInvoice>(
     cancelledAt:      { type: Date },
     cancelledBy:      { type: Schema.Types.ObjectId, ref: 'Profile' },
     cancelReason:     { type: String },
-    feeCategoryId:    { type: Schema.Types.ObjectId, ref: 'FeeCategory' },
+    feeCategoryId:    { type: Schema.Types.ObjectId },
     feeStructureId:   { type: Schema.Types.ObjectId, ref: 'FeeStructure' },
     allocationMethod: { type: String, enum: ['PRO_RATA', 'PRIORITY_WISE', 'MANUAL'], default: 'PRO_RATA' },
     collectionType:   { type: String, enum: ['FULL_ONLY', 'PARTIAL_ALLOWED', 'PARTIAL_WITH_MINIMUM_AMOUNT', 'PARTIAL_WITH_MINIMUM_PERCENTAGE'], default: 'PARTIAL_ALLOWED' },

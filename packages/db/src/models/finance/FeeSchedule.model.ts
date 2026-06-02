@@ -129,7 +129,7 @@ const FeeScheduleSchema = new Schema<IFeeSchedule>(
     slots:               [SlotSchema],
     isActive:            { type: Boolean, default: true },
     createdBy:           { type: String },
-    feeCategoryId:       { type: Schema.Types.ObjectId, ref: 'FeeCategory' },
+    feeCategoryId:       { type: Schema.Types.ObjectId },
     campusId:            { type: Schema.Types.ObjectId, ref: 'Campus' },
     allowPartialPayment: { type: Boolean, default: true },
     collectionType:      {

@@ -2,7 +2,7 @@
  * Finance Service Lambda — thin router
  *
  * Handles: fee heads, fee structures, fee assignments,
- *          fee schedules, installment plans, fee revisions, invoices,
+ *          fee schedules, fee revisions, invoices,
  *          payments, Razorpay, receipts, day book report, financial analytics.
  *
  * Invoked by:
@@ -12,20 +12,11 @@
  */
 import { bootstrapDB, ensureDB, FinanceRepo } from '@vebgenix/db';
 import { resolveContext } from '@vebgenix/auth';
-import { AppError, isAppError } from '@vebgenix/errors';
+import { isAppError } from '@vebgenix/errors';
 import { getTenantId } from '@vebgenix/tenant';
 import { verifyRazorpaySignature } from './razorpay';
-import { handleFeeHead } from './operations/feeHead';
-import { handleFeeSchedule } from './operations/feeSchedule';
-import { handleFeeStructure } from './operations/feeStructure';
-import { handleFeeStructureMapping } from './operations/feeStructureMapping';
-import { handleFeeAssignment } from './operations/feeAssignment';
-import { handleInstallmentPlan } from './operations/installmentPlan';
-import { handleInvoice } from './operations/invoice';
-import { handlePayment, applyOnlineSuccess } from './operations/payment';
-import { handleStudentOrder } from './operations/studentOrder';
-import { handleTransaction } from './operations/transaction';
-import { handleManualCollection } from './operations/manualCollection';
+import { applyOnlineSuccess } from './use-cases/payment';
+import { handleFinanceRoute } from './routes';
 
 function parseEvent(event: Record<string, unknown>) {
   if (event.info) {
@@ -79,43 +70,7 @@ export const handler = async (event: Record<string, unknown>, context: Record<st
     const ctx      = await resolveContext(event);
     const tenantId = getTenantId(ctx);
 
-    // Delegate to operation groups (first non-undefined wins)
-    let result: unknown;
-
-    result = await handleFeeHead(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handleFeeStructure(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handleFeeStructureMapping(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handleFeeAssignment(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handleFeeSchedule(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handleInstallmentPlan(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handleInvoice(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handlePayment(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handleStudentOrder(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handleTransaction(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    result = await handleManualCollection(operation, args, ctx, tenantId);
-    if (result !== undefined) return result;
-
-    throw new AppError('NOT_FOUND', `Unknown operation: ${operation}`);
+    return handleFinanceRoute(operation, args, ctx, tenantId);
   } catch (err) {
     if (isAppError(err)) {
       throw err;

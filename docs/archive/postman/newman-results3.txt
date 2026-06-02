@@ -1,0 +1,1241 @@
+newman
+
+Vebgenix API
+
+□ 🔐 Auth (Cognito)
+└ Get Token — User+Password
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [200 OK, 4.48kB, 817ms]
+  √  Status 200
+  ┌
+  │ '✅ Tokens saved. IdToken prefix:', 'eyJraWQiOiJaZlJhVC
+  │ tYSzA4ZmRyR1Npb3hYREF2'
+  └
+
+└ Forgot Password — Send Code
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [200 OK, 299B, 440ms]
+  √  Status 200
+  √  Code delivery returned
+
+└ Confirm Forgot Password — Reset
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [400 Bad Request, 1.07kB, 112ms]
+  √  ConfirmForgotPassword responded
+  ┌
+  │ 'ConfirmForgotPassword status:', 400
+  │ 'ConfirmForgotPassword skipped — set forgot_password_e
+  │ mail, password_reset_code, new_password env vars to te
+  │ st'
+  └
+
+└ Change Password — Logged In
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [400 Bad Request, 876B, 119ms]
+  √  ChangePassword responded
+  ┌
+  │ 'ChangePassword status:', 400
+  │ 'ChangePassword skipped — set previous_password, propo
+  │ sed_password env vars to test'
+  └
+
+└ Refresh Token
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [200 OK, 2.68kB, 317ms]
+  √  Status 200
+  ┌
+  │ '✅ Tokens refreshed.'
+  └
+
+□ ⚙️ Settings
+└ Create Academic Year
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 718B, 1304ms]
+  √  Status 200
+  ┌
+  │ 'Academic year already exists, fetching existing...'
+  └
+  √  createAcademicYear or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 736B, 637ms]
+  ┌
+  │ 'academic_year_id (from list):', '69fb5e883633f68d4d31
+  │ a50f', '2027-28'
+  └
+
+└ Set Active Academic Year
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 518B, 334ms]
+  √  Status 200
+  √  setActiveAcademicYear exists
+  √  isActive is true
+
+└ List Academic Years
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.1kB, 233ms]
+  √  Status 200
+  √  listAcademicYears exists
+  √  listAcademicYears is array
+  ┌
+  │ 'academic_year_id (from list):', '69fb5e883633f68d4d31
+  │ a50f', '2027-28'
+  └
+
+└ Create Campus
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 667B, 244ms]
+  √  Status 200
+  ┌
+  │ 'Campus already exists, fetching existing...'
+  └
+  √  createCampus or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 547B, 198ms]
+  ┌
+  │ 'campus_id (from list):', '69f9c29a690fae033907970c', 
+  │ 'Main Campus'
+  └
+
+└ List Campuses
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 563B, 189ms]
+  √  Status 200
+  √  listCampuses exists
+  √  listCampuses is array
+
+└ Create Program
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 687B, 205ms]
+  √  Status 200
+  ┌
+  │ 'createProgram error:', 'A program with this code alre
+  │ ady exists for this tenant'
+  └
+  √  createProgram or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 464B, 168ms]
+  ┌
+  │ 'No programs found — program tests will be skipped'
+  └
+
+└ List Programs
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 464B, 182ms]
+  √  Status 200
+  √  listPrograms exists
+  √  listPrograms is array
+
+└ Get Program
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 647B, 447ms]
+  √  Status 200
+  √  getProgram (soft)
+  ┌
+  │ 'getProgram:', 'Internal server error'
+  └
+
+└ Update Program
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 653B, 280ms]
+  √  Status 200
+  √  updateProgram (soft)
+  ┌
+  │ 'updateProgram:', 'Internal server error'
+  └
+
+└ Delete Program
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 653B, 269ms]
+  √  Status 200
+  √  deleteProgram (soft)
+  ┌
+  │ 'deleteProgram:', 'Internal server error'
+  └
+
+└ Dashboard Overview
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 646B, 166ms]
+  √  Status 200
+  √  dashboardOverview exists
+
+└ Get Tenant Features
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 978B, 391ms]
+  √  Status 200
+  √  getTenantFeatures exists
+
+└ Update Tenant Features
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 922B, 180ms]
+  √  Status 200
+  √  No errors
+
+└ List Audit Logs
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 9.4kB, 278ms]
+  √  Status 200
+  √  listAuditLogs exists
+
+└ List Templates
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 522B, 339ms]
+  √  Status 200
+  √  listTemplates exists
+  ┌
+  │ 'Templates count:', 0
+  └
+
+□ 👤 Identity
+└ Me (current user)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 3.73kB, 2.8s]
+  √  Status 200
+  √  me exists
+  ┌
+  │ 'me id:', '69f9c29a690fae0339079710', 'email:', 'dhanu
+  │ shags08@gmail.com', 'tenantId:', 'org_vqr1dsp1'
+  └
+
+└ List Users
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 647B, 800ms]
+  √  Status 200
+  √  listUsers exists
+  ┌
+  │ 'Users count:', 1
+  └
+
+└ Invite Staff / Onboard Staff
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 648B, 463ms]
+  √  Status 200
+  ┌
+  │ 'Errors:', '[{"path":["inviteStaff"],"data":null,"erro
+  │ rType":"Lambda:Unhandled","errorInfo":null,"locations"
+  │ :[{"line":1,"column":51,"sourceName":null}],"message":
+  │ "campusId or campusIds[0] is required"}]'
+  └
+  √  inviteStaff or already exists
+
+└ List Staff
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 461B, 323ms]
+  √  Status 200
+  √  listStaff exists
+
+└ List Employees
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 465B, 179ms]
+  √  Status 200
+  √  listEmployees exists
+
+└ Get Employee
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 649B, 495ms]
+  √  Status 200
+  ┌
+  │ 'getEmployee:', 'Internal server error'
+  └
+  √  getEmployee or no employee
+
+└ Resend Staff Invite
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 651B, 232ms]
+  √  Status 200
+  ┌
+  │ 'resendInvite:', 'Internal server error'
+  └
+  √  resendInvite or no staff
+
+└ Accept Invite
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 663B, 179ms]
+  √  Status 200
+  ┌
+  │ 'acceptInvite:', "Validation error of type SubSelectio
+  │ nRequired: Sub selection required for type null of fie
+  │ ld acceptInvite @ 'acceptInvite'"
+  └
+  √  acceptInvite or no staff
+
+└ List Roles
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 641B, 118ms]
+  √  Status 200
+  ┌
+  │ 'listRoles errors:', `[{"path":null,"locations":[{"lin
+  │ e":1,"column":9,"sourceName":null}],"message":"Validat
+  │ ion error of type FieldUndefined: Field 'listRoles' in
+  │  type 'Query' is undefined @ 'listRoles'"}]`
+  └
+  √  listRoles exists
+  √  listRoles is array
+
+□ 🎓 Admissions / Enquiries
+└ Create Enquiry
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 883B, 2.9s]
+  √  Status 200
+  √  createEnquiry exists
+  ┌
+  │ 'enquiry_id:', '69fe501e137cf9b3534e298e'
+  └
+
+└ List Enquiries
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 3.21kB, 505ms]
+  √  Status 200
+  √  listEnquiries exists
+
+└ Get Enquiry
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 879B, 248ms]
+  √  Status 200
+  √  getEnquiry exists
+
+└ Update Enquiry
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 882B, 240ms]
+  √  Status 200
+  √  No errors
+
+└ Duplicate Check
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 466B, 220ms]
+  √  Status 200
+  √  checkDuplicate exists
+
+└ Admissions Stats
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 585B, 182ms]
+  √  Status 200
+  √  admissionsStats exists
+
+└ Delete Enquiry
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 465B, 135ms]
+  √  Status 200
+  √  No crash
+
+□ 🎓 Admissions / Applications
+└ Create Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.15kB, 292ms]
+  √  Status 200
+  √  createApplication exists
+  ┌
+  │ 'application_id:', '69fe5022137cf9b3534e2a0e', '| appl
+  │ icationNumber:', 'APP/27-28/0007'
+  └
+
+└ List Applications
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 11.11kB, 280ms]
+  √  Status 200
+  √  listApplications exists
+
+└ Get Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.09kB, 187ms]
+  √  Status 200
+  √  getApplication exists
+
+└ Get Approval Queue
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 468B, 161ms]
+  √  Status 200
+  √  getApprovalQueue exists
+
+└ Submit Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.14kB, 237ms]
+  √  Status 200
+  √  No crash
+
+└ Review Application (mark Under Review)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.14kB, 251ms]
+  √  Status 200
+  √  No crash
+
+└ Get Application Reviews
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 600B, 224ms]
+  √  Status 200
+  √  getApplicationReviews exists
+
+└ Approve Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.49kB, 222ms]
+  √  Status 200
+  √  No errors
+
+└ Reject Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 634B, 100ms]
+  √  Status 200
+  √  No crash
+
+└ Verify Document
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 694B, 402ms]
+  √  Status 200
+  √  No crash
+
+└ Withdraw Application
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.55kB, 251ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Categories
+└ Create Fee Category
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 661B, 598ms]
+  √  Status 200
+  √  createFeeCategory or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 469B, 133ms]
+
+└ List Fee Categories
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 469B, 337ms]
+  √  Status 200
+  √  listFeeCategories exists
+  ┌
+  │ 'No active fee categories found — fee_category_id not 
+  │ set'
+  └
+
+└ Get Fee Category
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 648B, 158ms]
+  √  Status 200
+  √  getFeeCategory (soft)
+  ┌
+  │ 'getFeeCategory:', 'id is required'
+  └
+
+└ Update Fee Category
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 654B, 183ms]
+  √  Status 200
+  √  updateFeeCategory (soft)
+  ┌
+  │ 'updateFeeCategory:', 'id is required'
+  └
+
+└ Delete Fee Category
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 654B, 173ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Heads
+└ Create Fee Head
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 657B, 199ms]
+  √  Status 200
+  ┌
+  │ 'createFeeHead:', 'feeCategoryId is required'
+  └
+  √  createFeeHead or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 464B, 163ms]
+
+└ Update Fee Head
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 705B, 160ms]
+  √  Status 200
+  ┌
+  │ 'updateFeeHead:', 'id is required'
+  └
+  √  No crash
+
+└ List Fee Heads
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 464B, 184ms]
+  √  Status 200
+  √  listFeeHeads exists
+
+└ Delete Fee Head
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 646B, 138ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Schedules
+└ Create Fee Schedule
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 661B, 213ms]
+  √  Status 200
+  ┌
+  │ 'createFeeSchedule:', 'Internal server error'
+  └
+  √  createFeeSchedule or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 2.18kB, 145ms]
+  ┌
+  │ 'fee_schedule_id (from list):', '69fa45611ed52b49bc126
+  │ fc9', 'Annual T0WPZM'
+  └
+
+└ Update Fee Schedule
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1kB, 118ms]
+  √  Status 200
+  √  No crash
+
+└ List Fee Schedules
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 2.12kB, 165ms]
+  √  Status 200
+  √  listFeeSchedules exists
+
+└ Delete Fee Schedule
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 635B, 167ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Structures
+└ Create Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 726B, 189ms]
+  √  Status 200
+  ┌
+  │ 'createFeeStructure:', 'feeCategoryId is required'
+  └
+  √  createFeeStructure or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 528B, 169ms]
+
+└ Get Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 716B, 253ms]
+  √  Status 200
+  ┌
+  │ 'getFeeStructure:', 'Internal server error'
+  └
+  √  getFeeStructure exists
+
+└ Update Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 656B, 203ms]
+  √  Status 200
+  ┌
+  │ 'updateFeeStructure:', 'id is required'
+  └
+  √  No crash
+
+└ List Fee Structures
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 469B, 182ms]
+  √  Status 200
+  √  listFeeStructures exists
+
+└ Copy Fee Pattern to Next Year
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 526B, 165ms]
+  √  Status 200
+  √  No crash
+
+└ Delete Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 663B, 125ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Fee Assignments
+└ Get Fee Assignment Queue
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 2.89kB, 188ms]
+  √  Status 200
+  √  getFeeAssignmentQueue exists
+  ┌
+  │ 'Unassigned students count:', 12
+  └
+
+└ Assign Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 665B, 185ms]
+  √  Status 200
+  ┌
+  │ 'createFeeAssignment:', 'Internal server error'
+  └
+  √  createFeeAssignment or existing
+
+└ Get Student Fee Assignment
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 475B, 169ms]
+  √  Status 200
+  √  getStudentFeeAssignment exists
+
+└ Bulk Assign Fee Structure
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 514B, 108ms]
+  √  Status 200
+  √  bulkAssignFeeStructure exists
+  ┌
+  │ 'Bulk assign — succeeded:', 0, 'failed:', 1, 'total:',
+  │  1
+  └
+
+└ List Fee Assignments
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 470B, 183ms]
+  √  Status 200
+  √  listFeeAssignments exists
+
+└ Get Fee Assignment
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 659B, 329ms]
+  √  Status 200
+  ┌
+  │ 'getFeeAssignment:', 'Internal server error'
+  └
+  √  getFeeAssignment exists
+
+□ 💰 Finance / Invoices
+└ Get Student Invoices
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 662B, 282ms]
+  √  Status 200
+  ┌
+  │ 'getStudentInvoices:', 'Internal server error'
+  └
+  √  getStudentInvoices exists
+  √  Returns array
+
+└ List Invoices
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 6.5kB, 197ms]
+  √  Status 200
+  √  listInvoices exists
+
+└ Get Invoice
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.82kB, 153ms]
+  √  Status 200
+  √  getInvoice exists
+
+└ Student Dues
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 654B, 164ms]
+  √  Status 200
+  √  getStudentDues exists
+
+└ Create One-off Charge
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 722B, 192ms]
+  √  Status 200
+  √  createOneOffCharge exists
+
+└ Revise Invoice
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.82kB, 193ms]
+  √  Status 200
+  √  No crash
+
+└ Cancel Invoice
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.88kB, 282ms]
+  √  Status 200
+  √  No crash
+
+□ 💰 Finance / Payments
+└ Record Payment (Cash / Cheque / UPI)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 652B, 119ms]
+  √  Status 200
+  ┌
+  │ 'recordPayment errors:', 'Invoice is cancelled'
+  └
+  √  recordPayment exists
+  √  Has payment or error
+
+└ Record Payment — Manual Allocation
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 652B, 165ms]
+  √  Status 200
+  ┌
+  │ 'recordPayment manual:', 'Invoice is cancelled'
+  └
+  √  No crash
+
+└ Collect Payment By Student
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 126ms]
+  √  Status 200
+  √  collectPaymentByStudent exists
+
+└ List Payments
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 7.22kB, 138ms]
+  √  Status 200
+  √  listPayments exists
+
+└ Get Payment
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 647B, 164ms]
+  √  Status 200
+  ┌
+  │ 'getPayment:', 'Internal server error'
+  └
+  √  getPayment exists
+
+└ List Receipts
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 6.67kB, 186ms]
+  √  Status 200
+  √  listReceipts exists
+  ┌
+  │ 'receipt_id:', '69fae2b852a604ab48e898d3'
+  └
+
+└ Get Receipt
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.08kB, 228ms]
+  √  Status 200
+  √  getReceipt exists
+
+└ Create Razorpay Order
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 663B, 271ms]
+  √  Status 200
+  √  createPaymentOrder exists
+  ┌
+  │ 'Order error:', 'Internal server error'
+  └
+
+└ Verify Razorpay Signature
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 675B, 168ms]
+  √  Status 200
+  √  No crash
+  ┌
+  │ 'Response:', '{"data":{"verifyPaymentSignature":null},
+  │ "errors":[{"path":["verifyPaymentSignature"],"data":nu
+  │ ll,"errorType":"Lambda:Unhandled","errorInfo":null,"lo
+  │ cations":[{"line":1,"column":53,"sourceName":null}],'
+  └
+
+└ List Fee Revisions (by invoice)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 526B, 217ms]
+  √  Status 200
+  √  getFeeRevisions exists
+
+□ 💰 Finance / Reports
+└ Day Book Report
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 572B, 112ms]
+  √  Status 200
+  √  dayBookReport exists
+
+└ Fee Collection Analytics
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 788B, 306ms]
+  √  Status 200
+  √  feeCollectionAnalytics exists
+
+□ 📚 Academics / Classes
+└ Create Class
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 681B, 761ms]
+  √  Status 200
+  ┌
+  │ 'Class already exists, fetching existing...'
+  └
+  √  createClass or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 3.7kB, 196ms]
+  ┌
+  │ 'class_id (from list):', '69fa25e7fc42e073eb5607f0', '
+  │ API Numbering SW40KD'
+  └
+
+└ List Classes
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 3.76kB, 168ms]
+  √  Status 200
+  √  listClasses exists
+  ┌
+  │ 'Classes count:', 12
+  └
+
+└ Create Section
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 669B, 363ms]
+  √  Status 200
+  ┌
+  │ 'createSection error:', 'Unexpected error in academics
+  │ -service'
+  └
+  √  createSection or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 848B, 115ms]
+  ┌
+  │ 'section_id (from list):', '69fe462f397957680cac7c27',
+  │  'A'
+  └
+
+└ List Sections
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 848B, 295ms]
+  √  Status 200
+  √  listAllSections exists
+
+□ 📚 Academics / Subjects & Timetable Builder
+└ Create Subject
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 687B, 299ms]
+  √  Status 200
+  ┌
+  │ 'Subject already exists, fetching existing...'
+  └
+  √  createSubject or existing
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.13kB, 427ms]
+  ┌
+  │ 'subject_id (from list):', '69fe3872ea526ebb5edfba57',
+  │  'Mathematics'
+  └
+
+└ List Subjects
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.07kB, 155ms]
+  √  Status 200
+  √  listSubjects exists
+
+└ Replace Section Timetable
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 895B, 189ms]
+  √  Status 200
+  √  replaceSectionTimetable exists
+
+└ Get Section Timetable
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 813B, 134ms]
+  √  Status 200
+  √  getSectionTimetable exists
+
+└ Get Teacher Timetable
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 874B, 120ms]
+  √  Status 200
+  √  getTeacherTimetable exists
+
+□ 📚 Academics / Students
+└ Enroll Student
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 706B, 157ms]
+  √  Status 200
+  ┌
+  │ 'enrollStudent errors:', 'Possible duplicate student d
+  │ etected (1 match). Use force=true to override.'
+  └
+  √  enrollStudent or existing
+  √  Has student result
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.69kB, 307ms]
+  ┌
+  │ 'student_id (from list fallback):', '69fa25edfc42e073e
+  │ b560873', 'Application', 'Student SW40KD'
+  └
+
+└ Get Student
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.55kB, 158ms]
+  √  Status 200
+  √  getStudent exists
+
+└ Update Student
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.55kB, 180ms]
+  √  Status 200
+  √  No crash
+
+└ Assign Student to Class
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.56kB, 288ms]
+  √  Status 200
+  √  No crash
+
+└ Update Student Status
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.56kB, 144ms]
+  √  Status 200
+  √  No crash
+
+└ List Students
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 2.42kB, 300ms]
+  √  Status 200
+  √  listStudents exists
+  ┌
+  │ 'Students count:', 12
+  └
+
+□ 📚 Academics / Registration Numbers
+└ Generate Registration Numbers
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 702B, 113ms]
+  √  Status 200
+  √  generateRegistrationNumbers exists
+
+└ Freeze Registration Numbers
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 710B, 258ms]
+  √  Status 200
+  √  No crash
+  ┌
+  │ 'freezeRegistrationNumbers:', 'Registration numbers mu
+  │ st be generated before freezing'
+  └
+
+└ List Registration Batches
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.47kB, 209ms]
+  √  Status 200
+  √  listRegistrationBatches exists
+  ┌
+  │ 'Registration batches:', 2
+  └
+
+□ 📚 Academics / Roll Numbers
+└ Generate Roll Numbers — Alphabetical
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 688B, 139ms]
+  √  Status 200
+  √  generateRollNumbers exists
+
+└ Generate Roll Numbers — Sequential
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 688B, 183ms]
+  √  Status 200
+  √  generateRollNumbers exists
+
+└ Freeze Roll Numbers
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 686B, 285ms]
+  √  Status 200
+  √  No crash
+  ┌
+  │ 'freezeRollNumbers:', 'Roll numbers must be generated 
+  │ before freezing'
+  └
+
+└ List Roll Number Batches
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 884B, 180ms]
+  √  Status 200
+  √  listRollNoBatches exists
+  ┌
+  │ 'Roll number batches:', 1
+  └
+
+□ 📚 Academics / Attendance
+└ Mark Section Attendance
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 583B, 363ms]
+  √  Status 200
+  ┌
+  │ 'Marked', 1, 'records'
+  └
+  √  markSectionAttendance no crash
+
+└ Get Section Attendance (by date)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 582B, 160ms]
+  √  Status 200
+  √  getSectionAttendance exists
+  ┌
+  │ 'Records:', 1
+  └
+
+└ Get Attendance Summary (date range)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 570B, 235ms]
+  √  Status 200
+  √  getSectionAttendanceSummary exists
+  ┌
+  │ 'Summary — totalDays:', 214, '| from:', '2025-06-01', 
+  │ '| to:', '2025-12-31'
+  └
+
+└ Get Student Attendance (date range)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 470B, 223ms]
+  √  Status 200
+  ┌
+  │ 'Student attendance records:', 0
+  └
+  √  getStudentAttendance no crash
+
+□ 📚 Academics / Exams & Results
+└ Create Exam
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 939B, 164ms]
+  √  Status 200
+  √  createExam exists
+  ┌
+  │ 'exam_id:', '69fe50457f47eb4e7d1b67ee'
+  └
+  √  Has id
+
+└ List Exams
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 940B, 203ms]
+  √  Status 200
+  √  listExams exists
+
+└ Get Exam
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 936B, 166ms]
+  √  Status 200
+  √  getExam exists
+
+└ Enter Marks (single student)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 996B, 179ms]
+  √  Status 200
+  √  enterMarks response exists
+
+└ Get Exam Stats
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 587B, 194ms]
+  √  Status 200
+  √  getExamStats exists
+  ┌
+  │ 'Exam stats — avg:', 0, '| highest:', 0, '| pass:', 0,
+  │  '| fail:', 0
+  └
+
+└ Get Marks Status
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 579B, 175ms]
+  √  Status 200
+  √  getMarksStatus exists
+  ┌
+  │ 'Total entries:', 1, '| Submitted:', 0
+  └
+
+└ Get Exam Results
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1kB, 256ms]
+  √  Status 200
+  √  getExamResults exists
+
+└ Publish Results
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 466B, 169ms]
+  √  Status 200
+  √  No crash
+
+└ List Results (published)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 463B, 115ms]
+  √  Status 200
+  √  listResults exists
+
+└ Update Exam
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.07kB, 250ms]
+  √  Status 200
+  √  No errors
+
+└ Delete Exam
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 614B, 277ms]
+  √  Status 200
+  √  No crash
+
+□ 📚 Academics / Promotions
+└ Set Promotion Eligibility
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 495B, 161ms]
+  √  Status 200
+  √  setStudentPromotionEligibility exists
+  ┌
+  │ 'Updated:', 0, 'students set to ELIGIBLE'
+  └
+
+└ Auto-Evaluate Promotion Eligibility
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 691B, 131ms]
+  √  Status 200
+  √  autoEvaluatePromotionEligibility response exists
+  ┌
+  │ 'Not deployed yet:', "Validation error of type FieldUn
+  │ defined: Field 'autoEvaluatePromotionEligibility' in t
+  │ ype 'Mutation' is undefined @ 'autoEvaluatePromotionEl
+  │ igibility'"
+  └
+
+└ Promote Students — SAME_SECTION / Skip fee
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 165ms]
+  √  Status 200
+  √  promoteStudents (SAME_SECTION) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ Unexpected error in academics-service'
+  └
+
+└ Promote Students — MANUAL sections / Copy fee pattern
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 699B, 174ms]
+  √  Status 200
+  √  promoteStudents (MANUAL) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ sectionAssignments is required for MANUAL/EXCEL_IMPORT
+  │  strategy'
+  └
+
+└ Promote Students — AUTO_SHUFFLE / Assign existing fee
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 232ms]
+  √  Status 200
+  √  promoteStudents (AUTO_SHUFFLE) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ Unexpected error in academics-service'
+  └
+
+└ Promote Students — GENDER_BALANCE
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 182ms]
+  √  Status 200
+  √  promoteStudents (GENDER_BALANCE) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ Unexpected error in academics-service'
+  └
+
+└ Promote Students — CAPACITY_LIMIT
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 190ms]
+  √  Status 200
+  √  promoteStudents (CAPACITY_LIMIT) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ Unexpected error in academics-service'
+  └
+
+└ Promote Students — PERFORMANCE_RANK (by exam scores)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 143ms]
+  √  Status 200
+  √  promoteStudents (PERFORMANCE_RANK) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ Unexpected error in academics-service'
+  └
+
+└ Promote Students — SUBJECT_GROUP
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 173ms]
+  √  Status 200
+  √  promoteStudents (SUBJECT_GROUP) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ Unexpected error in academics-service'
+  └
+
+└ Promote Students — TRANSPORT_ROUTE
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 159ms]
+  √  Status 200
+  √  promoteStudents (TRANSPORT_ROUTE) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ Unexpected error in academics-service'
+  └
+
+└ Promote Students — EXCEL_IMPORT (pre-uploaded file)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 673B, 151ms]
+  √  Status 200
+  √  promoteStudents (EXCEL_IMPORT) exists
+  √  Has batch or error info
+  ┌
+  │ 'Promoted:', null, '| Strategy:', null, '| Errors:', '
+  │ Unexpected error in academics-service'
+  └
+
+└ List Promotion Batches
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 472B, 252ms]
+  √  Status 200
+  √  listPromotionBatches exists
+
+└ Get Promotion Batch
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 713B, 156ms]
+  √  Status 200
+  √  getPromotionBatch (soft)
+  ┌
+  │ 'getPromotionBatch:', 'id is required'
+  └
+
+└ List Promotion Batch Items
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 665B, 194ms]
+  √  Status 200
+  √  listPromotionBatchItems exists
+
+└ Rollback Promotion Batch
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 671B, 174ms]
+  √  Status 200
+  √  No crash
+  ┌
+  │ 'Rollback result:', `[{"path":null,"locations":[{"line
+  │ ":1,"column":45,"sourceName":null}],"message":"Validat
+  │ ion error of type FieldUndefined: Field 'rollbackPromo
+  │ tionBatch' in type 'Mutation' is undefined @ 'rollback
+  │ Promo`
+  └
+
+□ 📢 Comms
+└ Create Announcement
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 831B, 2.6s]
+  √  Status 200
+  √  createAnnouncement exists
+
+└ List Announcements
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 10.26kB, 892ms]
+  √  Status 200
+  √  listAnnouncements exists
+
+└ List Events
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 462B, 271ms]
+  √  Status 200
+  √  listEvents exists
+
+└ List Leave Requests
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 469B, 294ms]
+  √  Status 200
+  √  listLeaveRequests exists
+
+□ 📁 Storage
+└ Get Upload URL
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 2.33kB, 936ms]
+  √  Status 200
+  √  generateUploadUrl exists
+  ┌
+  │ 'Upload URL ready:', 'https://vebgenix-documents-dev-2
+  │ 78035644568.s3.ap-south-1.amazonaws.com/org_vqr1'
+  └
+
+└ Get Download URL
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 674B, 488ms]
+  √  Status 200
+  √  generateDownloadUrl exists
+
+□ 📊 Results
+└ Create Result Batch
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 661B, 2.6s]
+  √  Status 200
+  √  createResultBatch exists
+
+└ List Result Batches
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 469B, 895ms]
+  √  Status 200
+  √  listResultBatches exists
+
+└ Get Public Result (no auth)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 142ms]
+  √  Get Public Result responded
+  ┌
+  │ 'Public result status:', 401, '| body:', '{"errors":[{
+  │ "errorType":"UnauthorizedException","message":"Valid a
+  │ uthorization header not provided."}]}'
+  └
+
+□ 🔍 Audit & Cleanup
+└ List Audit Logs
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 9.24kB, 701ms]
+  √  Status 200
+  √  listAuditLogs exists
+
+└ Duplicate Student Report
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 1.12kB, 2.8s]
+  √  Status 200
+  √  getDuplicateStudentReport exists
+
+└ Merge Students
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 577B, 597ms]
+  √  Status 200
+  √  No crash
+
+□ ❤️ Health
+└ Health Check
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [200 OK, 458B, 158ms]
+  √  Health Check responded
+  ┌
+  │ 'Health status:', 200, '| body:', '{"data":{"health":"
+  │ OK"}}'
+  └
+
+□ 🛡️ Platform Admin
+└ Get Platform Token
+  POST https://cognito-idp.ap-south-1.amazonaws.com/ [400 Bad Request, 291B, 342ms]
+  √  Get Platform Token responded
+  ┌
+  │ 'Platform token not set — set platform_admin_email + p
+  │ latform_admin_password env vars to enable Platform Adm
+  │ in tests'
+  └
+
+└ List Tenants
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 151ms]
+  √  List Tenants (skipped — platform_id_token not set)
+
+└ Get Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 142ms]
+  √  Get Tenant (skipped — platform_id_token not set)
+
+└ Create Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 100ms]
+  √  Create Tenant (skipped — platform_id_token not set)
+
+└ Update Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 115ms]
+  √  Update Tenant (skipped — platform_id_token not set)
+
+└ Suspend Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 159ms]
+  √  Suspend Tenant (skipped — platform_id_token not set)
+
+└ Reactivate Tenant
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 154ms]
+  √  Reactivate Tenant (skipped — platform_id_token not set)
+
+└ Provision Tenant + Campus + Admin
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 146ms]
+  √  Provision Tenant + Campus + Admin (skipped — platform_id_token not set)
+
+└ List All Users (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 110ms]
+  √  List All Users (Platform) (skipped — platform_id_token not set)
+
+└ Get User (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 91ms]
+  √  Get User (Platform) (skipped — platform_id_token not set)
+
+└ Disable User (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 139ms]
+  √  Disable User (Platform) (skipped — platform_id_token not set)
+
+└ Enable User (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 291ms]
+  √  Enable User (Platform) (skipped — platform_id_token not set)
+
+└ Delete User (Platform)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 154ms]
+  √  Delete User (Platform) (skipped — platform_id_token not set)
+
+└ List Feature Flags
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 155ms]
+  √  List Feature Flags (skipped — platform_id_token not set)
+
+└ Set Feature Flag
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 137ms]
+  √  Set Feature Flag (skipped — platform_id_token not set)
+
+└ Platform Overview (Super Admin Dashboard)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 142ms]
+  √  Platform Overview (Super Admin Dashboard) (skipped — platform_id_token not set)
+
+└ Platform Audit Logs
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 640B, 104ms]
+  √  Platform Audit Logs (skipped — platform_id_token not set)
+
+└ Get Tenant Usage Stats
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 139ms]
+  √  Get Tenant Usage Stats (skipped — platform_id_token not set)
+
+└ Request Tenant Deletion (sends OTP)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 133ms]
+  √  Request Tenant Deletion (sends OTP) (skipped — platform_id_token not set)
+
+└ Confirm Tenant Deletion (with OTP)
+  POST https://7mvru7zcnnbxbm2vnapww47mme.appsync-api.ap-south-1.amazonaws.com/graphql [401 Unauthorized, 581B, 136ms]
+  √  Confirm Tenant Deletion (with OTP) (skipped — platform_id_token not set)
+
+┌─────────────────────────┬────────────────────┬───────────────────┐
+│                         │           executed │            failed │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│              iterations │                  1 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│                requests │                187 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│            test-scripts │                176 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│      prerequest-scripts │                  0 │                 0 │
+├─────────────────────────┼────────────────────┼───────────────────┤
+│              assertions │                344 │                 0 │
+├─────────────────────────┴────────────────────┴───────────────────┤
+│ total run duration: 1m 34.7s                                     │
+├──────────────────────────────────────────────────────────────────┤
+│ total data received: 134.26kB (approx)                           │
+├──────────────────────────────────────────────────────────────────┤
+│ average response time: 312ms [min: 91ms, max: 2.9s, s.d.: 446ms] │
+└──────────────────────────────────────────────────────────────────┘
