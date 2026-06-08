@@ -60,6 +60,9 @@ export async function buildAuthContext(
     allowedCampusIds: new Set<string>(),
   };
 
+  const normalizeRoleName = (role: { roleName?: string; role?: string } | null | undefined) =>
+    String(role?.roleName ?? role?.role ?? '').trim();
+
   const profiles = await IdentityRepo.listProfilesByAuthUserId(authUser._id.toString(), {
     isActive: true,
   });
@@ -95,11 +98,10 @@ export async function buildAuthContext(
       ctx.fullName         = profile.fullName;
       const allPerms: string[] = [];
       for (const role of profile.roles) {
+        const fallbackPermissions = ROLE_PERMISSION_FALLBACK[normalizeRoleName(role).toUpperCase()];
         if (role.permissions?.length) {
           allPerms.push(...role.permissions);
-          continue;
         }
-        const fallbackPermissions = ROLE_PERMISSION_FALLBACK[String(role.roleName).toUpperCase()];
         if (fallbackPermissions?.length) {
           allPerms.push(...fallbackPermissions);
         }
