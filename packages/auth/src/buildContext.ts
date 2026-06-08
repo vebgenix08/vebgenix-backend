@@ -2,6 +2,16 @@ import { IdentityRepo } from '@vebgenix/db';
 import { AppError } from '@vebgenix/errors';
 import { AuthContext } from './AuthContext';
 
+const ROLE_PERMISSION_FALLBACK: Record<string, string[]> = {
+  TENANT_ADMIN: ['*'],
+  PRINCIPAL: ['academics.*', 'admissions.*', 'finance.read'],
+  TEACHER: ['academics.classes.read', 'academics.attendance.mark', 'academics.exams.update'],
+  ACCOUNTANT: ['finance.*'],
+  ADMISSIONS_OFFICER: ['admissions.*'],
+  RECEPTIONIST: ['admissions.enquiry.*', 'admissions.application.read'],
+  STAFF: ['academics.read'],
+};
+
 /**
  * Cognito identity claims — the shape AppSync puts in event.identity.claims
  * and what aws-jwt-verify returns after verifying an Access/ID token.
@@ -84,7 +94,16 @@ export async function buildAuthContext(
     if (profile) {
       ctx.fullName         = profile.fullName;
       const allPerms: string[] = [];
-      for (const role of profile.roles) allPerms.push(...role.permissions);
+      for (const role of profile.roles) {
+        if (role.permissions?.length) {
+          allPerms.push(...role.permissions);
+          continue;
+        }
+        const fallbackPermissions = ROLE_PERMISSION_FALLBACK[String(role.roleName).toUpperCase()];
+        if (fallbackPermissions?.length) {
+          allPerms.push(...fallbackPermissions);
+        }
+      }
       ctx.permissions      = new Set(allPerms);
       ctx.allowedCampusIds = new Set(profile.campusAccess.map(c => c.campusId.toString()));
       ctx.membership = resolvedMembership;

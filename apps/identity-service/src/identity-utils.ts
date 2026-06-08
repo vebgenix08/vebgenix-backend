@@ -1,14 +1,25 @@
 export type ResolveTenantId = () => string;
 
-const ROLE_LABELS: Record<string, string> = {
-  TENANT_ADMIN: 'Tenant Admin',
-  PRINCIPAL: 'Principal',
-  TEACHER: 'Teacher',
-  ACCOUNTANT: 'Accountant',
-  ADMISSIONS_OFFICER: 'Admissions Officer',
-  RECEPTIONIST: 'Receptionist',
-  STAFF: 'Staff',
+export type RoleCatalogEntry = {
+  id: string;
+  roleName: string;
+  permissions: string[];
+  description: string;
 };
+
+export const ROLE_CATALOG: RoleCatalogEntry[] = [
+  { id: 'TENANT_ADMIN', roleName: 'Tenant Admin', permissions: ['*'], description: 'Full access to all tenant features' },
+  { id: 'PRINCIPAL', roleName: 'Principal', permissions: ['academics.*', 'admissions.*', 'finance.read'], description: 'School principal' },
+  { id: 'TEACHER', roleName: 'Teacher', permissions: ['academics.classes.read', 'academics.attendance.mark', 'academics.exams.update'], description: 'Class teacher / subject teacher' },
+  { id: 'ACCOUNTANT', roleName: 'Accountant', permissions: ['finance.*'], description: 'Finance and fee management' },
+  { id: 'ADMISSIONS_OFFICER', roleName: 'Admissions Officer', permissions: ['admissions.*'], description: 'Manages enquiries and applications' },
+  { id: 'RECEPTIONIST', roleName: 'Receptionist', permissions: ['admissions.enquiry.*', 'admissions.application.read'], description: 'Front-desk reception' },
+  { id: 'STAFF', roleName: 'Staff', permissions: ['academics.read'], description: 'General staff with read-only access' },
+];
+
+const ROLE_LABELS = Object.fromEntries(
+  ROLE_CATALOG.map((entry) => [entry.id, entry.roleName]),
+) as Record<string, string>;
 
 function normalizeRoleKey(value: string) {
   return value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -17,6 +28,11 @@ function normalizeRoleKey(value: string) {
 export function canonicalRoleName(value: string) {
   const normalized = normalizeRoleKey(value);
   return ROLE_LABELS[normalized] ?? value.trim();
+}
+
+export function canonicalRolePermissions(value: string) {
+  const normalized = normalizeRoleKey(value);
+  return ROLE_CATALOG.find((entry) => entry.id === normalized)?.permissions ?? [];
 }
 
 export function toGql(doc: unknown): Record<string, unknown> | null {
@@ -62,10 +78,11 @@ export function buildRoleAssignments(roleIds?: string[]) {
       const raw = String(role ?? '').trim();
       if (!raw) return null;
       const roleName = canonicalRoleName(raw);
+      const permissions = canonicalRolePermissions(raw);
       return {
         roleId: null as never,
         roleName,
-        permissions: [] as string[],
+        permissions,
       };
     })
     .filter((role): role is { roleId: never; roleName: string; permissions: string[] } => role !== null);
