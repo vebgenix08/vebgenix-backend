@@ -6,7 +6,7 @@ import { AuditLogger } from '@vebgenix/audit';
 import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
 import type { ResolveTenantId } from '../identity-utils';
-import { toGql, toGqlProfile } from '../identity-utils';
+import { buildRoleAssignments, toGql, toGqlProfile } from '../identity-utils';
 
 async function createUser(ctx: AuthContext, input: {
   email: string;
@@ -47,7 +47,7 @@ async function createUser(ctx: AuthContext, input: {
     isAllCampuses:  false,
     isPrimaryOwner: false,
     campusAccess:   [{ campusId: new Types.ObjectId(input.campusId), campusName: '' }],
-    roles:          (input.roleIds ?? []).filter(id => /^[a-f0-9]{24}$/i.test(id)).map((id) => ({ roleId: new Types.ObjectId(id), roleName: '', permissions: [] })),
+    roles:          buildRoleAssignments(input.roleIds),
   });
 
   await AuditLogger.logTenantAction({

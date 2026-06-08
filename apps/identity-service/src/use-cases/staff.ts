@@ -6,7 +6,7 @@ import { AuditLogger } from '@vebgenix/audit';
 import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
 import type { ResolveTenantId } from '../identity-utils';
-import { toGql } from '../identity-utils';
+import { buildRoleAssignments, toGql } from '../identity-utils';
 import { ensureInvitedStaffCognitoUser } from './invites';
 
 async function inviteStaff(ctx: AuthContext, input: {
@@ -56,21 +56,21 @@ async function inviteStaff(ctx: AuthContext, input: {
 
   let profile = existing;
   if (!profile) {
-    profile = await IdentityRepo.createProfile({
-      tenantId,
-      authUserId:     authUser._id as Types.ObjectId,
-      email:          input.email,
-      fullName:       input.fullName,
+      profile = await IdentityRepo.createProfile({
+        tenantId,
+        authUserId:     authUser._id as Types.ObjectId,
+        email:          input.email,
+        fullName:       input.fullName,
       phone:          input.phone,
       personaRole:    'STAFF',
       isActive:       true,
       isAllCampuses:  input.allCampuses === true,
-      isPrimaryOwner: false,
-      campusAccess:   input.allCampuses === true
+        isPrimaryOwner: false,
+        campusAccess:   input.allCampuses === true
         ? []
         : (input.campusIds?.length ? input.campusIds : [campusId]).map(id => ({ campusId: new Types.ObjectId(id!), campusName: '' })),
-      roles:          (input.roleIds ?? []).filter(id => /^[a-f0-9]{24}$/i.test(id)).map((id) => ({ roleId: new Types.ObjectId(id), roleName: '', permissions: [] })),
-    });
+      roles:          buildRoleAssignments(input.roleIds),
+      });
   }
 
   const employeeCode = input.employeeCode ?? `EMP${new Types.ObjectId().toString().slice(-8).toUpperCase()}`;

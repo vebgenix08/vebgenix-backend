@@ -3,7 +3,7 @@ import { AppError } from '@vebgenix/errors';
 import { authorize } from '@vebgenix/permissions';
 import type { AuthContext } from '@vebgenix/auth';
 import type { ResolveTenantId } from '../identity-utils';
-import { toGql } from '../identity-utils';
+import { canonicalRoleName, toGql } from '../identity-utils';
 
 export async function handleRoles(
   operation: string,
@@ -30,12 +30,13 @@ export async function handleRoles(
       const profile  = await IdentityRepo.findProfileById(tenantId, targetId);
       if (!profile) throw new AppError('NOT_FOUND', 'User not found');
       const roles        = (profile.roles ?? []) as unknown as Array<Record<string, unknown>>;
-      const roleName     = (args.role ?? args.roleId) as string;
+      const roleName     = canonicalRoleName(String(args.role ?? args.roleId ?? ''));
+      if (!roleName) throw new AppError('BAD_REQUEST', 'role is required');
       const campusId     = args.campusId as string | undefined;
-      if (roles.some((r) => r.role === roleName && r.campusId?.toString() === campusId)) {
+      if (roles.some((r) => canonicalRoleName(String(r.roleName ?? r.role ?? '')) === roleName && r.campusId?.toString() === campusId)) {
         throw new AppError('CONFLICT', 'Role already assigned');
       }
-      roles.push({ role: roleName, campusId, assignedAt: new Date(), assignedBy: ctx.membership!.profileId });
+      roles.push({ roleName, campusId, assignedAt: new Date(), assignedBy: ctx.membership!.profileId });
       return toGql(await IdentityRepo.updateProfile(tenantId, targetId, {
         roles: roles as never,
       }));
@@ -46,8 +47,9 @@ export async function handleRoles(
       const tenantId = resolveTenantId();
       const profile  = await IdentityRepo.findProfileById(tenantId, args.id as string);
       if (!profile) throw new AppError('NOT_FOUND', 'User not found');
+      const roleName = canonicalRoleName(String(args.role ?? args.roleId ?? ''));
       const filtered = (profile.roles ?? []).filter(
-        (r) => (r as unknown as Record<string, unknown>).role !== args.role
+        (r) => canonicalRoleName(String((r as unknown as Record<string, unknown>).roleName ?? (r as unknown as Record<string, unknown>).role ?? '')) !== roleName
       );
       await IdentityRepo.updateProfile(tenantId, args.id as string, {
         roles: filtered as never,

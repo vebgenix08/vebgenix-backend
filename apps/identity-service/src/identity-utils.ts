@@ -1,5 +1,24 @@
 export type ResolveTenantId = () => string;
 
+const ROLE_LABELS: Record<string, string> = {
+  TENANT_ADMIN: 'Tenant Admin',
+  PRINCIPAL: 'Principal',
+  TEACHER: 'Teacher',
+  ACCOUNTANT: 'Accountant',
+  ADMISSIONS_OFFICER: 'Admissions Officer',
+  RECEPTIONIST: 'Receptionist',
+  STAFF: 'Staff',
+};
+
+function normalizeRoleKey(value: string) {
+  return value.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+export function canonicalRoleName(value: string) {
+  const normalized = normalizeRoleKey(value);
+  return ROLE_LABELS[normalized] ?? value.trim();
+}
+
 export function toGql(doc: unknown): Record<string, unknown> | null {
   if (!doc) return null;
   const plain = JSON.parse(JSON.stringify(doc)) as Record<string, unknown>;
@@ -35,4 +54,19 @@ export function getAvatarUploadKey(tenantId: string | undefined, userId: string)
 
 export function getTenantLogoUploadKey(tenantId: string) {
   return `${tenantId}/logos/tenant-logo-${Date.now()}.png`;
+}
+
+export function buildRoleAssignments(roleIds?: string[]) {
+  return (roleIds ?? [])
+    .map((role) => {
+      const raw = String(role ?? '').trim();
+      if (!raw) return null;
+      const roleName = canonicalRoleName(raw);
+      return {
+        roleId: null as never,
+        roleName,
+        permissions: [] as string[],
+      };
+    })
+    .filter((role): role is { roleId: never; roleName: string; permissions: string[] } => role !== null);
 }

@@ -3,6 +3,23 @@ import { AuthContext } from '@vebgenix/auth';
 import { AppError } from '@vebgenix/errors';
 import { TenantFeature } from '@vebgenix/db';
 
+function permissionMatches(granted: string, required: string): boolean {
+  if (granted === required || granted === '*') return true;
+  if (!granted.endsWith('.*')) return false;
+
+  const prefix = granted.slice(0, -2);
+  return required === prefix || required.startsWith(`${prefix}.`);
+}
+
+function hasPermission(ctx: AuthContext, required: string): boolean {
+  if (ctx.isPlatformAdmin) return true;
+  if (ctx.permissions.has(required)) return true;
+  for (const granted of ctx.permissions) {
+    if (permissionMatches(granted, required)) return true;
+  }
+  return false;
+}
+
 export function requirePermission(...permissions: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const ctx = req.ctx as AuthContext;
@@ -10,7 +27,7 @@ export function requirePermission(...permissions: string[]) {
       res.status(401).json({ code: 'UNAUTHORIZED', message: 'Not authenticated' });
       return;
     }
-    const missing = permissions.filter(p => !ctx.permissions.has(p) && !ctx.isPlatformAdmin);
+    const missing = permissions.filter((p) => !hasPermission(ctx, p));
     if (missing.length > 0) {
       res.status(403).json({ code: 'FORBIDDEN', message: `Missing permissions: ${missing.join(', ')}` });
       return;
@@ -101,7 +118,13 @@ export function authorize(ctx: AuthContext, ...permissions: string[]): void {
       if (p.startsWith('finance.')) effective.add(p);
     }
   }
-  const missing = permissions.filter(p => !effective.has(p));
+  const missing = permissions.filter((p) => {
+    if (effective.has(p)) return false;
+    for (const granted of effective) {
+      if (permissionMatches(granted, p)) return false;
+    }
+    return true;
+  });
   if (missing.length > 0) {
     throw new AppError('FORBIDDEN', `Missing permissions: ${missing.join(', ')}`);
   }
