@@ -136,7 +136,7 @@ export async function handleApplications(
     case 'PATCH:/api/admissions/applications/:id': {
       authorize(ctx, 'admissions.application.update');
       const input = ((args.input as Record<string, unknown>) ?? {}) as Record<string, unknown>;
-      return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, {
+      const updated = await AdmissionsRepo.updateApplication(tenantId, args.id as string, {
         ...(input.academicYearId ? { academicYearId: input.academicYearId } : {}),
         ...(input.programId ? { programId: input.programId } : {}),
         ...(input.studentName ? { studentName: input.studentName } : {}),
@@ -152,7 +152,11 @@ export async function handleApplications(
         ...(input.documents ? { documents: input.documents } : {}),
         ...(input.photoUrl !== undefined ? { photoUrl: input.photoUrl } : {}),
         ...(input.photoKey !== undefined ? { photoKey: input.photoKey } : {}),
-      } as never));
+      } as never);
+      if (!updated) {
+        throw new AppError('NOT_FOUND', 'Application not found');
+      }
+      return toGql(updated);
     }
     case 'submitApplication':
     case 'POST:/api/admissions/applications/:id/submit': {
