@@ -413,6 +413,9 @@ export async function handleStudents(
         };
         if (sectionId) update.sectionId = new Types.ObjectId(sectionId);
         const student = await AcademicsRepo.updateStudent(tenantId, studentId, update);
+        if (!student) {
+          throw new AppError('NOT_FOUND', 'Student not found');
+        }
         try {
           await FinanceRepo.autoGenerateFeeOrdersForStudent({
             tenantId,
@@ -425,7 +428,7 @@ export async function handleStudents(
         } catch (err) {
           console.warn('[assignStudentClass] Auto fee order generation failed (non-fatal):', err);
         }
-        return student;
+        return toGqlStudent(student);
       }
 
     case 'bulkAssignStudentsToClass':
