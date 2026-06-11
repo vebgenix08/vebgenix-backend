@@ -405,22 +405,34 @@ export async function handleStudents(
       authorize(ctx, 'academics.students.assign');
       {
         const input = ((args.input as Record<string, unknown>) ?? args) as Record<string, unknown>;
+        const studentId = (args.studentId ?? args.id) as string;
+        const classId = input.classId as string;
+        const sectionId = input.sectionId as string | undefined;
         const update: Record<string, unknown> = {
-          classId: new Types.ObjectId(input.classId as string),
+          classId: new Types.ObjectId(classId),
         };
-        if (input.sectionId) update.sectionId = new Types.ObjectId(input.sectionId as string);
-        return AcademicsRepo.updateStudent(
-          tenantId,
-          (args.studentId ?? args.id) as string,
-          update,
-        );
+        if (sectionId) update.sectionId = new Types.ObjectId(sectionId);
+        const student = await AcademicsRepo.updateStudent(tenantId, studentId, update);
+        try {
+          await FinanceRepo.autoGenerateFeeOrdersForStudent({
+            tenantId,
+            studentId,
+            classId,
+            sectionId,
+            academicYearId: (input.academicYearId as string) || (student as unknown as Record<string, unknown>)?.academicYearId?.toString?.() || '',
+            campusId: (input.campusId as string) || (student as unknown as Record<string, unknown>)?.campusId?.toString?.() || '',
+          });
+        } catch (err) {
+          console.warn('[assignStudentClass] Auto fee order generation failed (non-fatal):', err);
+        }
+        return student;
       }
 
     case 'bulkAssignStudentsToClass':
     case 'POST:/api/tenant/students/bulk-assign-class': {
       authorize(ctx, 'academics.students.assign');
-      const { classId, sectionId, studentIds } = args as {
-        classId: string; sectionId?: string; studentIds: string[];
+      const { classId, sectionId, studentIds, academicYearId, campusId } = args as {
+        classId: string; sectionId?: string; studentIds: string[]; academicYearId?: string; campusId?: string;
       };
       if (!Array.isArray(studentIds) || studentIds.length === 0) {
         throw new AppError('BAD_REQUEST', 'studentIds must be a non-empty array');
@@ -431,6 +443,22 @@ export async function handleStudents(
         { tenantId, _id: { $in: studentIds.map(id => new Types.ObjectId(id)) } },
         { $set: update },
       );
+      if (academicYearId && campusId) {
+        for (const studentId of studentIds) {
+          try {
+            await FinanceRepo.autoGenerateFeeOrdersForStudent({
+              tenantId,
+              studentId,
+              classId,
+              sectionId,
+              academicYearId,
+              campusId,
+            });
+          } catch (err) {
+            console.warn('[bulkAssignStudentsToClass] Auto fee order generation failed (non-fatal):', err);
+          }
+        }
+      }
       return { updatedCount: result.modifiedCount, classId };
     }
 
@@ -441,8 +469,9 @@ export async function handleStudents(
       if (!Array.isArray(classIds) || classIds.length === 0) {
         throw new AppError('BAD_REQUEST', 'classIds required');
       }
+      const campusId = args.campusId as string | undefined;
       const filter: Record<string, unknown> = { tenantId, status: 'ACTIVE', classId: { $exists: false } };
-      if (args.campusId) filter.campusId = new Types.ObjectId(args.campusId as string);
+      if (campusId) filter.campusId = new Types.ObjectId(campusId);
       const students = await Student.find(filter).lean();
       if (students.length === 0) return { assignedCount: 0 };
       const bulkOps = students.map((s, i) => ({
@@ -457,6 +486,22 @@ export async function handleStudents(
         },
       }));
       const r = await Student.bulkWrite(bulkOps);
+      if (campusId) {
+        for (const s of students) {
+          const assignedClassId = classIds[students.indexOf(s) % classIds.length];
+          try {
+            await FinanceRepo.autoGenerateFeeOrdersForStudent({
+              tenantId,
+              studentId: String(s._id),
+              classId: assignedClassId,
+              academicYearId,
+              campusId,
+            });
+          } catch (err) {
+            console.warn('[randomAssignStudentsToClass] Auto fee order generation failed (non-fatal):', err);
+          }
+        }
+      }
       return { assignedCount: r.modifiedCount };
     }
 
