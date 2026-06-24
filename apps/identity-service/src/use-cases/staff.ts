@@ -7,7 +7,46 @@ import { Types } from 'mongoose';
 import type { AuthContext } from '@vebgenix/auth';
 import type { ResolveTenantId } from '../identity-utils';
 import { buildRoleAssignments, toGql } from '../identity-utils';
-import { ensureInvitedStaffCognitoUser } from './invites';
+import { UsernameExistsException } from '@aws-sdk/client-cognito-identity-provider';
+
+async function sendStaffInviteEmail(
+  toEmail: string,
+  fullName: string,
+  tempPassword: string,
+  context: { tenantId: string; role: string },
+) {
+  const { SESClient, SendEmailCommand } = await import('@aws-sdk/client-ses');
+  const ses = new SESClient({ region: process.env.COGNITO_REGION ?? 'ap-south-1' });
+  const appBaseUrl = process.env.APP_BASE_URL ?? 'https://app.vebgenix.com';
+  const params = new URLSearchParams({
+    email: toEmail,
+    token: tempPassword,
+    tenantId: context.tenantId,
+    role: context.role,
+  });
+  const link = `${appBaseUrl.replace(/\/$/, '')}/invite/accept?${params.toString()}`;
+  const fromEmail = process.env.INVITE_FROM_EMAIL ?? 'contact@vebgenix.com';
+  const firstName = fullName.split(' ')[0] || fullName;
+
+  await ses.send(new SendEmailCommand({
+    Source: fromEmail,
+    Destination: { ToAddresses: [toEmail] },
+    Message: {
+      Subject: { Data: 'You\'ve been invited to Vebgenix — Activate your account' },
+      Body: {
+        Html: {
+          Data: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f6f9;margin:0;padding:40px 0">
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+<tr><td style="background:#1a56db;padding:32px 40px;text-align:center"><h1 style="color:#fff;margin:0;font-size:24px;font-weight:700">Vebgenix</h1></td></tr>
+<tr><td style="padding:40px"><h2 style="color:#111827;margin:0 0 12px">Hello ${firstName},</h2><p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 24px">You've been invited to join <strong>Vebgenix</strong> as a staff member.<br>Click the button below to activate your account and set your password.</p><div style="text-align:center;margin:32px 0"><a href="${link}" style="background:#1a56db;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:16px;font-weight:600;display:inline-block">Activate My Account</a></div><p style="color:#6b7280;font-size:13px;line-height:1.5;margin:24px 0 0">This link is valid for 7 days.</p></td></tr>
+</table></td></tr></table></body></html>`,
+        },
+        Text: { Data: `Hello ${firstName},\n\nYou've been invited to Vebgenix as a staff member.\n\nActivate your account here:\n${link}\n\nThis link is valid for 7 days.\n\nVebgenix Team` },
+      },
+    },
+  }));
+}
 
 async function inviteStaff(ctx: AuthContext, input: {
   email: string;
@@ -47,12 +86,28 @@ async function inviteStaff(ctx: AuthContext, input: {
   const userPoolId = process.env.COGNITO_USER_POOL_ID;
   if (!userPoolId) throw new AppError('INTERNAL', 'COGNITO_USER_POOL_ID not configured');
 
-  await ensureInvitedStaffCognitoUser({
-    userPoolId,
-    email: input.email,
-    fullName: input.fullName,
-    tenantId,
-  });
+  const tempPassword = process.env.DEFAULT_INVITE_PASSWORD ?? `Tmp${new Types.ObjectId().toString().slice(-8)}!aA1`;
+  const { AdminCreateUserCommand, CognitoIdentityProviderClient } =
+    await import('@aws-sdk/client-cognito-identity-provider');
+  const cognito = new CognitoIdentityProviderClient({ region: process.env.COGNITO_REGION });
+  try {
+    await cognito.send(new AdminCreateUserCommand({
+      UserPoolId: userPoolId,
+      Username: input.email,
+      TemporaryPassword: tempPassword,
+      MessageAction: 'SUPPRESS',
+      DesiredDeliveryMediums: ['EMAIL'],
+      UserAttributes: [
+        { Name: 'email', Value: input.email },
+        { Name: 'email_verified', Value: 'true' },
+        { Name: 'name', Value: input.fullName },
+        { Name: 'custom:tenantId', Value: tenantId },
+        { Name: 'custom:role', Value: input.staffType ?? 'STAFF' },
+      ],
+    }));
+  } catch (error) {
+    if (!(error instanceof UsernameExistsException)) throw error;
+  }
 
   let profile = existing;
   if (!profile) {
@@ -97,6 +152,11 @@ async function inviteStaff(ctx: AuthContext, input: {
     });
     profile = await IdentityRepo.updateProfile(tenantId, profile._id.toString(), { employeeId: employee._id } as never) ?? profile;
   }
+
+  await sendStaffInviteEmail(input.email, input.fullName, tempPassword, {
+    tenantId,
+    role: input.staffType ?? 'STAFF',
+  });
 
   await AuditLogger.logTenantAction({
     ctx,

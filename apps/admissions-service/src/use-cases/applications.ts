@@ -8,6 +8,58 @@ import { Types } from 'mongoose';
 import { exactNameRegex, normalizeDateOnly, studentNameConditions, toGql } from '../admissions-utils';
 import { generateApplicationNo } from '../admissions-numbering';
 
+async function findDuplicateApplicationMatch(
+  tenantId: string,
+  input: { studentName: string; phone: string; dateOfBirth?: string; email?: string },
+) {
+  const exactDob = normalizeDateOnly(input.dateOfBirth);
+  if (!input.studentName || !input.phone || !exactDob) return null;
+
+  const existingStudent = await Student.findOne({
+    tenantId,
+    $or: studentNameConditions(input.studentName),
+    phone: input.phone,
+    dateOfBirth: exactDob,
+    status: { $ne: 'INACTIVE' },
+  }).lean();
+  if (existingStudent) {
+    return {
+      kind: 'student' as const,
+      reference: (existingStudent as unknown as Record<string, unknown>).registrationNumber as string | undefined,
+    };
+  }
+
+  const existingApplication = await Application.findOne({
+    tenantId,
+    studentName: exactNameRegex(input.studentName),
+    phone: input.phone,
+    dateOfBirth: exactDob,
+    status: { $nin: ['REJECTED', 'WITHDRAWN'] },
+  }).lean();
+  if (existingApplication) {
+    return {
+      kind: 'application' as const,
+      reference: (existingApplication as unknown as Record<string, unknown>).applicationNumber as string | undefined,
+    };
+  }
+
+  if (input.email) {
+    const existingByEmail = await Student.findOne({
+      tenantId,
+      email: input.email,
+      status: { $ne: 'INACTIVE' },
+    }).lean();
+    if (existingByEmail) {
+      return {
+        kind: 'student' as const,
+        reference: (existingByEmail as unknown as Record<string, unknown>).registrationNumber as string | undefined,
+      };
+    }
+  }
+
+  return null;
+}
+
 async function createApplication(ctx: AuthContext, input: {
   campusId: string;
   academicYearId: string;
@@ -44,35 +96,19 @@ async function createApplication(ctx: AuthContext, input: {
   if (!resolvedName)  throw new AppError('BAD_REQUEST', 'studentName is required');
   if (!resolvedPhone) throw new AppError('BAD_REQUEST', 'phone is required');
 
-  const exactDob = normalizeDateOnly(input.dateOfBirth);
-  if (resolvedName && resolvedPhone && exactDob) {
-    const existingApplication = await Application.findOne({
-      tenantId,
-      studentName: exactNameRegex(resolvedName),
-      phone: resolvedPhone,
-      dateOfBirth: exactDob,
-      status: { $nin: ['REJECTED', 'WITHDRAWN'] },
-    }).lean();
-    if (existingApplication) {
-      throw new AppError(
-        'CONFLICT',
-        `A matching application already exists for ${resolvedName}. Application #: ${existingApplication.applicationNumber}`,
-      );
-    }
-
-    const existingStudent = await Student.findOne({
-      tenantId,
-      $or: studentNameConditions(resolvedName),
-      phone: resolvedPhone,
-      dateOfBirth: exactDob,
-      status: { $ne: 'INACTIVE' },
-    }).lean();
-    if (existingStudent) {
-      throw new AppError(
-        'CONFLICT',
-        `A matching student record already exists for ${resolvedName}. Registration #: ${existingStudent.registrationNumber}`,
-      );
-    }
+  const duplicate = await findDuplicateApplicationMatch(tenantId, {
+    studentName: resolvedName,
+    phone: resolvedPhone,
+    dateOfBirth: input.dateOfBirth,
+    email: resolvedEmail,
+  });
+  if (duplicate) {
+    throw new AppError(
+      'CONFLICT',
+      duplicate.kind === 'student'
+        ? `A matching student record already exists for ${resolvedName}. Registration #: ${duplicate.reference ?? 'unknown'}`
+        : `A matching application already exists for ${resolvedName}. Application #: ${duplicate.reference ?? 'unknown'}`,
+    );
   }
 
   const applicationNumber = await generateApplicationNo(tenantId, input.academicYearId);
@@ -164,6 +200,22 @@ export async function handleApplications(
       const app = await AdmissionsRepo.findApplicationById(tenantId, args.id as string);
       if (!app) throw new AppError('NOT_FOUND', 'Application not found');
       if (app.status !== 'DRAFT') throw new AppError('BAD_REQUEST', `Cannot submit — status is ${app.status}`);
+      const duplicate = await findDuplicateApplicationMatch(tenantId, {
+        studentName: String((app as unknown as Record<string, unknown>).studentName ?? ''),
+        phone: String((app as unknown as Record<string, unknown>).phone ?? ''),
+        dateOfBirth: (app as unknown as Record<string, unknown>).dateOfBirth
+          ? new Date((app as unknown as Record<string, unknown>).dateOfBirth as string).toISOString()
+          : undefined,
+        email: (app as unknown as Record<string, unknown>).email as string | undefined,
+      });
+      if (duplicate) {
+        throw new AppError(
+          'CONFLICT',
+          duplicate.kind === 'student'
+            ? `A matching student record already exists for ${String((app as unknown as Record<string, unknown>).studentName ?? '')}. Registration #: ${duplicate.reference ?? 'unknown'}`
+            : `A matching application already exists for ${String((app as unknown as Record<string, unknown>).studentName ?? '')}. Application #: ${duplicate.reference ?? 'unknown'}`,
+        );
+      }
       return toGql(await AdmissionsRepo.updateApplication(tenantId, args.id as string, {
         status: 'SUBMITTED',
         submittedAt: new Date(),
